@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from tags import TagDetector
-from cup import CupDetector, UltralyticsYOLOCupDetector
+from cup import CupDetector
 from imu import IMUFusion
 from output import OutputFormatter
 from utils.geometry import pixel_and_depth_to_cam_point, relative_position_of_point_in_arm_frame
@@ -21,20 +21,23 @@ class VisionSystem:
         dist_coeffs: np.ndarray,
         marker_length_m: float,
         assumed_cup_diameter_m: float = 0.08,
-        detector_kind: str = "contour",
-        yolo_model_path: Optional[str] = None,
+        yolo_model_path: str = "vision/models/yolo11n.pt",
         yolo_device: Optional[str] = None,
+        yolo_conf: float = 0.35,
+        yolo_iou: float = 0.45,
     ) -> None:
         self.tag_detector = TagDetector(camera_matrix, dist_coeffs, marker_length_m)
-        if detector_kind == "yolo11" and yolo_model_path is not None:
-            self.cup_detector = UltralyticsYOLOCupDetector(
-                camera_matrix=camera_matrix,
-                weights_path=yolo_model_path,
-                assumed_cup_diameter_m=assumed_cup_diameter_m,
-                device=yolo_device,
-            )
-        else:
-            self.cup_detector = CupDetector(camera_matrix, assumed_cup_diameter_m)
+        
+        # Always use YOLO for cup detection
+        self.cup_detector = CupDetector(
+            camera_matrix=camera_matrix,
+            weights_path=yolo_model_path,
+            assumed_cup_diameter_m=assumed_cup_diameter_m,
+            device=yolo_device,
+            conf=yolo_conf,
+            iou=yolo_iou,
+        )
+        
         self.imu_fusion = IMUFusion()
         self.camera_matrix = camera_matrix
 
@@ -44,6 +47,7 @@ class VisionSystem:
         imu_delta_T_cam_from_arm: Optional[np.ndarray] = None,
         mode: str = "cup",
     ) -> Dict[str, Any]:
+        
         # 1) IMU predict
         if imu_delta_T_cam_from_arm is not None:
             self.imu_fusion.predict_with_imu(imu_delta_T_cam_from_arm)
@@ -81,12 +85,37 @@ class VisionSystem:
             )
             cup_relative_position_m = (float(cup_arm_xyz[0]), float(cup_arm_xyz[1]), float(cup_arm_xyz[2]))
 
-        # 6) Build output
+        # 6) Build output with tag detection
+        tag_detected = False
+        tag_ids = []
+        tag_positions = []
+        
+        if mode == "tag" and tag_result is not None:
+            tag_detected = hasattr(tag_result, 'tag_ids') and tag_result.tag_ids is not None and len(tag_result.tag_ids) > 0
+            if tag_detected:
+                tag_ids = tag_result.tag_ids.tolist() if hasattr(tag_result.tag_ids, 'tolist') else list(tag_result.tag_ids)
+                # Add position data if available
+                if hasattr(tag_result, 'tvecs') and tag_result.tvecs is not None:
+                    for i, tvec in enumerate(tag_result.tvecs):
+                        if i < len(tag_ids):
+                            tag_positions.append({
+                                "id": tag_ids[i],
+                                "position": {
+                                    "x": float(tvec[0][0]) if tvec.ndim > 1 else float(tvec[0]),
+                                    "y": float(tvec[1][0]) if tvec.ndim > 1 else float(tvec[1]),
+                                    "z": float(tvec[2][0]) if tvec.ndim > 1 else float(tvec[2]),
+                                }
+                            })
+        
         result = OutputFormatter.build_output(
             cup_detected=cup_det.detected,
             cup_relative_position_m=cup_relative_position_m,
             arm_pose_corrected_cam_from_arm=arm_pose_corrected,
+            tag_detected=tag_detected,
+            tag_ids=tag_ids,
+            tag_positions=tag_positions,
         )
+        
         return result
 
 
