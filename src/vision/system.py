@@ -39,20 +39,24 @@ class VisionSystem:
         self.camera_matrix = camera_matrix
 
     def process_frame(
-        self, frame_bgr: np.ndarray, imu_delta_T_cam_from_arm: Optional[np.ndarray] = None
+        self,
+        frame_bgr: np.ndarray,
+        imu_delta_T_cam_from_arm: Optional[np.ndarray] = None,
+        mode: str = "cup",
     ) -> Dict[str, Any]:
         # 1) IMU predict
         if imu_delta_T_cam_from_arm is not None:
             self.imu_fusion.predict_with_imu(imu_delta_T_cam_from_arm)
 
-        # 2) Tag detection → vision pose for arm/hand in camera frame (choose tag by ID policy)
-        tag_result = self.tag_detector.detect_and_estimate(frame_bgr)
+        # 2) Tag detection (optional by mode) → vision pose for arm/hand in camera frame
         vision_T_cam_from_arm = None
-        if tag_result.tvecs is not None and tag_result.rvecs is not None and len(tag_result.tag_ids) > 0:
-            # Here we simply use the first detected tag as the arm reference.
-            rvec = tag_result.rvecs[0]
-            tvec = tag_result.tvecs[0]
-            vision_T_cam_from_arm = self.tag_detector.rvec_tvec_to_matrix(rvec, tvec)
+        if mode == "tag":
+            tag_result = self.tag_detector.detect_and_estimate(frame_bgr)
+            if tag_result.tvecs is not None and tag_result.rvecs is not None and len(tag_result.tag_ids) > 0:
+                # Use first detected tag as reference
+                rvec = tag_result.rvecs[0]
+                tvec = tag_result.tvecs[0]
+                vision_T_cam_from_arm = self.tag_detector.rvec_tvec_to_matrix(rvec, tvec)
 
         # 3) Correct IMU with vision if available
         if vision_T_cam_from_arm is not None:
@@ -60,8 +64,12 @@ class VisionSystem:
 
         arm_pose_corrected = self.imu_fusion.pose.transform_cam_from_arm
 
-        # 4) Cup detection
-        cup_det = self.cup_detector.detect(frame_bgr)
+        # 4) Cup detection (only in cup mode)
+        if mode == "cup":
+            cup_det = self.cup_detector.detect(frame_bgr)
+        else:
+            from cup import CupDetectionResult  # lightweight dataclass import
+            cup_det = CupDetectionResult(False, None, None, None)
 
         # 5) Compute relative position of cup in arm frame
         cup_relative_position_m: Optional[Tuple[float, float, float]] = None
