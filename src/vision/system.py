@@ -6,9 +6,7 @@ import numpy as np
 from tags import TagDetector
 from cup import CupDetector
 from imu import IMUFusion
-from output import OutputFormatter
-from utils.geometry import pixel_and_depth_to_cam_point, relative_position_of_point_in_arm_frame
-from cup import CupDetectionResult
+
 
 class VisionSystem:
     """
@@ -21,7 +19,7 @@ class VisionSystem:
         dist_coeffs: np.ndarray,
         marker_length_m: float,
         assumed_cup_diameter_m: float = 0.08,
-        yolo_model_path: str = "models/yolo11n.pt",
+        yolo_model_path: str = "models/yolo11s.pt",
         yolo_device: Optional[str] = None,
         yolo_conf: float = 0.35,
         yolo_iou: float = 0.45,
@@ -65,17 +63,6 @@ class VisionSystem:
            "tag_result": tag_result,
            "cup_result": cup_result,
         }
-
-    '''
-    def _compute_relative_position_of_cup(self, cup_det: CupDetectionResult, arm_pose_corrected: np.ndarray) -> Tuple[float, float, float]:
-        if cup_det.detected and cup_det.pixel_center is not None and cup_det.distance_m is not None:
-            u, v = cup_det.pixel_center
-            cup_cam_xyz = pixel_and_depth_to_cam_point(u, v, cup_det.distance_m, self.camera_matrix)
-            cup_arm_xyz = relative_position_of_point_in_arm_frame(
-                arm_pose_corrected, cup_cam_xyz
-            )
-            return cup_arm_xyz
-    '''
     
 
 
