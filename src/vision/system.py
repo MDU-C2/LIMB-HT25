@@ -19,7 +19,7 @@ class VisionSystem:
         dist_coeffs: np.ndarray,
         marker_length_m: float,
         assumed_cup_diameter_m: float = 0.08,
-        yolo_model_path: str = "models/yolo11s.pt",
+        yolo_model_path: str = "yolo11s.pt",
         yolo_device: Optional[str] = None,
         yolo_conf: float = 0.35,
         yolo_iou: float = 0.45,

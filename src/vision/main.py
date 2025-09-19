@@ -30,10 +30,55 @@ def load_camera_calibration(calibration_path: Optional[str] = None) -> tuple[np.
     return K, dist
 
 
+def normalize_yolo_model_path(model_name: str) -> str:
+    """
+    Ensure the YOLO model path always points to the models folder in src/vision/models.
+    
+    Args:
+        model_name: Model name (e.g., "yolo11s.pt", "yolo11n.pt", "yolo11m.pt")
+    
+    Returns:
+        Full path to the model in src/vision/models/
+        
+    Raises:
+        FileNotFoundError: If the model file doesn't exist in the models directory
+    """
+    # Get the directory of this file (src/vision/)
+    vision_dir = os.path.dirname(__file__)
+    models_dir = os.path.join(vision_dir, "models")
+    
+    # Extract just the filename if a full path was provided
+    model_filename = os.path.basename(model_name)
+    
+    # Ensure it has .pt extension
+    if not model_filename.endswith('.pt'):
+        model_filename += '.pt'
+    
+    # Construct the full path
+    full_path = os.path.join(models_dir, model_filename)
+    
+    # Check if the model file exists
+    if not os.path.isfile(full_path):
+        # List available models for helpful error message
+        available_models = []
+        if os.path.isdir(models_dir):
+            available_models = [f for f in os.listdir(models_dir) if f.endswith('.pt')]
+        
+        error_msg = f"YOLO model '{model_filename}' not found in {models_dir}"
+        if available_models:
+            error_msg += f"\nAvailable models: {', '.join(available_models)}"
+        else:
+            error_msg += f"\nNo .pt model files found in {models_dir}"
+        
+        raise FileNotFoundError(error_msg)
+    
+    return full_path
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--show", action="store_true", help="Display camera frames in a window")
-    parser.add_argument("--yolo-model", type=str, default="vision/models/yolo11s.pt", help="Path to YOLO .pt model")
+    parser.add_argument("--yolo-model", type=str, default="yolo11s.pt", help="YOLO model name (e.g., yolo11s.pt, yolo11n.pt). Will be loaded from src/vision/models/. Available: yolo11n.pt, yolo11s.pt")
     parser.add_argument("--yolo-device", type=str, default=None, help="Device for YOLO (e.g., cuda:0 on Jetson)")
     parser.add_argument("--yolo-conf", type=float, default=0.35, help="YOLO confidence threshold")
     parser.add_argument("--yolo-iou", type=float, default=0.45, help="YOLO IoU threshold")
@@ -41,11 +86,19 @@ def main() -> None:
     parser.add_argument("--calib", type=str, default=None, help="Path to calibration JSON (defaults to utils/camera_calibration.json)")
     args = parser.parse_args()
     camera_matrix, dist_coeffs = load_camera_calibration(args.calib)
+    
+    try:
+        # Normalize the YOLO model path to always point to src/vision/models/
+        normalized_model_path = normalize_yolo_model_path(args.yolo_model)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        return
+    
     system = VisionSystem(
         camera_matrix,
         dist_coeffs,
         marker_length_m=0.03,
-        yolo_model_path=args.yolo_model,
+        yolo_model_path=normalized_model_path,
         yolo_device=args.yolo_device,
         yolo_conf=args.yolo_conf,
         yolo_iou=args.yolo_iou,
