@@ -8,7 +8,7 @@ from cup import CupDetector
 from imu import IMUFusion
 from output import OutputFormatter
 from utils.geometry import pixel_and_depth_to_cam_point, relative_position_of_point_in_arm_frame
-
+from cup import CupDetectionResult
 
 class VisionSystem:
     """
@@ -21,7 +21,7 @@ class VisionSystem:
         dist_coeffs: np.ndarray,
         marker_length_m: float,
         assumed_cup_diameter_m: float = 0.08,
-        yolo_model_path: str = "vision/models/yolo11n.pt",
+        yolo_model_path: str = "models/yolo11n.pt",
         yolo_device: Optional[str] = None,
         yolo_conf: float = 0.35,
         yolo_iou: float = 0.45,
@@ -40,6 +40,7 @@ class VisionSystem:
         
         self.imu_fusion = IMUFusion()
         self.camera_matrix = camera_matrix
+        self.dist_coeffs = dist_coeffs
 
     def process_frame(
         self,
@@ -48,74 +49,33 @@ class VisionSystem:
         mode: str = "cup",
     ) -> Dict[str, Any]:
         
-        # 1) IMU predict
-        if imu_delta_T_cam_from_arm is not None:
-            self.imu_fusion.predict_with_imu(imu_delta_T_cam_from_arm)
 
-        # 2) Tag detection (optional by mode) → vision pose for arm/hand in camera frame
-        vision_T_cam_from_arm = None
+        # 1) Tag detection (optional by mode) → vision pose for arm/hand in camera frame
+        #vision_T_cam_from_arm = None
+        tag_result = None
         if mode == "tag":
             tag_result = self.tag_detector.detect_and_estimate(frame_bgr)
-            if tag_result.tvecs is not None and tag_result.rvecs is not None and len(tag_result.tag_ids) > 0:
-                # Use first detected tag as reference
-                rvec = tag_result.rvecs[0]
-                tvec = tag_result.tvecs[0]
-                vision_T_cam_from_arm = self.tag_detector.rvec_tvec_to_matrix(rvec, tvec)
-
-        # 3) Correct IMU with vision if available
-        if vision_T_cam_from_arm is not None:
-            self.imu_fusion.correct_with_vision(vision_T_cam_from_arm)
-
-        arm_pose_corrected = self.imu_fusion.pose.transform_cam_from_arm
-
-        # 4) Cup detection (only in cup mode)
+           
+        # 2) Cup detection (only in cup mode)
+        cup_result = None
         if mode == "cup":
-            cup_det = self.cup_detector.detect(frame_bgr)
-        else:
-            from cup import CupDetectionResult  # lightweight dataclass import
-            cup_det = CupDetectionResult(False, None, None, None)
+            cup_result = self.cup_detector.detect(frame_bgr)
+        
+        return {
+           "tag_result": tag_result,
+           "cup_result": cup_result,
+        }
 
-        # 5) Compute relative position of cup in arm frame
-        cup_relative_position_m: Optional[Tuple[float, float, float]] = None
+    '''
+    def _compute_relative_position_of_cup(self, cup_det: CupDetectionResult, arm_pose_corrected: np.ndarray) -> Tuple[float, float, float]:
         if cup_det.detected and cup_det.pixel_center is not None and cup_det.distance_m is not None:
             u, v = cup_det.pixel_center
             cup_cam_xyz = pixel_and_depth_to_cam_point(u, v, cup_det.distance_m, self.camera_matrix)
             cup_arm_xyz = relative_position_of_point_in_arm_frame(
                 arm_pose_corrected, cup_cam_xyz
             )
-            cup_relative_position_m = (float(cup_arm_xyz[0]), float(cup_arm_xyz[1]), float(cup_arm_xyz[2]))
-
-        # 6) Build output with tag detection
-        tag_detected = False
-        tag_ids = []
-        tag_positions = []
-        
-        if mode == "tag" and tag_result is not None:
-            tag_detected = hasattr(tag_result, 'tag_ids') and tag_result.tag_ids is not None and len(tag_result.tag_ids) > 0
-            if tag_detected:
-                tag_ids = tag_result.tag_ids.tolist() if hasattr(tag_result.tag_ids, 'tolist') else list(tag_result.tag_ids)
-                # Add position data if available
-                if hasattr(tag_result, 'tvecs') and tag_result.tvecs is not None:
-                    for i, tvec in enumerate(tag_result.tvecs):
-                        if i < len(tag_ids):
-                            tag_positions.append({
-                                "id": tag_ids[i],
-                                "position": {
-                                    "x": float(tvec[0][0]) if tvec.ndim > 1 else float(tvec[0]),
-                                    "y": float(tvec[1][0]) if tvec.ndim > 1 else float(tvec[1]),
-                                    "z": float(tvec[2][0]) if tvec.ndim > 1 else float(tvec[2]),
-                                }
-                            })
-        
-        result = OutputFormatter.build_output(
-            cup_detected=cup_det.detected,
-            cup_relative_position_m=cup_relative_position_m,
-            arm_pose_corrected_cam_from_arm=arm_pose_corrected,
-            tag_detected=tag_detected,
-            tag_ids=tag_ids,
-            tag_positions=tag_positions,
-        )
-        
-        return result
+            return cup_arm_xyz
+    '''
+    
 
 

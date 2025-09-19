@@ -7,10 +7,10 @@ import cv2
 
 @dataclass
 class CupDetectionResult:
-    detected: bool
-    pixel_center: Optional[Tuple[int, int]]
+    detected: bool # Flag if cup is detected
+    pixel_center: Optional[Tuple[int, int]] # Center of cup in pixels
     bounding_box: Optional[Tuple[int, int, int, int]]  # x, y, w, h
-    distance_m: Optional[float]
+    distance_m: Optional[float] # Distance of cup from camera in meters
 
 
 class CupDetector:

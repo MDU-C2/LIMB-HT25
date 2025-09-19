@@ -9,6 +9,7 @@ import numpy as np
 
 from system import VisionSystem
 from tags.camera_calibration import load_calibration_json
+from visualization import visualize_tag_detection, visualize_cup_detection
 
 
 def load_camera_calibration(calibration_path: Optional[str] = None) -> tuple[np.ndarray, np.ndarray]:
@@ -32,7 +33,7 @@ def load_camera_calibration(calibration_path: Optional[str] = None) -> tuple[np.
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--show", action="store_true", help="Display camera frames in a window")
-    parser.add_argument("--yolo-model", type=str, default="vision/models/yolo11n.pt", help="Path to YOLO .pt model")
+    parser.add_argument("--yolo-model", type=str, default="vision/models/yolo11s.pt", help="Path to YOLO .pt model")
     parser.add_argument("--yolo-device", type=str, default=None, help="Device for YOLO (e.g., cuda:0 on Jetson)")
     parser.add_argument("--yolo-conf", type=float, default=0.35, help="YOLO confidence threshold")
     parser.add_argument("--yolo-iou", type=float, default=0.45, help="YOLO IoU threshold")
@@ -50,89 +51,60 @@ def main() -> None:
         yolo_iou=args.yolo_iou,
     )
 
-    # Prefer AVFoundation on macOS for stability
-    cap = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
-    # Reduce internal buffering to lower latency and potential threading issues
-    try:
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    except Exception:
-        pass
-    if not cap.isOpened():
-        raise RuntimeError("Unable to open camera 0")
+    cap = cv2.VideoCapture(0)
+   
 
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret or frame is None:
+    while True:
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            break
+
+        # Optional: Provide IMU delta transform per frame. Using identity here as placeholder.
+        imu_delta = np.eye(4, dtype=np.float64)
+      
+      
+        result = system.process_frame(frame, imu_delta, mode=args.mode)
+        #print(json.dumps(result), end="\r")
+        '''
+        result = OutputFormatter.build_output(
+            cup_detected=cup_det.detected,
+            cup_relative_position_m=cup_relative_position_m,
+            arm_pose_corrected_cam_from_arm=arm_pose_corrected,
+            tag_detected=tag_detected,
+            tag_ids=tag_result.tag_ids,
+            tag_positions=tag_positions,
+        )
+        '''
+
+
+        if args.show:
+            
+            if args.mode == "cup":
+                
+                print("Cup mode: frame shape {frame.shape}, showing window...", end="\r", flush=True)
+                frame = visualize_cup_detection(frame, result["cup_result"])
+
+            if args.mode == "tag":
+                
+                print("Tag mode: frame shape {frame.shape}, showing window...", end="\r", flush=True)
+                #print(f"Tag result: {result['tag_result']}")
+                frame = visualize_tag_detection(frame, result["tag_result"], system.camera_matrix, system.dist_coeffs)
+             
+                
+            
+            # Always show the camera window
+           
+            cv2.imshow("Vision", frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
                 break
 
-            # Optional: Provide IMU delta transform per frame. Using identity here as placeholder.
-            imu_delta = np.eye(4, dtype=np.float64)
-            try:
-                result = system.process_frame(frame, imu_delta, mode=args.mode)
-                #print(json.dumps(result), end="\r")
 
-            except Exception:
-                # Skip frame on unexpected errors to avoid crashing
-                continue
-
-            if args.show:
-                # Add visualization overlays based on mode
-                if args.mode == "cup":
-                    try:
-                        cup_det = system.cup_detector.detect(frame)
-                        if cup_det.detected and cup_det.bounding_box is not None:
-                            x, y, w, h = cup_det.bounding_box
-                            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                            if cup_det.pixel_center is not None:
-                                cx, cy = cup_det.pixel_center
-                                cv2.circle(frame, (cx, cy), 3, (0, 255, 0), -1)
-                        # Draw detection flag in top-right corner
-                        flag_text = "True" if cup_det.detected else "False"
-                        color = (0, 200, 0) if cup_det.detected else (0, 0, 255)
-                        font = cv2.FONT_HERSHEY_SIMPLEX
-                        scale = 0.8
-                        thickness = 2
-                        (text_w, text_h), _ = cv2.getTextSize(flag_text, font, scale, thickness)
-                        margin = 10
-                        x_right = frame.shape[1] - text_w - margin
-                        y_top = margin + text_h
-                        bg_margin = 6
-                        cv2.rectangle(
-                            frame,
-                            (x_right - bg_margin, y_top - text_h - bg_margin),
-                            (x_right + text_w + bg_margin, y_top + bg_margin // 2),
-                            (0, 0, 0),
-                            -1,
-                        )
-                        cv2.putText(frame, flag_text, (x_right, y_top), font, scale, color, thickness, cv2.LINE_AA)
-                    except Exception:
-                        pass
-                else:
-                    
-                    # Tag mode - no visualization overlays, just raw camera feed
-                    print(f"Tag mode: frame shape {frame.shape}, showing window...", end="\r", flush=True)
-                
-                # Always show the camera window
-                try:
-                    cv2.imshow("Vision", frame)
-                    key = cv2.waitKey(1) & 0xFF
-                    if key == ord('q'):
-                        break
-                except Exception as e:
-                    print(f"Display error: {e}")
-                    # If GUI not available, continue headless
-                    pass
-
-            # Throttle loop slightly
-            time.sleep(0.005 if args.show else 0.01)
-    finally:
-        cap.release()
-        if 'args' in locals() and args.show:
-            try:
-                cv2.destroyAllWindows()
-            except Exception:
-                pass
+        # Throttle loop slightly
+        #time.sleep(0.005 if args.show else 0.01)
+    cap.release()
+    cv2.destroyAllWindows()
+    
 
 
 if __name__ == "__main__":
