@@ -394,3 +394,18 @@ fp-info-cache
 
 # Local project settings
 *.kicad_prl
+
+# ESP-IDF
+
+build/
+sdkconfig
+sdkconfig.old
+
+# Nix
+
+# Ignore build outputs from performing a nix-build or `nix build` command
+result
+result-*
+
+# Ignore automatically generated direnv output
+.direnv
