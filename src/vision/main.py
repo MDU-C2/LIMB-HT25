@@ -142,6 +142,18 @@ def main() -> None:
                 print("Tag mode: frame shape {frame.shape}, showing window...", end="\r", flush=True)
                 #print(f"Tag result: {result['tag_result']}")
                 frame = visualize_tag_detection(frame, result["tag_result"], system.camera_matrix, system.dist_coeffs)
+                
+                # Print coordinate information to terminal
+                if result["tag_coordinates"] is not None and len(result["tag_coordinates"]) > 0:
+                    print(f"\nDetected {len(result['tag_coordinates'])} tags with coordinates:")
+                    for tag_id, coord_info in result["tag_coordinates"].items():
+                        pos = coord_info['position']
+                        orient = coord_info['orientation']
+                        distance = coord_info['distance']
+                        print(f"  Tag {tag_id}: Pos({pos['x']:.3f}, {pos['y']:.3f}, {pos['z']:.3f})m, "
+                              f"Dist: {distance:.3f}m, RPY({orient['roll']:.1f}, {orient['pitch']:.1f}, {orient['yaw']:.1f})°")
+                else:
+                    print("No tags detected", end="\r")
              
                 
             

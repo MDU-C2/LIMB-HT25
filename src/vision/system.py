@@ -6,6 +6,7 @@ import numpy as np
 from tags import TagDetector
 from cup import CupDetector
 from imu import IMUFusion
+from visualization import calculate_camera_relative_coordinates
 
 
 class VisionSystem:
@@ -49,10 +50,13 @@ class VisionSystem:
         
 
         # 1) Tag detection (optional by mode) → vision pose for arm/hand in camera frame
-        #vision_T_cam_from_arm = None
         tag_result = None
+        tag_coordinates = None
         if mode == "tag":
             tag_result = self.tag_detector.detect_and_estimate(frame_bgr)
+            # Calculate camera-relative coordinates for all detected tags
+            if tag_result is not None:
+                tag_coordinates = calculate_camera_relative_coordinates(tag_result)
            
         # 2) Cup detection (only in cup mode)
         cup_result = None
@@ -61,6 +65,7 @@ class VisionSystem:
         
         return {
            "tag_result": tag_result,
+           "tag_coordinates": tag_coordinates,
            "cup_result": cup_result,
         }
     
