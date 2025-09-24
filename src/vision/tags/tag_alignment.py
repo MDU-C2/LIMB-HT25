@@ -1,0 +1,270 @@
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+import numpy as np
+import cv2
+
+
+@dataclass
+class TagAlignment:
+    """Represents an alignment between two tags."""
+    tag1_id: int
+    tag2_id: int
+    alignment_type: str  # 'vertical', 'horizontal', 'parallel', etc.
+    confidence: float  # 0.0 to 1.0
+    distance_m: float
+    angle_deg: float
+
+
+@dataclass
+class TagInfo:
+    """Information about a detected tag."""
+    tag_id: int
+    position: np.ndarray  # 3D position in camera frame
+    rotation_matrix: np.ndarray  # 3x3 rotation matrix
+    transform_matrix: np.ndarray  # 4x4 transform matrix
+
+
+class RobotArmTagConfig:
+    """Configuration for robot arm tag placement."""
+    
+    # Define tag IDs and their expected positions on the robot arm
+    TAG_POSITIONS = {
+        0: "hand_top",      # First tag on top of the hand
+        1: "hand_side",     # Second on side of the hand/on thumb
+        2: "forearm_top",   # Third on top of the forearm
+        3: "forearm_bottom", # Fourth on bottom side of the forearm
+        4: "upper_arm_top", # Fifth on top of the upper arm (bicep)
+        5: "upper_arm_bottom" # Sixth on bottom of the upper arm (tricep)
+    }
+    
+    # Define expected alignments between tags
+    EXPECTED_ALIGNMENTS = [
+        # Vertical alignments (tags should be vertically aligned)
+        (0, 2, "vertical"),    # hand_top with forearm_top
+        (1, 3, "vertical"),    # hand_side with forearm_bottom
+        (2, 4, "vertical"),    # forearm_top with upper_arm_top
+        (3, 5, "vertical"),    # forearm_bottom with upper_arm_bottom
+        
+        # Horizontal alignments (tags should be horizontally aligned)
+        (0, 1, "horizontal"),  # hand_top with hand_side
+        (2, 3, "horizontal"),  # forearm_top with forearm_bottom
+        (4, 5, "horizontal"),  # upper_arm_top with upper_arm_bottom
+        
+        # Parallel alignments (tags should be parallel to each other)
+        (0, 4, "parallel"),    # hand_top with upper_arm_top
+        (1, 5, "parallel"),    # hand_side with upper_arm_bottom
+    ]
+
+
+class TagAlignmentDetector:
+    """Detects alignments between ArUco tags on the robot arm."""
+    
+    def __init__(self, alignment_threshold_deg: float = 15.0, distance_threshold_m: float = 0.5):
+        """
+        Initialize the alignment detector.
+        
+        Args:
+            alignment_threshold_deg: Maximum angle deviation for alignment (degrees)
+            distance_threshold_m: Maximum distance for considering tags as aligned (meters)
+        """
+        self.alignment_threshold_deg = alignment_threshold_deg
+        self.distance_threshold_m = distance_threshold_m
+        self.config = RobotArmTagConfig()
+    
+    def extract_tag_info(self, tag_detection_result) -> Dict[int, TagInfo]:
+        """
+        Extract tag information from detection result.
+        
+        Args:
+            tag_detection_result: TagDetectionResult from TagDetector
+            
+        Returns:
+            Dictionary mapping tag_id to TagInfo
+        """
+        tag_info_dict = {}
+        
+        if (tag_detection_result.tag_ids is None or 
+            tag_detection_result.rvecs is None or 
+            tag_detection_result.tvecs is None):
+            return tag_info_dict
+        
+        for i, tag_id in enumerate(tag_detection_result.tag_ids):
+            if i < len(tag_detection_result.rvecs) and i < len(tag_detection_result.tvecs):
+                rvec = tag_detection_result.rvecs[i].flatten()
+                tvec = tag_detection_result.tvecs[i].flatten()
+                
+                # Convert to rotation matrix
+                rotation_matrix, _ = cv2.Rodrigues(rvec)
+                
+                # Create 4x4 transform matrix
+                transform_matrix = np.eye(4)
+                transform_matrix[:3, :3] = rotation_matrix
+                transform_matrix[:3, 3] = tvec
+                
+                tag_info = TagInfo(
+                    tag_id=int(tag_id),
+                    position=tvec,
+                    rotation_matrix=rotation_matrix,
+                    transform_matrix=transform_matrix
+                )
+                
+                tag_info_dict[int(tag_id)] = tag_info
+        
+        return tag_info_dict
+    
+    def check_vertical_alignment(self, tag1: TagInfo, tag2: TagInfo) -> Tuple[bool, float, float]:
+        """
+        Check if two tags are vertically aligned.
+        
+        Args:
+            tag1: First tag info
+            tag2: Second tag info
+            
+        Returns:
+            Tuple of (is_aligned, confidence, angle_deg)
+        """
+        # Calculate the vector between the two tags
+        vector = tag2.position - tag1.position
+        
+        # For vertical alignment, we expect the X and Z components to be small
+        # compared to the Y component (assuming Y is up/down)
+        horizontal_distance = np.sqrt(vector[0]**2 + vector[2]**2)
+        vertical_distance = abs(vector[1])
+        
+        if vertical_distance < 0.01:  # Too close to determine alignment
+            return False, 0.0, 0.0
+        
+        # Calculate the angle from vertical
+        angle_rad = np.arctan2(horizontal_distance, vertical_distance)
+        angle_deg = np.degrees(angle_rad)
+        
+        # Check if within threshold
+        is_aligned = angle_deg <= self.alignment_threshold_deg
+        
+        # Calculate confidence (higher confidence for smaller angles)
+        confidence = max(0.0, 1.0 - (angle_deg / self.alignment_threshold_deg))
+        
+        return is_aligned, confidence, angle_deg
+    
+    def check_horizontal_alignment(self, tag1: TagInfo, tag2: TagInfo) -> Tuple[bool, float, float]:
+        """
+        Check if two tags are horizontally aligned.
+        
+        Args:
+            tag1: First tag info
+            tag2: Second tag info
+            
+        Returns:
+            Tuple of (is_aligned, confidence, angle_deg)
+        """
+        # Calculate the vector between the two tags
+        vector = tag2.position - tag1.position
+        
+        # For horizontal alignment, we expect the Y component to be small
+        # compared to the X and Z components
+        horizontal_distance = np.sqrt(vector[0]**2 + vector[2]**2)
+        vertical_distance = abs(vector[1])
+        
+        if horizontal_distance < 0.01:  # Too close to determine alignment
+            return False, 0.0, 0.0
+        
+        # Calculate the angle from horizontal
+        angle_rad = np.arctan2(vertical_distance, horizontal_distance)
+        angle_deg = np.degrees(angle_rad)
+        
+        # Check if within threshold
+        is_aligned = angle_deg <= self.alignment_threshold_deg
+        
+        # Calculate confidence (higher confidence for smaller angles)
+        confidence = max(0.0, 1.0 - (angle_deg / self.alignment_threshold_deg))
+        
+        return is_aligned, confidence, angle_deg
+    
+    def check_parallel_alignment(self, tag1: TagInfo, tag2: TagInfo) -> Tuple[bool, float, float]:
+        """
+        Check if two tags are parallel (have similar orientations).
+        
+        Args:
+            tag1: First tag info
+            tag2: Second tag info
+            
+        Returns:
+            Tuple of (is_aligned, confidence, angle_deg)
+        """
+        # Compare the Z-axes of both tags (assuming Z points out of the tag)
+        z1 = tag1.rotation_matrix[:, 2]
+        z2 = tag2.rotation_matrix[:, 2]
+        
+        # Calculate the angle between the Z-axes
+        dot_product = np.dot(z1, z2)
+        dot_product = np.clip(dot_product, -1.0, 1.0)  # Clamp to avoid numerical errors
+        angle_rad = np.arccos(dot_product)
+        angle_deg = np.degrees(angle_rad)
+        
+        # Check if within threshold
+        is_aligned = angle_deg <= self.alignment_threshold_deg
+        
+        # Calculate confidence (higher confidence for smaller angles)
+        confidence = max(0.0, 1.0 - (angle_deg / self.alignment_threshold_deg))
+        
+        return is_aligned, confidence, angle_deg
+    
+    def detect_alignments(self, tag_detection_result) -> List[TagAlignment]:
+        """
+        Detect all alignments between detected tags.
+        
+        Args:
+            tag_detection_result: TagDetectionResult from TagDetector
+            
+        Returns:
+            List of TagAlignment objects
+        """
+        alignments = []
+        tag_info_dict = self.extract_tag_info(tag_detection_result)
+        
+        # Check each expected alignment
+        for tag1_id, tag2_id, alignment_type in self.config.EXPECTED_ALIGNMENTS:
+            if tag1_id in tag_info_dict and tag2_id in tag_info_dict:
+                tag1 = tag_info_dict[tag1_id]
+                tag2 = tag_info_dict[tag2_id]
+                
+                # Calculate distance between tags
+                distance = np.linalg.norm(tag2.position - tag1.position)
+                
+                # Skip if tags are too far apart
+                if distance > self.distance_threshold_m:
+                    continue
+                
+                # Check alignment based on type
+                if alignment_type == "vertical":
+                    is_aligned, confidence, angle_deg = self.check_vertical_alignment(tag1, tag2)
+                elif alignment_type == "horizontal":
+                    is_aligned, confidence, angle_deg = self.check_horizontal_alignment(tag1, tag2)
+                elif alignment_type == "parallel":
+                    is_aligned, confidence, angle_deg = self.check_parallel_alignment(tag1, tag2)
+                else:
+                    continue
+                
+                if is_aligned:
+                    alignment = TagAlignment(
+                        tag1_id=tag1_id,
+                        tag2_id=tag2_id,
+                        alignment_type=alignment_type,
+                        confidence=confidence,
+                        distance_m=distance,
+                        angle_deg=angle_deg
+                    )
+                    alignments.append(alignment)
+        
+        return alignments
+    
+    def get_tag_name(self, tag_id: int) -> str:
+        """Get the human-readable name for a tag ID."""
+        return self.config.TAG_POSITIONS.get(tag_id, f"tag_{tag_id}")
+    
+    def get_alignment_description(self, alignment: TagAlignment) -> str:
+        """Get a human-readable description of an alignment."""
+        tag1_name = self.get_tag_name(alignment.tag1_id)
+        tag2_name = self.get_tag_name(alignment.tag2_id)
+        
+        return f"{tag1_name} <-> {tag2_name}"# ({alignment.alignment_type})"
