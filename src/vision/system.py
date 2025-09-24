@@ -49,18 +49,18 @@ class VisionSystem:
     ) -> Dict[str, Any]:
         
 
-        # 1) Tag detection (optional by mode) → vision pose for arm/hand in camera frame
+        # 1) Tag detection (tag mode or combined mode)
         tag_result = None
         tag_coordinates = None
-        if mode == "tag":
+        if mode in ["tag", "combined"]:
             tag_result = self.tag_detector.detect_and_estimate(frame_bgr)
             # Calculate camera-relative coordinates for all detected tags
             if tag_result is not None:
                 tag_coordinates = calculate_camera_relative_coordinates(tag_result)
            
-        # 2) Cup detection (only in cup mode)
+        # 2) Cup detection (cup mode or combined mode)
         cup_result = None
-        if mode == "cup":
+        if mode in ["cup", "combined"]:
             cup_result = self.cup_detector.detect(frame_bgr)
         
         return {

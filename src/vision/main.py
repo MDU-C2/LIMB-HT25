@@ -9,7 +9,7 @@ import numpy as np
 
 from system import VisionSystem
 from tags.camera_calibration import load_calibration_json
-from visualization import visualize_tag_detection, visualize_cup_detection
+from visualization import visualize_tag_detection, visualize_cup_detection, visualize_combined_detection, calculate_tag_cup_distance
 
 
 def load_camera_calibration(calibration_path: Optional[str] = None) -> tuple[np.ndarray, np.ndarray]:
@@ -82,7 +82,7 @@ def main() -> None:
     parser.add_argument("--yolo-device", type=str, default=None, help="Device for YOLO (e.g., cuda:0 on Jetson)")
     parser.add_argument("--yolo-conf", type=float, default=0.35, help="YOLO confidence threshold")
     parser.add_argument("--yolo-iou", type=float, default=0.45, help="YOLO IoU threshold")
-    parser.add_argument("--mode", choices=["cup", "tag"], default="cup", help="Select detection pipeline: cup or tag")
+    parser.add_argument("--mode", choices=["cup", "tag", "combined"], default="cup", help="Select detection pipeline: cup, tag, or combined")
     parser.add_argument("--calib", type=str, default=None, help="Path to calibration JSON (defaults to utils/camera_calibration.json)")
     args = parser.parse_args()
     camera_matrix, dist_coeffs = load_camera_calibration(args.calib)
@@ -137,7 +137,7 @@ def main() -> None:
                 print("Cup mode: frame shape {frame.shape}, showing window...", end="\r", flush=True)
                 frame = visualize_cup_detection(frame, result["cup_result"])
 
-            if args.mode == "tag":
+            elif args.mode == "tag":
                 
                 print("Tag mode: frame shape {frame.shape}, showing window...", end="\r", flush=True)
                 #print(f"Tag result: {result['tag_result']}")
@@ -154,6 +154,47 @@ def main() -> None:
                               f"Dist: {distance:.3f}m, RPY({orient['roll']:.1f}, {orient['pitch']:.1f}, {orient['yaw']:.1f})°")
                 else:
                     print("No tags detected", end="\r")
+            
+            elif args.mode == "combined":
+                
+                print("Combined mode: frame shape {frame.shape}, showing window...", end="\r", flush=True)
+                frame = visualize_combined_detection(frame, result["tag_result"], result["cup_result"], system.camera_matrix, system.dist_coeffs)
+                
+                # Print combined information to terminal
+                output_lines = []
+                
+                # Cup information
+                if result["cup_result"] is not None and result["cup_result"].detected:
+                    cup_info = result["cup_result"]
+                    output_lines.append(f"Cup detected: center=({cup_info.pixel_center[0]}, {cup_info.pixel_center[1]}), distance={cup_info.distance_m:.3f}m")
+                else:
+                    output_lines.append("Cup: Not detected")
+                
+                # Tag information
+                if result["tag_coordinates"] is not None and len(result["tag_coordinates"]) > 0:
+                    output_lines.append(f"Tags detected: {len(result['tag_coordinates'])}")
+                    for tag_id, coord_info in result["tag_coordinates"].items():
+                        pos = coord_info['position']
+                        orient = coord_info['orientation']
+                        distance = coord_info['distance']
+                        output_lines.append(f"  Tag {tag_id}: Pos({pos['x']:.3f}, {pos['y']:.3f}, {pos['z']:.3f})m, Dist: {distance:.3f}m")
+                else:
+                    output_lines.append("Tags: None detected")
+                
+                # Tag-Cup distance information
+                distance_info = calculate_tag_cup_distance(result["tag_result"], result["cup_result"], system.camera_matrix, target_tag_id=2)
+                if distance_info is not None:
+                    distance_mag = distance_info['distance_magnitude']
+                    distance_components = distance_info['distance_components']
+                    output_lines.append(f"Tag 2 -> Cup Distance: {distance_mag:.3f}m")
+                    output_lines.append(f"  deltaX: {distance_components['x']:.3f}m, deltaY: {distance_components['y']:.3f}m, deltaZ: {distance_components['z']:.3f}m")
+                else:
+                    output_lines.append("Tag 2 -> Cup Distance: Not available (Tag 2 or cup not detected)")
+                
+                # Print all information
+                #print(f"\nCombined Detection:")
+                #for line in output_lines:
+                #    print(f"  {line}")
              
                 
             

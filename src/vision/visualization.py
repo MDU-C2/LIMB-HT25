@@ -115,6 +115,87 @@ def calculate_camera_relative_coordinates(tag_detection_result):
     return coordinates
 
 
+def calculate_tag_cup_distance(tag_detection_result, cup_detection_result, camera_matrix, target_tag_id=2):
+    """
+    Calculate the distance between a specific tag and the cup.
+    
+    Args:
+        tag_detection_result: TagDetectionResult from TagDetector
+        cup_detection_result: CupDetectionResult from CupDetector
+        camera_matrix: Camera intrinsic matrix
+        target_tag_id: ID of the tag to measure distance from (default: 2 for forearm_top)
+    
+    Returns:
+        Dictionary with distance information or None if not available
+    """
+    # Check if both tag and cup are detected
+    if (tag_detection_result is None or 
+        tag_detection_result.tag_ids is None or 
+        tag_detection_result.tvecs is None or
+        cup_detection_result is None or 
+        not cup_detection_result.detected):
+        return None
+    
+    # Find the target tag
+    target_tag_index = None
+    for i, tag_id in enumerate(tag_detection_result.tag_ids):
+        if int(tag_id) == target_tag_id:
+            target_tag_index = i
+            break
+    
+    if target_tag_index is None:
+        return None
+    
+    # Get tag position in camera coordinates
+    tag_tvec = tag_detection_result.tvecs[target_tag_index].flatten()
+    
+    # Get cup position in camera coordinates
+    # We need to convert cup pixel position to 3D coordinates
+    if cup_detection_result.pixel_center is None or cup_detection_result.distance_m is None:
+        return None
+    
+    cup_pixel_x, cup_pixel_y = cup_detection_result.pixel_center
+    cup_distance = cup_detection_result.distance_m
+    
+    # Convert pixel coordinates to 3D coordinates
+    # Using camera intrinsics to back-project
+    fx = camera_matrix[0, 0]
+    fy = camera_matrix[1, 1]
+    cx = camera_matrix[0, 2]
+    cy = camera_matrix[1, 2]
+    
+    # Calculate 3D position of cup
+    cup_x = (cup_pixel_x - cx) * cup_distance / fx
+    cup_y = (cup_pixel_y - cy) * cup_distance / fy
+    cup_z = cup_distance
+    
+    cup_position = np.array([cup_x, cup_y, cup_z])
+    
+    # Calculate distance between tag and cup
+    distance_vector = cup_position - tag_tvec
+    distance_magnitude = np.linalg.norm(distance_vector)
+    
+    # Calculate direction vector (normalized)
+    if distance_magnitude > 0:
+        direction_vector = distance_vector / distance_magnitude
+    else:
+        direction_vector = np.array([0, 0, 0])
+    
+    return {
+        'tag_id': target_tag_id,
+        'tag_position': tag_tvec,
+        'cup_position': cup_position,
+        'distance_magnitude': distance_magnitude,
+        'distance_vector': distance_vector,
+        'direction_vector': direction_vector,
+        'distance_components': {
+            'x': float(distance_vector[0]),
+            'y': float(distance_vector[1]),
+            'z': float(distance_vector[2])
+        }
+    }
+
+
 def draw_tag_coordinates(frame, tag_detection_result, camera_matrix, dist_coeffs):
     """
     Draw coordinate information for each detected tag on the frame.
@@ -190,6 +271,124 @@ def draw_tag_coordinates(frame, tag_detection_result, camera_matrix, dist_coeffs
                     thickness, 
                     cv2.LINE_AA
                 )
+    
+    return frame
+
+
+def draw_tag_cup_distance(frame, tag_detection_result, cup_detection_result, camera_matrix, dist_coeffs, target_tag_id=2):
+    """
+    Draw the distance between a specific tag and the cup on the frame.
+    
+    Args:
+        frame: Input frame
+        tag_detection_result: TagDetectionResult from TagDetector
+        cup_detection_result: CupDetectionResult from CupDetector
+        camera_matrix: Camera intrinsic matrix
+        dist_coeffs: Distortion coefficients
+        target_tag_id: ID of the tag to measure distance from (default: 2 for forearm_top)
+    """
+    # Calculate distance information
+    distance_info = calculate_tag_cup_distance(tag_detection_result, cup_detection_result, camera_matrix, target_tag_id)
+    
+    if distance_info is None:
+        return frame
+    
+    try:
+        # Get tag position in image
+        target_tag_index = None
+        for i, tag_id in enumerate(tag_detection_result.tag_ids):
+            if int(tag_id) == target_tag_id:
+                target_tag_index = i
+                break
+        
+        if target_tag_index is None:
+            return frame
+        
+        # Project tag position to 2D
+        tag_tvec = tag_detection_result.tvecs[target_tag_index].flatten()
+        tag_2d, _ = cv2.projectPoints(
+            tag_tvec.reshape(1, 3), 
+            np.zeros(3), 
+            np.zeros(3), 
+            camera_matrix, 
+            dist_coeffs
+        )
+        tag_2d = np.int32(tag_2d).reshape(-1, 2)
+        
+        # Get cup center position
+        cup_center = cup_detection_result.pixel_center
+        
+        # Draw line between tag and cup
+        cv2.line(frame, tuple(tag_2d[0]), cup_center, (255, 255, 0), 3)  # Yellow line
+        
+        # Draw circles at tag and cup positions
+        cv2.circle(frame, tuple(tag_2d[0]), 8, (255, 255, 0), -1)  # Yellow circle at tag
+        cv2.circle(frame, cup_center, 8, (255, 255, 0), -1)  # Yellow circle at cup
+        
+        # Calculate midpoint for text display
+        mid_x = (tag_2d[0][0] + cup_center[0]) // 2
+        mid_y = (tag_2d[0][1] + cup_center[1]) // 2
+        
+        # Prepare distance text
+        distance_mag = distance_info['distance_magnitude']
+        distance_components = distance_info['distance_components']
+        
+        distance_text = [
+            f"Tag {target_tag_id} -> Cup",
+            f"Distance: {distance_mag:.3f}m",
+            f"deltaX: {distance_components['x']:.3f}m",
+            f"deltaY: {distance_components['y']:.3f}m", 
+            f"deltaZ: {distance_components['z']:.3f}m"
+        ]
+        
+        # Draw distance information
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.5
+        thickness = 1
+        
+        # Position text near the midpoint
+        text_x = mid_x - 60
+        text_y = mid_y - 60
+        
+        # Draw background rectangle for each line
+        for i, text_line in enumerate(distance_text):
+            (text_w, text_h), _ = cv2.getTextSize(text_line, font, scale, thickness)
+            
+            # Draw background rectangle
+            cv2.rectangle(
+                frame,
+                (text_x - 2, text_y - text_h - 2 + i * 18),
+                (text_x + text_w + 2, text_y + 2 + i * 18),
+                (0, 0, 0),
+                -1
+            )
+            
+            # Draw text
+            cv2.putText(
+                frame, 
+                text_line, 
+                (text_x, text_y + i * 18), 
+                font, 
+                scale, 
+                (255, 255, 0),  # Yellow text
+                thickness, 
+                cv2.LINE_AA
+            )
+        
+        # Draw arrow indicating direction
+        if distance_mag > 0.01:  # Only draw arrow if there's significant distance
+            direction = distance_info['direction_vector']
+            
+            # Calculate arrow endpoint (scaled for visibility)
+            arrow_scale = 30  # pixels
+            arrow_end_x = int(mid_x + direction[0] * arrow_scale)
+            arrow_end_y = int(mid_y + direction[1] * arrow_scale)
+            
+            # Draw arrow
+            cv2.arrowedLine(frame, (mid_x, mid_y), (arrow_end_x, arrow_end_y), (255, 255, 0), 2, tipLength=0.3)
+        
+    except Exception as e:
+        print(f"Error drawing tag-cup distance: {e}")
     
     return frame
 
@@ -383,6 +582,145 @@ def visualize_tag_detection(frame_bgr: np.ndarray, tag_detection_result: TagDete
         print(f"Error visualizing tag detection: {e}")
 
     return frame_bgr
+
+
+def visualize_combined_detection(frame_bgr: np.ndarray, tag_detection_result: TagDetectionResult, cup_detection_result: CupDetectionResult, camera_matrix: np.ndarray, dist_coeffs: np.ndarray) -> np.ndarray:
+    '''
+    Visualize both tag and cup detection results in combined mode.
+    '''
+    try:
+        # Initialize alignment detector
+        alignment_detector = TagAlignmentDetector()
+        
+        # Draw cup detection first (background)
+        if cup_detection_result is not None:
+            frame_bgr = visualize_cup_detection(frame_bgr, cup_detection_result)
+        
+        # Draw tag detection (foreground)
+        if (tag_detection_result is not None and 
+            tag_detection_result.tag_ids is not None and 
+            len(tag_detection_result.tag_ids) > 0 and 
+            tag_detection_result.corners is not None and 
+            len(tag_detection_result.corners) > 0):
+            
+            # Draw detected markers
+            cv2.aruco.drawDetectedMarkers(frame_bgr, corners=tag_detection_result.corners, ids=np.array(tag_detection_result.tag_ids))
+        
+            # Draw coordinate axes
+            if tag_detection_result.rvecs is not None and tag_detection_result.tvecs is not None:
+                frame_bgr = draw_axis_on_tag(frame_bgr, camera_matrix, dist_coeffs, rvecs=tag_detection_result.rvecs, tvecs=tag_detection_result.tvecs, length=0.01)
+            
+            # Draw tag coordinates
+            frame_bgr = draw_tag_coordinates(frame_bgr, tag_detection_result, camera_matrix, dist_coeffs)
+            
+            # Detect alignments
+            alignments = alignment_detector.detect_alignments(tag_detection_result)
+            
+            # Draw alignment information
+            if alignments:
+                frame_bgr = draw_alignment_info(frame_bgr, alignments, camera_matrix, dist_coeffs, tag_detection_result)
+            
+            # Draw alignment status
+            frame_bgr = draw_alignment_status(frame_bgr, alignments, alignment_detector)
+        
+        # Draw tag-cup distance (if both are detected)
+        frame_bgr = draw_tag_cup_distance(frame_bgr, tag_detection_result, cup_detection_result, camera_matrix, dist_coeffs, target_tag_id=0)
+        
+        # Draw combined status in top-right corner
+        frame_bgr = draw_combined_status(frame_bgr, tag_detection_result, cup_detection_result)
+        
+    except Exception as e:
+        print(f"Error visualizing combined detection: {e}")
+
+    return frame_bgr
+
+
+def draw_combined_status(frame, tag_detection_result, cup_detection_result):
+    """
+    Draw combined detection status in the top-right corner.
+    
+    Args:
+        frame: Input frame
+        tag_detection_result: TagDetectionResult (can be None)
+        cup_detection_result: CupDetectionResult (can be None)
+    """
+    # Count detected items
+    tag_count = 0
+    if tag_detection_result is not None and tag_detection_result.tag_ids is not None:
+        tag_count = len(tag_detection_result.tag_ids)
+    
+    cup_detected = False
+    if cup_detection_result is not None:
+        cup_detected = cup_detection_result.detected
+    
+    # Create status text
+    status_lines = []
+    if tag_count > 0:
+        status_lines.append(f"Tags: {tag_count}")
+    else:
+        status_lines.append("Tags: 0")
+    
+    if cup_detected:
+        status_lines.append("Cup: Yes")
+    else:
+        status_lines.append("Cup: No")
+    
+    # Draw status
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 0.6
+    thickness = 2
+    margin = 10
+    
+    # Calculate total height needed
+    total_height = len(status_lines) * 25 + 10
+    
+    # Position in top-right corner
+    x_right = frame.shape[1] - 120
+    y_top = margin + 20
+    
+    # Draw background rectangle
+    cv2.rectangle(
+        frame,
+        (x_right - 5, y_top - 20),
+        (x_right + 110, y_top + total_height),
+        (0, 0, 0),
+        -1
+    )
+    
+    # Draw border
+    cv2.rectangle(
+        frame,
+        (x_right - 5, y_top - 20),
+        (x_right + 110, y_top + total_height),
+        (255, 255, 255),
+        2
+    )
+    
+    # Draw each status line
+    for i, line in enumerate(status_lines):
+        # Choose color based on content
+        if "Tags: 0" in line:
+            color = (0, 0, 255)  # Red for no tags
+        elif "Tags:" in line:
+            color = (0, 255, 0)  # Green for tags detected
+        elif "Cup: No" in line:
+            color = (0, 0, 255)  # Red for no cup
+        else:
+            color = (0, 255, 0)  # Green for cup detected
+        
+        cv2.putText(
+            frame, 
+            line, 
+            (x_right, y_top + i * 25), 
+            font, 
+            scale, 
+            color, 
+            thickness, 
+            cv2.LINE_AA
+        )
+    
+    return frame
+
 
 def visualize_cup_detection(frame_bgr: np.ndarray, cup_detection_result: CupDetectionResult) -> np.ndarray:
 
