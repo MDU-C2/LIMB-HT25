@@ -1,0 +1,138 @@
+{
+  "timestamp": "2025-09-29 10:22:27",
+  "test_duration": 10.0,
+  "warmup_duration": 2.0,
+  "camera_capture": {
+    "Low Latency": {
+      "frames_captured": 528191,
+      "total_time": 10.0000159740448,
+      "avg_fps": 52819.01562666781,
+      "avg_capture_time_ms": 0.018679920602138776,
+      "std_capture_time_ms": 0.019750424429923003,
+      "dropped_frames": 359,
+      "drop_rate_percent": 99.44598337950139,
+      "actual_resolution": "640x480",
+      "actual_fps": 30.0
+    },
+    "High Quality": {
+      "frames_captured": 545603,
+      "total_time": 10.000001907348633,
+      "avg_fps": 54560.28959345062,
+      "avg_capture_time_ms": 0.018060278485730736,
+      "std_capture_time_ms": 0.022021867622836328,
+      "dropped_frames": 354,
+      "drop_rate_percent": 99.43820224719101,
+      "actual_resolution": "640x480",
+      "actual_fps": 30.0
+    },
+    "Balanced": {
+      "frames_captured": 527539,
+      "total_time": 10.000011920928955,
+      "avg_fps": 52753.837112525565,
+      "avg_capture_time_ms": 0.018690780260998126,
+      "std_capture_time_ms": 0.006855011271400252,
+      "dropped_frames": 351,
+      "drop_rate_percent": 99.43342776203966,
+      "actual_resolution": "640x480",
+      "actual_fps": 30.0
+    }
+  },
+  "cup_detection": {
+    "Nano": {
+      "frames_processed": 141003,
+      "detections": 0,
+      "detection_rate_percent": 0.0,
+      "total_time": 10.000022888183594,
+      "avg_fps": 14100.267727048355,
+      "avg_inference_time_ms": 1986.3514423370361,
+      "current_fps": 15.998657339243074,
+      "skip_frames": 0
+    },
+    "Small": {
+      "frames_processed": 141875,
+      "detections": 0,
+      "detection_rate_percent": 0.0,
+      "total_time": 10.000003099441528,
+      "avg_fps": 14187.495602668694,
+      "avg_inference_time_ms": 1097.9627503289116,
+      "current_fps": 8.999785428394594,
+      "skip_frames": 0
+    },
+    "Small + Skip": {
+      "frames_processed": 206814,
+      "detections": 0,
+      "detection_rate_percent": 0.0,
+      "total_time": 10.00003981590271,
+      "avg_fps": 20681.31765546683,
+      "avg_inference_time_ms": 4944.378137588501,
+      "current_fps": 9.999120312834874,
+      "skip_frames": 1
+    },
+    "Small + Skip2": {
+      "frames_processed": 241197,
+      "detections": 0,
+      "detection_rate_percent": 0.0,
+      "total_time": 10.000002145767212,
+      "avg_fps": 24119.69482447497,
+      "avg_inference_time_ms": 3313.4008248647056,
+      "current_fps": 8.999974250867126,
+      "skip_frames": 2
+    }
+  },
+  "tag_detection": {
+    "frames_processed": 1569,
+    "detections": 5,
+    "detection_rate_percent": 0.3186743148502231,
+    "total_time": 10.00577998161316,
+    "avg_fps": 156.80936447565594,
+    "avg_detection_time_ms": 6.328615130247623,
+    "std_detection_time_ms": 1.3204001106273073
+  },
+  "end_to_end": {
+    "High Performance": {
+      "frames_processed": 151937,
+      "total_time": 10.009557008743286,
+      "avg_fps": 15179.193231756806,
+      "cup_detections": 0,
+      "tag_detections": 430,
+      "cup_detection_rate": 0.0,
+      "tag_detection_rate": 0.28301203788412305,
+      "cup_fps": 17.724279390010825,
+      "cup_inference_ms": 710.0562538419451,
+      "camera_drop_rate": 99.44444444444444,
+      "target_fps": 60,
+      "skip_frames": 0,
+      "low_latency": true
+    },
+    "Balanced": {
+      "frames_processed": 195200,
+      "total_time": 10.000002145767212,
+      "avg_fps": 19519.9958114633,
+      "cup_detections": 0,
+      "tag_detections": 2247,
+      "cup_detection_rate": 0.0,
+      "tag_detection_rate": 1.1511270491803278,
+      "cup_fps": 13.967906780804013,
+      "cup_inference_ms": 757.090660241934,
+      "camera_drop_rate": 99.44289693593315,
+      "target_fps": 30,
+      "skip_frames": 1,
+      "low_latency": true
+    },
+    "High Quality": {
+      "frames_processed": 354979,
+      "total_time": 10.000026941299438,
+      "avg_fps": 35497.80436430232,
+      "cup_detections": 0,
+      "tag_detections": 2467,
+      "cup_detection_rate": 0.0,
+      "tag_detection_rate": 0.6949706884069199,
+      "cup_fps": 4.690320390299412,
+      "cup_inference_ms": 888.3283734321594,
+      "camera_drop_rate": 99.44444444444444,
+      "target_fps": 15,
+      "skip_frames": 2,
+      "low_latency": false
+    }
+  }
+}
