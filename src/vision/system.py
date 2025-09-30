@@ -9,7 +9,7 @@ import numpy as np
 
 from tags import TagDetector
 from cup import CupDetector
-#from imu import IMUFusion
+from imu import IMUFusion
 from visualization import calculate_camera_relative_coordinates
 from utils.performance_monitor import get_performance_monitor, start_timer
 from utils.camera_optimizer import OptimizedCameraCapture, create_optimized_camera_config
@@ -35,11 +35,14 @@ class VisionSystem:
         skip_frames: int = 0,
         camera_device_id: int = 0,
         low_latency_mode: bool = True,
+        monitor_performance: bool = False,
     ) -> None:
 
         # Initialize performance monitor
-        self.perf_monitor = get_performance_monitor()
-        self.perf_monitor.start_monitoring()
+        self.monitor_performance = monitor_performance
+        if self.monitor_performance:
+            self.perf_monitor = get_performance_monitor()
+            self.perf_monitor.start_monitoring()
         
         # Store configuration
         self.target_fps = target_fps
@@ -60,7 +63,7 @@ class VisionSystem:
             target_fps=target_fps,
         )
         
-        #self.imu_fusion = IMUFusion()
+        self.imu_fusion = IMUFusion()
         self.camera_matrix = camera_matrix
         self.dist_coeffs = dist_coeffs
         
@@ -104,7 +107,8 @@ class VisionSystem:
                 return self.last_results
             
             self.last_frame_time = current_time
-            self.perf_monitor.record_frame()
+            if hasattr(self, 'perf_monitor'):
+                self.perf_monitor.record_frame()
 
             # Process based on mode
             tag_result = None
@@ -135,7 +139,7 @@ class VisionSystem:
         self,
         mode: str = "cup",
         show_window: bool = True,
-        #imu_delta: Optional[np.ndarray] = None
+        imu_delta: Optional[np.ndarray] = None
     ):
         """
         Run continuous processing with optimized performance.
@@ -202,6 +206,9 @@ class VisionSystem:
 
     def _add_performance_overlay(self, frame: np.ndarray):
         """Add performance statistics overlay to frame."""
+        if not self.monitor_performance or not hasattr(self, 'perf_monitor'):
+            return frame
+            
         system_fps = self.perf_monitor.get_system_fps()
         cup_stats = self.cup_detector.get_performance_stats()
         camera_stats = self.camera.get_performance_stats()
@@ -230,6 +237,9 @@ class VisionSystem:
 
     def _print_performance_summary(self):
         """Print a brief performance summary."""
+        if not self.monitor_performance or not hasattr(self, 'perf_monitor'):
+            return
+            
         system_fps = self.perf_monitor.get_system_fps()
         cup_stats = self.cup_detector.get_performance_stats()
         camera_stats = self.camera.get_performance_stats()
@@ -241,6 +251,10 @@ class VisionSystem:
 
     def _print_performance_stats(self):
         """Print detailed performance statistics."""
+        if not self.monitor_performance or not hasattr(self, 'perf_monitor'):
+            print("Performance monitoring is disabled.")
+            return
+            
         print("\n" + "="*60)
         print("DETAILED PERFORMANCE STATISTICS")
         print("="*60)
@@ -270,6 +284,10 @@ class VisionSystem:
 
     def _save_performance_report(self):
         """Save performance report to file."""
+        if not self.monitor_performance or not hasattr(self, 'perf_monitor'):
+            print("Performance monitoring is disabled. Cannot save report.")
+            return
+            
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         filename = f"performance_report_{timestamp}.txt"
         
@@ -316,7 +334,8 @@ class VisionSystem:
         self.running = False
         self.cup_detector.stop_inference_thread()
         self.camera.release()
-        self.perf_monitor.stop_monitoring()
+        if self.monitor_performance:
+            self.perf_monitor.stop_monitoring()
         cv2.destroyAllWindows()
         print("Vision system cleanup completed")
 

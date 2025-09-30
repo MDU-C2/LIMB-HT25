@@ -77,6 +77,7 @@ def benchmark_system(args):
                 skip_frames=config["skip_frames"],
                 camera_device_id=0,
                 low_latency_mode=config["low_latency"],
+                monitor_performance=args.monitor_performance,
             )
             
             # Run for 10 seconds
@@ -149,6 +150,7 @@ def main() -> None:
     parser.add_argument("--low-latency", action="store_true", help="Enable low latency mode")
     parser.add_argument("--benchmark", action="store_true", help="Run performance benchmark")
     parser.add_argument("--camera-device", type=int, default=0, help="Camera device ID")
+    parser.add_argument("--monitor-performance", action="store_true", help="Monitor performance", default=False)
     args = parser.parse_args()
     
     # Run benchmark if requested
@@ -179,6 +181,7 @@ def main() -> None:
         skip_frames=args.skip_frames,
         camera_device_id=args.camera_device,
         low_latency_mode=args.low_latency,
+        monitor_performance=args.monitor_performance,
     )
     
     print(f"Starting vision system:")
