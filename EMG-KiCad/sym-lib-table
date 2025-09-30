@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "LIMB_EMG_Library")(type "KiCad")(uri "${KIPRJMOD}/LIMB_EMG_Library.kicad_sym")(options "")(descr ""))
+)
