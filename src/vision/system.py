@@ -3,10 +3,10 @@ from typing import Any, Dict, Optional, Tuple
 import cv2
 import numpy as np
 
-from tags import TagDetector
-from cup import CupDetector
-from imu import IMUFusion
-from visualization import calculate_camera_relative_coordinates
+from vision.tags import TagDetector
+from vision.cup import CupDetector
+from vision.imu import IMUFusion
+from vision.visualization import calculate_camera_relative_coordinates
 
 
 class VisionSystem:

@@ -7,9 +7,9 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from system import VisionSystem
-from tags.camera_calibration import load_calibration_json
-from visualization import visualize_tag_detection, visualize_cup_detection, visualize_combined_detection, calculate_tag_cup_distance
+from vision.system import VisionSystem
+from vision.tags.camera_calibration import load_calibration_json
+from vision.visualization import visualize_tag_detection, visualize_cup_detection, visualize_combined_detection, calculate_tag_cup_distance
 
 
 def load_camera_calibration(calibration_path: Optional[str] = None) -> tuple[np.ndarray, np.ndarray]:

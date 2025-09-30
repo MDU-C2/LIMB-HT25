@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
 
-from tags.tag_detector import TagDetectionResult
-from tags.tag_alignment import TagAlignmentDetector, TagAlignment
-from cup import CupDetectionResult
+from vision.tags.tag_detector import TagDetectionResult
+from vision.tags.tag_alignment import TagAlignmentDetector, TagAlignment
+from vision.cup import CupDetectionResult
 
 def draw_axis_on_tag(frame, camera_matrix, dist_coeffs, rvecs, tvecs, length=0.01):
     """
