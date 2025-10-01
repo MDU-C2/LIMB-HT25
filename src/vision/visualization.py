@@ -23,7 +23,7 @@ def draw_axis_on_tag(frame, camera_matrix, dist_coeffs, rvecs, tvecs, length=0.0
     
     try:
         # Define the axis points in 3D space
-        axis_points = np.float32([[0, 0, 0], [length, 0, 0], [0, length, 0], [0, 0, -length]]).reshape(-1, 3)
+        axis_points = np.float32([[0, 0, 0], [3*length, 0, 0], [0, 3*length, 0], [0, 0, -3*length]]).reshape(-1, 3)
         
         # Draw axes for each detected tag
         for i in range(len(rvecs)):
@@ -471,20 +471,23 @@ def draw_alignment_info(frame, alignments, camera_matrix, dist_coeffs, tag_detec
 
 def draw_alignment_status(frame, alignments, alignment_detector):
     """
-    Draw alignment status text on the frame.
+    Draw alignment status text on the frame showing detected states.
     
     Args:
         frame: Input frame
         alignments: List of TagAlignment objects
         alignment_detector: TagAlignmentDetector instance
     """
-    if not alignments:
-        # No alignments detected
-        text = "No alignments detected"
+    # Detect states from alignments
+    states = alignment_detector.detect_states(alignments) if alignments else []
+    
+    if not states:
+        # No states detected
+        text = "No state detected"
         color = (0, 0, 255)  # Red
     else:
-        # Show alignment count and details
-        text = f"Alignments: {len(alignments)}"
+        # Show detected state
+        text = states[0]  # Display the first detected state
         color = (0, 255, 0)  # Green
     
     # Draw main status
@@ -507,26 +510,11 @@ def draw_alignment_status(frame, alignments, alignment_detector):
     )
     cv2.putText(frame, text, (x_left, y_top), font, scale, color, thickness, cv2.LINE_AA)
     
-    # Draw detailed alignment information
-    if alignments:
+    # Draw additional states if multiple are detected
+    if len(states) > 1:
         y_offset = y_top + 25
-        for i, alignment in enumerate(alignments[:3]):  # Show max 3 alignments
-            desc = alignment_detector.get_alignment_description(alignment)
-            conf_text = f"({alignment.confidence:.2f})"
-            
-            # Choose color based on alignment type
-            if alignment.alignment_type == "vertical":
-                color = (0, 255, 0)  # Green
-            elif alignment.alignment_type == "horizontal":
-                color = (255, 0, 0)  # Blue
-            elif alignment.alignment_type == "parallel":
-                color = (0, 255, 255)  # Yellow
-            else:
-                color = (255, 255, 255)  # White
-            
-            # Draw alignment description
-            cv2.putText(frame, desc, (x_left, y_offset), font, 0.5, color, 1, cv2.LINE_AA)
-            #cv2.putText(frame, conf_text, (x_left + 200, y_offset), font, 0.5, color, 1, cv2.LINE_AA) # Add this to include confidence
+        for i, state in enumerate(states[1:4]):  # Show max 3 additional states
+            cv2.putText(frame, state, (x_left, y_offset), font, 0.5, color, 1, cv2.LINE_AA)
             y_offset += 20
     
     return frame
