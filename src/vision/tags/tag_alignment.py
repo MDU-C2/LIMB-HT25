@@ -29,30 +29,30 @@ class RobotArmTagConfig:
     
     # Define tag IDs and their expected positions on the robot arm
     TAG_POSITIONS = {
-        0: "hand_top",      # First tag on top of the hand
-        1: "hand_side",     # Second on side of the hand/on thumb
-        2: "forearm_top",   # Third on top of the forearm
-        3: "forearm_bottom", # Fourth on bottom side of the forearm
-        4: "upper_arm_top", # Fifth on top of the upper arm (bicep)
-        5: "upper_arm_bottom" # Sixth on bottom of the upper arm (tricep)
+        0: "upper_arm_top", 
+        1: "forearm_top",     
+        2: "hand_top",
+        3: "upper_arm_bottom",
+        4: "forearm_bottom",
+        5: "hand_bottom",
+        6: "hand_side",
     }
     
     # Define expected alignments between tags
     EXPECTED_ALIGNMENTS = [
         # Vertical alignments (tags should be vertically aligned)
-        (0, 2, "vertical"),    # hand_top with forearm_top
-        (1, 3, "vertical"),    # hand_side with forearm_bottom
-        (2, 4, "vertical"),    # forearm_top with upper_arm_top
-        (3, 5, "vertical"),    # forearm_bottom with upper_arm_bottom
         
-        # Horizontal alignments (tags should be horizontally aligned)
-        (0, 1, "horizontal"),  # hand_top with hand_side
-        (2, 3, "horizontal"),  # forearm_top with forearm_bottom
-        (4, 5, "horizontal"),  # upper_arm_top with upper_arm_bottom
+        (0, 1, "vertical"),    # upper_arm_top with forearm_top
+        (1, 2, "vertical"),    # forearm_top with hand_top
+        (3, 4, "vertical"),    # upper_arm_bottom with forearm_bottom
+        (4, 5, "vertical"),    # forearm_bottom with hand_bottom
         
-        # Parallel alignments (tags should be parallel to each other)
-        (0, 4, "parallel"),    # hand_top with upper_arm_top
-        (1, 5, "parallel"),    # hand_side with upper_arm_bottom
+        
+        (1, 5, "vertical"),    # forearm_top with hand_bottom
+        (1, 6, "vertical"),    # forearm_top with hand_side
+        (4, 6, "vertical"),    # forearm_bottom with hand_side
+
+        # Could also add 0-2, 3-5, 0-6, 3-6
     ]
 
 
