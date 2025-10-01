@@ -49,12 +49,12 @@ class RobotArmTagConfig:
     EXPECTED_ALIGNMENTS = [
         # Vertical alignments (tags should be vertically aligned)
         
-        #(0, 1, "parallel"),    # upper_arm_top with forearm_top
-        #(1, 2, "parallel"),    # forearm_top with hand_top
+        (0, 1, "parallel"),    # upper_arm_top with forearm_top
+        (1, 2, "parallel"),    # forearm_top with hand_top
         (0, 1, "vertical"),    # upper_arm_top with forearm_top
         (1, 2, "vertical"),    # forearm_top with hand_top
-        #(0, 1, "horizontal"),    # upper_arm_top with forearm_top
-        #(1, 2, "horizontal"),    # forearm_top with hand_top
+        (0, 1, "horizontal"),    # upper_arm_top with forearm_top
+        (1, 2, "horizontal"),    # forearm_top with hand_top
         (3, 4, "parallel"),    # upper_arm_bottom with forearm_bottom
         (4, 5, "parallel"),    # forearm_bottom with hand_bottom
         
@@ -62,6 +62,9 @@ class RobotArmTagConfig:
         (1, 5, "parallel"),    # forearm_top with hand_bottom
         (1, 6, "parallel"),    # forearm_top with hand_side
         (4, 6, "parallel"),    # forearm_bottom with hand_side
+        (1, 5, "horizontal"),    # forearm_top with hand_bottom
+        (1, 6, "horizontal"),    # forearm_top with hand_side
+        (4, 6, "horizontal"),    # forearm_bottom with hand_side
 
         # Could also add 0-2, 3-5, 0-6, 3-6
     ]

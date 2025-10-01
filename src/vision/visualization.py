@@ -115,7 +115,7 @@ def calculate_camera_relative_coordinates(tag_detection_result):
     return coordinates
 
 
-def calculate_tag_cup_distance(tag_detection_result, cup_detection_result, camera_matrix, target_tag_id=2):
+def calculate_tag_cup_distance(tag_detection_result, cup_detection_result, camera_matrix, target_tag_id=0):
     """
     Calculate the distance between a specific tag and the cup.
     
@@ -612,7 +612,7 @@ def visualize_combined_detection(frame_bgr: np.ndarray, tag_detection_result: Ta
             frame_bgr = draw_alignment_status(frame_bgr, alignments, alignment_detector)
         
         # Draw tag-cup distance (if both are detected)
-        frame_bgr = draw_tag_cup_distance(frame_bgr, tag_detection_result, cup_detection_result, camera_matrix, dist_coeffs, target_tag_id=0)
+        frame_bgr = draw_tag_cup_distance(frame_bgr, tag_detection_result, cup_detection_result, camera_matrix, dist_coeffs, target_tag_id=2)
         
         # Draw combined status in top-right corner
         frame_bgr = draw_combined_status(frame_bgr, tag_detection_result, cup_detection_result)
