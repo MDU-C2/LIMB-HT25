@@ -2724,16 +2724,6 @@
 	)
 	(wire
 		(pts
-			(xy 69.85 71.12) (xy 69.85 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1ac48a34-7985-48c6-abac-c1b6b021eccf")
-	)
-	(wire
-		(pts
 			(xy 96.52 83.82) (xy 96.52 86.36)
 		)
 		(stroke
@@ -2854,16 +2844,6 @@
 	)
 	(wire
 		(pts
-			(xy 66.04 63.5) (xy 62.23 63.5)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "34e109a6-1d00-4a9c-9a15-89f3ed27e049")
-	)
-	(wire
-		(pts
 			(xy 166.37 138.43) (xy 171.45 138.43)
 		)
 		(stroke
@@ -2871,6 +2851,16 @@
 			(type default)
 		)
 		(uuid "397196db-1103-4d74-a041-6e508d61a351")
+	)
+	(wire
+		(pts
+			(xy 66.04 60.96) (xy 62.23 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4210e9c2-9668-48e0-bcf9-e12a418aafb3")
 	)
 	(wire
 		(pts
@@ -3184,16 +3174,6 @@
 	)
 	(wire
 		(pts
-			(xy 69.85 60.96) (xy 62.23 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "80d98940-ba07-4469-af88-6d66ccaa0971")
-	)
-	(wire
-		(pts
 			(xy 83.82 29.21) (xy 83.82 40.64)
 		)
 		(stroke
@@ -3294,7 +3274,7 @@
 	)
 	(wire
 		(pts
-			(xy 66.04 81.28) (xy 66.04 63.5)
+			(xy 66.04 60.96) (xy 66.04 81.28)
 		)
 		(stroke
 			(width 0)
@@ -3391,6 +3371,16 @@
 			(type default)
 		)
 		(uuid "b00bcb6a-4160-4d35-871b-78fc1ae66b20")
+	)
+	(wire
+		(pts
+			(xy 69.85 71.12) (xy 69.85 63.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b2eceab6-058b-424c-a78f-5aa4bfcb4a01")
 	)
 	(wire
 		(pts
@@ -3501,6 +3491,16 @@
 			(type default)
 		)
 		(uuid "c4e9eb28-658f-4f36-8bc0-f2b2072b9ac6")
+	)
+	(wire
+		(pts
+			(xy 69.85 63.5) (xy 62.23 63.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c5ec3de8-53b2-4ba7-96c5-3adf1a91dc97")
 	)
 	(wire
 		(pts
@@ -3862,16 +3862,6 @@
 		)
 		(uuid "5ef1c0f7-f7bb-4b03-a8e5-9120a6339ba3")
 	)
-	(label "V-"
-		(at 96.52 86.36 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "86687fae-cda3-4130-a752-d485ea041a76")
-	)
 	(label "Vref"
 		(at 187.96 83.82 180)
 		(effects
@@ -4054,6 +4044,74 @@
 			(project "EMG-KiCad"
 				(path "/f6c8dea7-6a58-4159-9db2-42f13dd699f4"
 					(reference "C11")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:Earth")
+		(at 96.52 86.36 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "0a1bbc10-bf9f-454e-a55f-ead274737d62")
+		(property "Reference" "#PWR024"
+			(at 96.52 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "Earth"
+			(at 96.5201 90.17 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+		(property "Footprint" ""
+			(at 96.52 86.36 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 96.52 86.36 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"Earth\""
+			(at 96.52 86.36 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "de00df57-ec98-44ee-9505-39cc5a35c372")
+		)
+		(instances
+			(project "EMG-KiCad"
+				(path "/f6c8dea7-6a58-4159-9db2-42f13dd699f4"
+					(reference "#PWR024")
 					(unit 1)
 				)
 			)
@@ -6707,6 +6765,74 @@
 			(project ""
 				(path "/f6c8dea7-6a58-4159-9db2-42f13dd699f4"
 					(reference "R10")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:Earth")
+		(at 193.04 73.66 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "93e89cc4-8dd3-4059-b955-83154c356f6d")
+		(property "Reference" "#PWR023"
+			(at 193.04 67.31 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "Earth"
+			(at 193.0399 69.85 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+		(property "Footprint" ""
+			(at 193.04 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 193.04 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"Earth\""
+			(at 193.04 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "0bfd322e-2bf5-4e6c-b4c2-a20e10c29750")
+		)
+		(instances
+			(project "EMG-KiCad"
+				(path "/f6c8dea7-6a58-4159-9db2-42f13dd699f4"
+					(reference "#PWR023")
 					(unit 1)
 				)
 			)
