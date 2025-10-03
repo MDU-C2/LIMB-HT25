@@ -8,6 +8,7 @@ This vision system provides:
 - **Real-time performance optimization** with multi-threading and frame skipping
 - **Comprehensive performance monitoring** and benchmarking
 - **Structured JSON output** for integration with robotic systems
+- **Enhanced tag detection results** with pre-computed transforms and quality metrics
 
 ## Installation
 ```bash
@@ -121,6 +122,55 @@ The system includes several performance utilities:
 - `yolo11m.pt` - Medium
 - `yolo11l.pt` - Large
 - `yolo11x.pt` - Extra Large (slowest, most accurate)
+
+## Tag Detection Results
+
+The tag detection system now provides structured `TagDetectionResult` objects with enhanced information:
+
+### TagDetectionResult Structure
+```python
+@dataclass
+class TagDetectionResult:
+    tag_ids: np.ndarray               # shape (N,) - detected tag IDs
+    rvecs: Optional[np.ndarray]       # shape (N, 1, 3) - rotation vectors
+    tvecs: Optional[np.ndarray]       # shape (N, 1, 3) - translation vectors
+    corners: Optional[List[np.ndarray]] # corner coordinates for visualization
+    transforms: Optional[List[np.ndarray]]  # shape (N, 4, 4) - pre-computed transforms
+    reproj_errors: Optional[np.ndarray]     # shape (N,) - reprojection errors
+    timestamps: Optional[List[float]]       # detection timestamps
+```
+
+### Benefits
+- **Pre-computed Transforms**: 4x4 transformation matrices ready for use
+- **Quality Metrics**: Reprojection errors for pose quality assessment
+- **Enhanced Integration**: Better compatibility with IMU-vision fusion systems
+- **Structured Data**: Organized access to all detection information
+- **Performance**: Reduced computation overhead in downstream processing
+
+### Usage Example
+```python
+from vision.tags.tag_detector import TagDetector
+
+# Initialize detector
+detector = TagDetector(camera_matrix, dist_coeffs, marker_length_m=0.03)
+
+# Detect tags
+result = detector.detect_and_estimate(frame)
+
+# Access structured data
+if result.tag_ids is not None and len(result.tag_ids) > 0:
+    print(f"Detected {len(result.tag_ids)} tags: {result.tag_ids}")
+    
+    # Use pre-computed transforms
+    if result.transforms is not None:
+        for i, transform in enumerate(result.transforms):
+            print(f"Tag {result.tag_ids[i]} transform:\n{transform}")
+    
+    # Check quality metrics
+    if result.reproj_errors is not None:
+        for i, error in enumerate(result.reproj_errors):
+            print(f"Tag {result.tag_ids[i]} reprojection error: {error:.3f}")
+```
 
 ## Output Structure
 

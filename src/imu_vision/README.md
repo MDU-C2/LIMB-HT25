@@ -23,6 +23,8 @@ The system uses three main coordinate frames:
 ### 3. Hand Pose Estimation (`hand_pose.py`)
 - `HandPoseEstimator`: Converts ArUco detection to hand pose
 - **T_CH_meas** (camera to hand) to **T_WH** (world→hand)
+- **Enhanced Integration**: Works with `TagDetectionResult` structure
+- **Backward Compatibility**: Supports legacy dict formats
 
 ### 4. Cup 3D Estimation (`cup_3d.py`)
 - `Cup3DEstimator`: Estimates cup 3D position from YOLO + depth
@@ -49,6 +51,49 @@ The system uses three main coordinate frames:
 - `FiducialDepthSystem`: Orchestrates all components
 - Main interface for the complete system
 - Supports both IMU smoothing and validation independently
+- **Updated Integration**: Seamlessly handles `TagDetectionResult` structure
+
+## Tag Detection Integration
+
+The system now seamlessly integrates with the updated tag detection system that provides structured `TagDetectionResult` objects:
+
+### TagDetectionResult Structure
+```python
+@dataclass
+class TagDetectionResult:
+    tag_ids: np.ndarray               # shape (N,) - detected tag IDs
+    rvecs: Optional[np.ndarray]       # shape (N, 1, 3) - rotation vectors
+    tvecs: Optional[np.ndarray]       # shape (N, 1, 3) - translation vectors
+    corners: Optional[List[np.ndarray]] # corner coordinates for visualization
+    transforms: Optional[List[np.ndarray]]  # shape (N, 4, 4) - pre-computed transforms
+    reproj_errors: Optional[np.ndarray]     # shape (N,) - reprojection errors
+    timestamps: Optional[List[float]]       # detection timestamps
+```
+
+### Integration Benefits
+- **Pre-computed Transforms**: Direct access to 4x4 transformation matrices
+- **Quality Metrics**: Reprojection errors for pose quality assessment
+- **Enhanced Data**: Structured access to all detection information
+- **Backward Compatibility**: Legacy dict formats still supported
+- **Performance**: Reduced computation overhead in fusion system
+
+### Usage with New Structure
+```python
+from vision.tags.tag_detector import TagDetector, TagDetectionResult
+
+# Initialize tag detector
+tag_detector = TagDetector(camera_matrix, dist_coeffs, marker_length_m=0.03)
+
+# Detect tags (returns TagDetectionResult object)
+tag_result = tag_detector.detect_and_estimate(frame)
+
+# Use directly with fusion system
+fusion_result = system.process_frame(
+    tag_detection_result=tag_result,  # Direct TagDetectionResult object
+    cup_detection_result=cup_result,
+    imu_data=imu_data
+)
+```
 
 ## Usage
 

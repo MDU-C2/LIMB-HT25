@@ -23,11 +23,11 @@ class HandPoseEstimator:
         self.calibration_manager = calibration_manager
         self.transform_manager = calibration_manager.transform_manager
     
-    def estimate_hand_pose(self, tag_detection_result: Optional[Dict[str, Any]]) -> Optional[np.ndarray]:
+    def estimate_hand_pose(self, tag_detection_result) -> Optional[np.ndarray]:
         """Estimate hand pose in world frame from ArUco detection.
         
         Args:
-            tag_detection_result: Result from tag detector (should contain transform_cam_from_tag)
+            tag_detection_result: TagDetectionResult object or dict from tag detector
             
         Returns:
             4x4 transformation matrix T_WH (world to hand) or None if detection failed
@@ -51,29 +51,37 @@ class HandPoseEstimator:
         
         return T_WH
     
-    def _extract_tag_transform(self, tag_detection_result: Dict[str, Any]) -> Optional[np.ndarray]:
+    def _extract_tag_transform(self, tag_detection_result) -> Optional[np.ndarray]:
         """Extract 4x4 transform from tag detection result.
         
         Args:
-            tag_detection_result: Result from tag detector
+            tag_detection_result: TagDetectionResult object or dict from tag detector
             
         Returns:
             4x4 transformation matrix or None if not available
         """
-        # Try different possible keys for the transform
-        transform_keys = ['transform_cam_from_tag', 'transform', 'pose', 'T_cam_from_tag']
+        # Handle new TagDetectionResult object
+        if hasattr(tag_detection_result, 'transforms') and tag_detection_result.transforms is not None:
+            # Use the first detected tag's transform
+            if len(tag_detection_result.transforms) > 0:
+                return tag_detection_result.transforms[0]
         
-        for key in transform_keys:
-            if key in tag_detection_result:
-                transform = tag_detection_result[key]
-                if isinstance(transform, np.ndarray) and transform.shape == (4, 4):
-                    return transform
-                elif isinstance(transform, list) and len(transform) == 4 and len(transform[0]) == 4:
-                    return np.array(transform, dtype=np.float64)
-        
-        # If no direct transform, try to construct from position and orientation
-        if 'position' in tag_detection_result and 'orientation' in tag_detection_result:
-            return self._construct_transform_from_pose(tag_detection_result)
+        # Handle legacy dict format
+        if isinstance(tag_detection_result, dict):
+            # Try different possible keys for the transform
+            transform_keys = ['transform_cam_from_tag', 'transform', 'pose', 'T_cam_from_tag']
+            
+            for key in transform_keys:
+                if key in tag_detection_result:
+                    transform = tag_detection_result[key]
+                    if isinstance(transform, np.ndarray) and transform.shape == (4, 4):
+                        return transform
+                    elif isinstance(transform, list) and len(transform) == 4 and len(transform[0]) == 4:
+                        return np.array(transform, dtype=np.float64)
+            
+            # If no direct transform, try to construct from position and orientation
+            if 'position' in tag_detection_result and 'orientation' in tag_detection_result:
+                return self._construct_transform_from_pose(tag_detection_result)
         
         print("Warning: Could not extract transform from tag detection result")
         return None
@@ -175,11 +183,11 @@ class HandPoseEstimator:
         
         return R
     
-    def get_hand_position(self, tag_detection_result: Optional[Dict[str, Any]]) -> Optional[np.ndarray]:
+    def get_hand_position(self, tag_detection_result) -> Optional[np.ndarray]:
         """Get hand position in world frame.
         
         Args:
-            tag_detection_result: Result from tag detector
+            tag_detection_result: TagDetectionResult object or dict from tag detector
             
         Returns:
             3D position [x, y, z] in world frame or None if detection failed
@@ -190,11 +198,11 @@ class HandPoseEstimator:
         
         return T_WH[:3, 3]
     
-    def get_hand_orientation(self, tag_detection_result: Optional[Dict[str, Any]]) -> Optional[np.ndarray]:
+    def get_hand_orientation(self, tag_detection_result) -> Optional[np.ndarray]:
         """Get hand orientation in world frame.
         
         Args:
-            tag_detection_result: Result from tag detector
+            tag_detection_result: TagDetectionResult object or dict from tag detector
             
         Returns:
             3x3 rotation matrix in world frame or None if detection failed
