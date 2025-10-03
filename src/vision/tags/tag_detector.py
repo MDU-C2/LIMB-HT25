@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
+import time
 
 import cv2
 import numpy as np
@@ -7,10 +8,13 @@ import numpy as np
 
 @dataclass
 class TagDetectionResult:
-    tag_ids: np.ndarray
-    rvecs: Optional[np.ndarray]  # shape (N, 1, 3)
-    tvecs: Optional[np.ndarray]  # shape (N, 1, 3)
+    tag_ids: np.ndarray               # shape (N,)
+    rvecs: Optional[np.ndarray]       # shape (N, 1, 3)
+    tvecs: Optional[np.ndarray]       # shape (N, 1, 3)
     corners: Optional[List[np.ndarray]]
+    transforms: Optional[List[np.ndarray]]  # shape (N, 4, 4)
+    reproj_errors: Optional[np.ndarray]     # shape (N,)
+    timestamps: Optional[List[float]]       # optional: useful for sync
 
 
 class TagDetector:
@@ -54,16 +58,45 @@ class TagDetector:
         corners, ids, rejected = self.detector.detectMarkers(gray)
 
         if ids is None or len(ids) == 0:
-            return TagDetectionResult(tag_ids=[], rvecs=None, tvecs=None, corners=[])
+            return TagDetectionResult(
+                tag_ids=np.array([]), 
+                rvecs=None, 
+                tvecs=None, 
+                corners=None,
+                transforms=None,
+                reproj_errors=None,
+                timestamps=None
+            )
 
+        rvecs = None
+        tvecs = None
+        reproj_errors = None
+        
         if len(corners) > 0:
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
+            rvecs, tvecs, reproj_errors = cv2.aruco.estimatePoseSingleMarkers(
                 corners, self.marker_length_meters, self.camera_matrix, self.dist_coeffs
             )
 
-        # ids is Nx1; flatten to list of ints
-        #tag_ids = [int(x[0]) for x in ids]
-        return TagDetectionResult(tag_ids=np.array(ids), rvecs=rvecs, tvecs=tvecs, corners=corners)
+        # Convert rvecs and tvecs to 4x4 transform matrices
+        transforms = None
+        if rvecs is not None and tvecs is not None:
+            transforms = []
+            for i in range(len(rvecs)):
+                transform = self.rvec_tvec_to_matrix(rvecs[i], tvecs[i])
+                transforms.append(transform)
+
+        # Create timestamps (optional - can be None if not needed)
+        timestamps = [time.time()] * len(ids) if ids is not None else None
+
+        return TagDetectionResult(
+            tag_ids=ids.flatten(),  # Flatten from (N, 1) to (N,)
+            rvecs=rvecs, 
+            tvecs=tvecs, 
+            corners=corners,
+            transforms=transforms,
+            reproj_errors=reproj_errors,
+            timestamps=timestamps
+        )
 
     @staticmethod
     def rvec_tvec_to_matrix(rvec: np.ndarray, tvec: np.ndarray) -> np.ndarray:
