@@ -7,12 +7,12 @@ import numpy as np
 import sys
 import os
 
-# Add the current directory to Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add the parent directory to Python path to import imu_vision modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from fusion_system import FiducialDepthSystem
-    from smoothing import IMUData, IMUValidator
+    from imu_vision.fusion_system import FiducialDepthSystem
+    from imu_vision.smoothing import IMUData, IMUValidator
     print("✅ Imports successful")
 except ImportError as e:
     print(f"❌ Import error: {e}")

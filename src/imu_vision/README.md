@@ -249,6 +249,30 @@ approach_vector = control_command['approach_vector']
 target_position = control_command['target_position']
 ```
 
+## Package Structure
+
+```
+imu_vision/
+├── __init__.py                 # Main package
+├── fusion_system.py           # Main fusion system
+├── smoothing.py               # IMU smoothing and validation
+├── calibration.py             # Calibration management
+├── hand_pose.py               # Hand pose estimation
+├── cup_3d.py                  # Cup 3D estimation
+├── relative_pose.py           # Relative pose calculation
+├── frames.py                  # Frame management
+├── examples/                  # Example scripts
+│   ├── __init__.py
+│   ├── example_usage.py       # Basic usage examples
+│   ├── integration_example.py # Integration with vision system
+│   ├── quick_start.py         # Quick start guide
+│   └── validation_example.py  # IMU validation examples
+├── tests/                     # Test scripts
+│   ├── __init__.py
+│   └── test_validation.py     # IMU validation tests
+└── README.md                  # This file
+```
+
 ## Examples
 
 **All examples should be run from the `src` folder:**
@@ -256,31 +280,31 @@ target_position = control_command['target_position']
 ### Run Basic Demo
 ```bash
 cd src
-python -m imu_vision.example_usage
+python -m imu_vision.examples.example_usage
 ```
 
 ### Run Integration Example
 ```bash
 cd src
-python -m imu_vision.integration_example --show --enable-imu
+python -m imu_vision.examples.integration_example --show --enable-imu
 ```
 
 ### Run Quick Start
 ```bash
 cd src
-python -m imu_vision.quick_start
+python -m imu_vision.examples.quick_start
 ```
 
 ### Test IMU Validation
 ```bash
 cd src
-python -m imu_vision.test_validation
+python -m imu_vision.tests.test_validation
 ```
 
 ### Run Validation Examples
 ```bash
 cd src
-python -m imu_vision.validation_example
+python -m imu_vision.examples.validation_example
 ```
 
 ### Run Vision System
