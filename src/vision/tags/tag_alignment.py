@@ -29,30 +29,44 @@ class RobotArmTagConfig:
     
     # Define tag IDs and their expected positions on the robot arm
     TAG_POSITIONS = {
-        0: "hand_top",      # First tag on top of the hand
-        1: "hand_side",     # Second on side of the hand/on thumb
-        2: "forearm_top",   # Third on top of the forearm
-        3: "forearm_bottom", # Fourth on bottom side of the forearm
-        4: "upper_arm_top", # Fifth on top of the upper arm (bicep)
-        5: "upper_arm_bottom" # Sixth on bottom of the upper arm (tricep)
+        0: "upper_arm_top", 
+        1: "forearm_top",     
+        2: "hand_top",
+        3: "upper_arm_bottom",
+        4: "forearm_bottom",
+        5: "hand_bottom",
+        6: "hand_side",
+    }
+    
+    # Define body parts and their associated tags
+    BODY_PARTS = {
+        "upper_arm": [0, 3],  # upper_arm_top, upper_arm_bottom
+        "forearm": [1, 4],    # forearm_top, forearm_bottom
+        "hand": [2, 5, 6]     # hand_top, hand_bottom, hand_side
     }
     
     # Define expected alignments between tags
     EXPECTED_ALIGNMENTS = [
         # Vertical alignments (tags should be vertically aligned)
-        (0, 2, "vertical"),    # hand_top with forearm_top
-        (1, 3, "vertical"),    # hand_side with forearm_bottom
-        (2, 4, "vertical"),    # forearm_top with upper_arm_top
-        (3, 5, "vertical"),    # forearm_bottom with upper_arm_bottom
         
-        # Horizontal alignments (tags should be horizontally aligned)
-        (0, 1, "horizontal"),  # hand_top with hand_side
-        (2, 3, "horizontal"),  # forearm_top with forearm_bottom
-        (4, 5, "horizontal"),  # upper_arm_top with upper_arm_bottom
+        (0, 1, "parallel"),    # upper_arm_top with forearm_top
+        (1, 2, "parallel"),    # forearm_top with hand_top
+        (0, 1, "vertical"),    # upper_arm_top with forearm_top
+        (1, 2, "vertical"),    # forearm_top with hand_top
+        (0, 1, "horizontal"),    # upper_arm_top with forearm_top
+        (1, 2, "horizontal"),    # forearm_top with hand_top
+        (3, 4, "parallel"),    # upper_arm_bottom with forearm_bottom
+        (4, 5, "parallel"),    # forearm_bottom with hand_bottom
         
-        # Parallel alignments (tags should be parallel to each other)
-        (0, 4, "parallel"),    # hand_top with upper_arm_top
-        (1, 5, "parallel"),    # hand_side with upper_arm_bottom
+        
+        (1, 5, "parallel"),    # forearm_top with hand_bottom
+        (1, 6, "parallel"),    # forearm_top with hand_side
+        (4, 6, "parallel"),    # forearm_bottom with hand_side
+        (1, 5, "horizontal"),    # forearm_top with hand_bottom
+        (1, 6, "horizontal"),    # forearm_top with hand_side
+        (4, 6, "horizontal"),    # forearm_bottom with hand_side
+
+        # Could also add 0-2, 3-5, 0-6, 3-6
     ]
 
 
@@ -268,3 +282,69 @@ class TagAlignmentDetector:
         tag2_name = self.get_tag_name(alignment.tag2_id)
         
         return f"{tag1_name} <-> {tag2_name}"# ({alignment.alignment_type})"
+    
+    def detect_states(self, alignments: List[TagAlignment]) -> List[str]:
+        """
+        Detect states based on aligned tags from different body parts.
+        A state consists of one tag from upper_arm, one from forearm, and one from hand.
+        
+        Args:
+            alignments: List of TagAlignment objects
+            
+        Returns:
+            List of state strings (e.g., ["state_0-1-6", "state_3-4-5"])
+        """
+        if not alignments:
+            return []
+        
+        # Build a graph of which tags are aligned with each other
+        aligned_tags = {}
+        for alignment in alignments:
+            tag1_id = alignment.tag1_id
+            tag2_id = alignment.tag2_id
+            
+            if tag1_id not in aligned_tags:
+                aligned_tags[tag1_id] = set()
+            if tag2_id not in aligned_tags:
+                aligned_tags[tag2_id] = set()
+            
+            aligned_tags[tag1_id].add(tag2_id)
+            aligned_tags[tag2_id].add(tag1_id)
+        
+        # Find all detected tags organized by body part
+        detected_tags_by_part = {
+            "upper_arm": [],
+            "forearm": [],
+            "hand": []
+        }
+        
+        for tag_id in aligned_tags.keys():
+            for part_name, tag_ids in self.config.BODY_PARTS.items():
+                if tag_id in tag_ids:
+                    detected_tags_by_part[part_name].append(tag_id)
+                    break
+        
+        # Find all valid states (one tag from each body part that are all aligned together)
+        states = []
+        
+        for upper_arm_tag in detected_tags_by_part["upper_arm"]:
+            for forearm_tag in detected_tags_by_part["forearm"]:
+                for hand_tag in detected_tags_by_part["hand"]:
+                    # Check if all three tags are aligned with each other
+                    # This means: upper_arm-forearm, forearm-hand, and upper_arm-hand alignments exist
+                    upper_forearm_aligned = (
+                        upper_arm_tag in aligned_tags and 
+                        forearm_tag in aligned_tags[upper_arm_tag]
+                    )
+                    forearm_hand_aligned = (
+                        forearm_tag in aligned_tags and 
+                        hand_tag in aligned_tags[forearm_tag]
+                    )
+                    
+                    # For a valid state, we need at least upper_arm-forearm and forearm-hand
+                    if upper_forearm_aligned and forearm_hand_aligned:
+                        state_name = f"state_{upper_arm_tag}-{forearm_tag}-{hand_tag}"
+                        if state_name not in states:
+                            states.append(state_name)
+        
+        return states
