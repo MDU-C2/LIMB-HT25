@@ -66,7 +66,7 @@ class FiducialDepthSystem:
         print(f"FiducialDepthSystem initialized with IMU smoothing: {enable_imu_smoothing}, IMU validation: {enable_imu_validation}")
     
     def process_frame(self, 
-                     tag_detection_result: Optional[Dict[str, Any]] = None,
+                     tag_detection_result = None,
                      cup_detection_result: Optional[Dict[str, Any]] = None,
                      depth_image: Optional[np.ndarray] = None,
                      imu_data: Optional[IMUData] = None) -> Dict[str, Any]:
@@ -107,7 +107,7 @@ class FiducialDepthSystem:
         return result
     
     def _process_hand_pose(self, 
-                          tag_detection_result: Optional[Dict[str, Any]], 
+                          tag_detection_result, 
                           current_time: float,
                           imu_data: Optional[IMUData]) -> Dict[str, Any]:
         """Process hand pose estimation with IMU validation."""
