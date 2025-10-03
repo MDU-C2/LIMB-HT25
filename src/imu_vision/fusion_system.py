@@ -15,7 +15,7 @@ from .calibration import CalibrationManager
 from .hand_pose import HandPoseEstimator
 from .cup_3d import Cup3DEstimator
 from .relative_pose import RelativePoseCalculator
-from .smoothing import IMUSmoother, IMUData
+from .smoothing import IMUSmoother, IMUData, IMUValidator
 
 
 class FiducialDepthSystem:
@@ -25,17 +25,22 @@ class FiducialDepthSystem:
                  camera_matrix: np.ndarray,
                  calibration_file: Optional[str] = None,
                  enable_imu_smoothing: bool = False,
-                 smoothing_method: str = "complementary"):
+                 enable_imu_validation: bool = True,
+                 smoothing_method: str = "complementary",
+                 validation_thresholds: Optional[Dict[str, float]] = None):
         """Initialize the fiducial depth system.
         
         Args:
             camera_matrix: 3x3 camera intrinsic matrix
             calibration_file: Path to calibration file (optional)
             enable_imu_smoothing: Whether to enable IMU smoothing
+            enable_imu_validation: Whether to enable IMU validation
             smoothing_method: IMU smoothing method ("complementary", "ekf", "hold")
+            validation_thresholds: Custom validation thresholds
         """
         self.camera_matrix = camera_matrix
         self.enable_imu_smoothing = enable_imu_smoothing
+        self.enable_imu_validation = enable_imu_validation
         
         # Initialize components
         self.calibration_manager = CalibrationManager(calibration_file)
@@ -48,12 +53,17 @@ class FiducialDepthSystem:
         if enable_imu_smoothing:
             self.imu_smoother = IMUSmoother(smoothing_method)
         
+        # Initialize IMU validator if enabled
+        self.imu_validator = None
+        if enable_imu_validation:
+            self.imu_validator = IMUValidator(validation_thresholds)
+        
         # State tracking
         self.last_hand_pose = None
         self.last_cup_position = None
         self.last_update_time = None
         
-        print(f"FiducialDepthSystem initialized with IMU smoothing: {enable_imu_smoothing}")
+        print(f"FiducialDepthSystem initialized with IMU smoothing: {enable_imu_smoothing}, IMU validation: {enable_imu_validation}")
     
     def process_frame(self, 
                      tag_detection_result: Optional[Dict[str, Any]] = None,
@@ -100,13 +110,14 @@ class FiducialDepthSystem:
                           tag_detection_result: Optional[Dict[str, Any]], 
                           current_time: float,
                           imu_data: Optional[IMUData]) -> Dict[str, Any]:
-        """Process hand pose estimation."""
+        """Process hand pose estimation with IMU validation."""
         result = {
             'detected': False,
             'T_WH': None,
             'position': None,
             'orientation': None,
-            'source': None
+            'source': None,
+            'validation': None
         }
         
         # Try to get pose from ArUco detection
@@ -114,15 +125,28 @@ class FiducialDepthSystem:
         
         if T_WH_vision is not None:
             # Vision-based pose available
+            validation_result = None
+            
+            # Validate with IMU if available
+            if self.imu_validator is not None and imu_data is not None:
+                validation_result = self.imu_validator.validate_pose(T_WH_vision, imu_data, current_time)
+                
+                # Log validation issues
+                if not validation_result['is_valid']:
+                    print(f"⚠️  IMU Validation Failed: {validation_result['issues']}")
+                elif validation_result['confidence'] < 0.8:
+                    print(f"⚠️  Low IMU Validation Confidence: {validation_result['confidence']:.2f}")
+            
             result.update({
                 'detected': True,
                 'T_WH': T_WH_vision,
                 'position': T_WH_vision[:3, 3].tolist(),
                 'orientation': T_WH_vision[:3, :3].tolist(),
-                'source': 'vision'
+                'source': 'vision',
+                'validation': validation_result
             })
             
-            # Update IMU smoother with vision correction
+            # Update IMU smoother with vision correction (if smoothing enabled)
             if self.imu_smoother is not None:
                 self.imu_smoother.update_with_vision(T_WH_vision, current_time)
             
@@ -139,7 +163,8 @@ class FiducialDepthSystem:
                     'T_WH': T_WH_imu,
                     'position': T_WH_imu[:3, 3].tolist(),
                     'orientation': T_WH_imu[:3, :3].tolist(),
-                    'source': 'imu_prediction'
+                    'source': 'imu_prediction',
+                    'validation': None  # IMU prediction doesn't need validation
                 })
                 
                 self.last_hand_pose = T_WH_imu
@@ -213,11 +238,15 @@ class FiducialDepthSystem:
         info = {
             'calibrated': self.calibration_manager.is_calibrated(),
             'imu_smoothing_enabled': self.enable_imu_smoothing,
+            'imu_validation_enabled': self.enable_imu_validation,
             'last_update_time': self.last_update_time
         }
         
         if self.imu_smoother is not None:
             info['imu_smoothing'] = self.imu_smoother.get_smoothing_info()
+        
+        if self.imu_validator is not None:
+            info['imu_validation'] = self.imu_validator.get_validation_info()
         
         info['calibration'] = self.calibration_manager.get_calibration_info()
         

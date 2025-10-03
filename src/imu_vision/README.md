@@ -38,9 +38,17 @@ The system uses three main coordinate frames:
 - Methods: complementary filter, EKF, position hold
 - Propagates hand pose with IMU at 200-400 Hz
 
-### 7. Main Fusion System (`fusion_system.py`)
+### 7. IMU Validation (`smoothing.py`)
+- `IMUValidator`: Validates vision poses using IMU data
+- **Motion Validation**: Checks if acceleration/angular velocity are physically reasonable
+- **Orientation Validation**: Validates rotation matrix properties
+- **Temporal Consistency**: Detects large position/orientation jumps
+- **Independent Operation**: Can be used without IMU smoothing
+
+### 8. Main Fusion System (`fusion_system.py`)
 - `FiducialDepthSystem`: Orchestrates all components
 - Main interface for the complete system
+- Supports both IMU smoothing and validation independently
 
 ## Usage
 
@@ -54,7 +62,8 @@ from imu_vision import FiducialDepthSystem
 camera_matrix = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
 system = FiducialDepthSystem(
     camera_matrix=camera_matrix,
-    enable_imu_smoothing=True
+    enable_imu_smoothing=True,
+    enable_imu_validation=True  # NEW: Validate vision with IMU
 )
 
 # Process frame
@@ -63,6 +72,14 @@ result = system.process_frame(
     cup_detection_result=cup_result,
     imu_data=imu_data
 )
+
+# Check validation results
+if result['hand_pose']['validation']:
+    validation = result['hand_pose']['validation']
+    if validation['is_valid']:
+        print(f"✅ Pose validated (confidence: {validation['confidence']:.2f})")
+    else:
+        print(f"❌ Pose rejected: {validation['issues']}")
 
 # Get control command
 control_command = system.get_control_command()
@@ -76,7 +93,11 @@ from imu_vision import FiducialDepthSystem
 
 # Initialize both systems
 vision_system = VisionSystem(camera_matrix, dist_coeffs, marker_length_m=0.03)
-fiducial_system = FiducialDepthSystem(camera_matrix, enable_imu_smoothing=True)
+fiducial_system = FiducialDepthSystem(
+    camera_matrix, 
+    enable_imu_smoothing=True,
+    enable_imu_validation=True
+)
 
 # Process frame
 vision_result = vision_system.process_frame(frame, mode="combined")
@@ -85,6 +106,28 @@ fiducial_result = fiducial_system.process_frame(
     cup_detection_result=vision_result.get("cup_result"),
     imu_data=imu_data
 )
+```
+
+### IMU Validation Only (No Smoothing)
+
+```python
+# Use IMU validation without smoothing
+system = FiducialDepthSystem(
+    camera_matrix=camera_matrix,
+    enable_imu_smoothing=False,  # No smoothing
+    enable_imu_validation=True   # But validate with IMU
+)
+
+# Process frame - validation will check vision poses
+result = system.process_frame(
+    tag_detection_result=tag_result,
+    imu_data=imu_data
+)
+
+# Validation results are always available for vision poses
+validation = result['hand_pose']['validation']
+if validation and not validation['is_valid']:
+    print(f"⚠️  Vision pose rejected: {validation['issues']}")
 ```
 
 ## Calibration
@@ -136,6 +179,61 @@ result = system.process_frame(
 )
 ```
 
+## IMU Validation
+
+The system can validate vision poses using IMU data to detect physically unreasonable results:
+
+```python
+# Create IMU data for validation
+imu_data = IMUData(
+    angular_velocity=np.array([0.1, 0.05, -0.02]),  # rad/s
+    linear_acceleration=np.array([0.2, -0.1, 9.8]),  # m/s²
+    timestamp=time.time()
+)
+
+# Process frame with validation
+result = system.process_frame(
+    tag_detection_result=tag_result,
+    imu_data=imu_data
+)
+
+# Check validation results
+validation = result['hand_pose']['validation']
+if validation:
+    print(f"Validation: Valid={validation['is_valid']}")
+    print(f"Confidence: {validation['confidence']:.3f}")
+    if validation['issues']:
+        print(f"Issues: {validation['issues']}")
+    if validation['warnings']:
+        print(f"Warnings: {validation['warnings']}")
+```
+
+### Custom Validation Thresholds
+
+```python
+# Custom validation thresholds
+custom_thresholds = {
+    'max_acceleration': 100.0,      # Allow higher acceleration
+    'max_angular_velocity': 20.0,   # Allow faster rotation
+    'max_position_jump': 1.0,       # Allow larger position jumps
+    'max_orientation_jump': 0.8,    # Allow larger orientation changes
+}
+
+system = FiducialDepthSystem(
+    camera_matrix=camera_matrix,
+    enable_imu_validation=True,
+    validation_thresholds=custom_thresholds
+)
+```
+
+### Validation Features
+
+- **Motion Validation**: Checks if IMU acceleration and angular velocity are physically reasonable
+- **Orientation Validation**: Validates rotation matrix properties (orthogonality, determinant)
+- **Temporal Consistency**: Detects large position/orientation jumps between frames
+- **Confidence Scoring**: Provides confidence scores for validation results
+- **Independent Operation**: Can be used without IMU smoothing
+
 ## Control Information
 
 The system provides comprehensive control information:
@@ -173,6 +271,18 @@ cd src
 python -m imu_vision.quick_start
 ```
 
+### Test IMU Validation
+```bash
+cd src
+python -m imu_vision.test_validation
+```
+
+### Run Validation Examples
+```bash
+cd src
+python -m imu_vision.validation_example
+```
+
 ### Run Vision System
 ```bash
 cd src
@@ -184,7 +294,8 @@ python -m vision.main --mode combined --show
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   ArUco Tags    │    │   YOLO + Depth   │    │   IMU Data      │
-│   (Hand Pose)   │    │   (Cup 3D)       │    │   (Smoothing)   │
+│   (Hand Pose)   │    │   (Cup 3D)       │    │ (Smoothing +    │
+│                 │    │                  │    │  Validation)    │
 └─────────┬───────┘    └─────────┬────────┘    └─────────┬───────┘
           │                      │                       │
           ▼                      ▼                       ▼
@@ -192,6 +303,12 @@ python -m vision.main --mode combined --show
 │ Hand Pose       │    │ Cup 3D           │    │ IMU Smoother    │
 │ Estimator       │    │ Estimator        │    │ (Optional)      │
 └─────────┬───────┘    └─────────┬────────┘    └─────────┬───────┘
+          │                      │                       │
+          ▼                      │                       │
+┌─────────────────┐              │                       │
+│ IMU Validator   │              │                       │
+│ (Optional)      │              │                       │
+└─────────┬───────┘              │                       │
           │                      │                       │
           └──────────────────────┼───────────────────────┘
                                  ▼
@@ -211,8 +328,18 @@ python -m vision.main --mode combined --show
 1. **Simple**: No complex VIO algorithms
 2. **Robust**: ArUco markers provide reliable pose estimation
 3. **Flexible**: Optional IMU smoothing for temporary vision loss
-4. **Extensible**: Easy to add new components or modify existing ones
-5. **Well-tested**: Comprehensive examples and integration scripts
+4. **Quality Control**: IMU validation detects bad vision results
+5. **Independent Features**: Use validation without smoothing
+6. **Extensible**: Easy to add new components or modify existing ones
+7. **Well-tested**: Comprehensive examples and integration scripts
+
+## Validation Benefits
+
+- **Safety**: Prevent dangerous robot movements from bad vision data
+- **Debugging**: Get detailed information about pose quality issues
+- **Robustness**: Flag suspicious poses even without IMU smoothing
+- **Quality Assurance**: Validate vision results with physical constraints
+- **Flexible Thresholds**: Customize validation criteria for your application
 
 ## Future Extensions
 
@@ -221,3 +348,5 @@ python -m vision.main --mode combined --show
 - Advanced depth processing algorithms
 - Real-time performance optimization
 - Integration with robot control systems
+- Enhanced validation algorithms (Kalman filter-based validation)
+- Machine learning-based anomaly detection

@@ -277,3 +277,215 @@ class IMUSmoother:
             'current_position': self.current_position.tolist() if self.current_position is not None else None,
             'current_quaternion': self.current_quaternion.tolist() if self.current_quaternion is not None else None
         }
+
+
+class IMUValidator:
+    """IMU-based validation for vision system results."""
+    
+    def __init__(self, 
+                 validation_thresholds: Optional[Dict[str, float]] = None,
+                 enable_motion_validation: bool = True,
+                 enable_orientation_validation: bool = True,
+                 enable_consistency_checking: bool = True):
+        """Initialize IMU validator.
+        
+        Args:
+            validation_thresholds: Thresholds for validation
+            enable_motion_validation: Check if motion is physically reasonable
+            enable_orientation_validation: Check orientation consistency
+            enable_consistency_checking: Check temporal consistency
+        """
+        self.enable_motion_validation = enable_motion_validation
+        self.enable_orientation_validation = enable_orientation_validation
+        self.enable_consistency_checking = enable_consistency_checking
+        
+        # Default validation thresholds
+        self.thresholds = {
+            'max_acceleration': 50.0,  # m/s² (reasonable human motion limit)
+            'max_angular_velocity': 10.0,  # rad/s (reasonable rotation speed)
+            'max_position_jump': 0.5,  # meters (max position change between frames)
+            'max_orientation_jump': 0.5,  # radians (max orientation change)
+            'min_gravity_magnitude': 8.0,  # m/s² (gravity should be ~9.8)
+            'max_gravity_deviation': 2.0,  # m/s² (acceptable gravity deviation)
+        }
+        
+        if validation_thresholds:
+            self.thresholds.update(validation_thresholds)
+        
+        # History for temporal consistency
+        self.last_pose = None
+        self.last_imu_data = None
+        self.last_timestamp = None
+        self.pose_history = []
+        self.max_history = 10
+        
+    def validate_pose(self, 
+                     vision_pose: np.ndarray,
+                     imu_data: IMUData,
+                     timestamp: float) -> Dict[str, Any]:
+        """Validate a vision-based pose using IMU data.
+        
+        Args:
+            vision_pose: 4x4 transformation matrix from vision
+            imu_data: Current IMU measurements
+            timestamp: Current timestamp
+            
+        Returns:
+            Validation results with confidence score and issues
+        """
+        validation_result = {
+            'is_valid': True,
+            'confidence': 1.0,
+            'issues': [],
+            'warnings': [],
+            'validation_details': {}
+        }
+        
+        if vision_pose is None or imu_data is None:
+            validation_result['is_valid'] = False
+            validation_result['confidence'] = 0.0
+            validation_result['issues'].append('Missing vision pose or IMU data')
+            return validation_result
+        
+        # Extract position and orientation from vision pose
+        vision_position = vision_pose[:3, 3]
+        vision_rotation = vision_pose[:3, :3]
+        
+        # 1. Motion validation (check if motion is physically reasonable)
+        if self.enable_motion_validation:
+            motion_result = self._validate_motion(vision_pose, imu_data, timestamp)
+            validation_result['validation_details']['motion'] = motion_result
+            if not motion_result['is_valid']:
+                validation_result['is_valid'] = False
+                validation_result['issues'].extend(motion_result['issues'])
+            validation_result['confidence'] *= motion_result['confidence']
+        
+        # 2. Orientation validation (check orientation consistency with IMU)
+        if self.enable_orientation_validation:
+            orientation_result = self._validate_orientation(vision_rotation, imu_data)
+            validation_result['validation_details']['orientation'] = orientation_result
+            if not orientation_result['is_valid']:
+                validation_result['is_valid'] = False
+                validation_result['issues'].extend(orientation_result['issues'])
+            validation_result['confidence'] *= orientation_result['confidence']
+        
+        # 3. Temporal consistency checking
+        if self.enable_consistency_checking:
+            consistency_result = self._validate_temporal_consistency(vision_pose, timestamp)
+            validation_result['validation_details']['consistency'] = consistency_result
+            if not consistency_result['is_valid']:
+                validation_result['is_valid'] = False
+                validation_result['issues'].extend(consistency_result['issues'])
+            validation_result['confidence'] *= consistency_result['confidence']
+        
+        # Update history
+        self._update_history(vision_pose, imu_data, timestamp)
+        
+        return validation_result
+    
+    def _validate_motion(self, pose: np.ndarray, imu_data: IMUData, timestamp: float) -> Dict[str, Any]:
+        """Validate motion is physically reasonable."""
+        result = {'is_valid': True, 'confidence': 1.0, 'issues': []}
+        
+        # Check IMU acceleration magnitude
+        accel_magnitude = np.linalg.norm(imu_data.linear_acceleration)
+        if accel_magnitude > self.thresholds['max_acceleration']:
+            result['is_valid'] = False
+            result['issues'].append(f'Excessive acceleration: {accel_magnitude:.2f} m/s²')
+            result['confidence'] *= 0.3
+        
+        # Check angular velocity magnitude
+        angular_magnitude = np.linalg.norm(imu_data.angular_velocity)
+        if angular_magnitude > self.thresholds['max_angular_velocity']:
+            result['is_valid'] = False
+            result['issues'].append(f'Excessive angular velocity: {angular_magnitude:.2f} rad/s')
+            result['confidence'] *= 0.5
+        
+        # Check if gravity is reasonable (should be ~9.8 m/s² in stationary conditions)
+        if accel_magnitude < self.thresholds['min_gravity_magnitude']:
+            result['warnings'] = result.get('warnings', [])
+            result['warnings'].append('Low acceleration magnitude - possible sensor issue')
+            result['confidence'] *= 0.8
+        elif accel_magnitude > 9.8 + self.thresholds['max_gravity_deviation']:
+            result['warnings'] = result.get('warnings', [])
+            result['warnings'].append('High acceleration magnitude - possible motion or sensor issue')
+            result['confidence'] *= 0.9
+        
+        return result
+    
+    def _validate_orientation(self, vision_rotation: np.ndarray, imu_data: IMUData) -> Dict[str, Any]:
+        """Validate orientation consistency with IMU."""
+        result = {'is_valid': True, 'confidence': 1.0, 'issues': []}
+        
+        # Check if rotation matrix is valid (orthogonal)
+        if not np.allclose(vision_rotation @ vision_rotation.T, np.eye(3), atol=1e-6):
+            result['is_valid'] = False
+            result['issues'].append('Invalid rotation matrix')
+            result['confidence'] *= 0.1
+        
+        # Check determinant (should be 1 for rotation matrix)
+        det = np.linalg.det(vision_rotation)
+        if abs(det - 1.0) > 1e-6:
+            result['is_valid'] = False
+            result['issues'].append(f'Invalid rotation matrix determinant: {det:.6f}')
+            result['confidence'] *= 0.1
+        
+        return result
+    
+    def _validate_temporal_consistency(self, pose: np.ndarray, timestamp: float) -> Dict[str, Any]:
+        """Validate temporal consistency with previous poses."""
+        result = {'is_valid': True, 'confidence': 1.0, 'issues': []}
+        
+        if self.last_pose is None or self.last_timestamp is None:
+            return result
+        
+        dt = timestamp - self.last_timestamp
+        if dt <= 0:
+            result['is_valid'] = False
+            result['issues'].append('Invalid timestamp')
+            return result
+        
+        # Check position jump
+        position_change = np.linalg.norm(pose[:3, 3] - self.last_pose[:3, 3])
+        if position_change > self.thresholds['max_position_jump']:
+            result['is_valid'] = False
+            result['issues'].append(f'Large position jump: {position_change:.3f}m')
+            result['confidence'] *= 0.2
+        
+        # Check orientation jump
+        rotation_change = np.linalg.norm(pose[:3, :3] - self.last_pose[:3, :3])
+        if rotation_change > self.thresholds['max_orientation_jump']:
+            result['is_valid'] = False
+            result['issues'].append(f'Large orientation jump: {rotation_change:.3f}')
+            result['confidence'] *= 0.3
+        
+        return result
+    
+    def _update_history(self, pose: np.ndarray, imu_data: IMUData, timestamp: float):
+        """Update pose and IMU history."""
+        self.last_pose = pose.copy()
+        self.last_imu_data = imu_data
+        self.last_timestamp = timestamp
+        
+        # Keep limited history
+        self.pose_history.append({
+            'pose': pose.copy(),
+            'timestamp': timestamp,
+            'imu_data': imu_data
+        })
+        
+        if len(self.pose_history) > self.max_history:
+            self.pose_history.pop(0)
+    
+    def get_validation_info(self) -> Dict[str, Any]:
+        """Get validation system information."""
+        return {
+            'enabled_features': {
+                'motion_validation': self.enable_motion_validation,
+                'orientation_validation': self.enable_orientation_validation,
+                'consistency_checking': self.enable_consistency_checking
+            },
+            'thresholds': self.thresholds,
+            'history_length': len(self.pose_history),
+            'has_recent_data': self.last_timestamp is not None
+        }
