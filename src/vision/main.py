@@ -11,6 +11,7 @@ from system import VisionSystem
 from tags.camera_calibration import load_calibration_json
 from utils.performance_monitor import get_performance_monitor
 
+
 def load_camera_calibration(calibration_path: Optional[str] = None) -> tuple[np.ndarray, np.ndarray]:
     """Load camera calibration with fallback to placeholder values."""
     if calibration_path is None:
