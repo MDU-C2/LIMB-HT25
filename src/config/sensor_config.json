@@ -1,0 +1,43 @@
+{
+  "sensor_mappings": {
+    "MOVE_to_cup": ["vision", "imu", "piezo"],
+    "GRAB_cup": ["vision", "pressure", "slip"],
+    "LIFT_cup": ["vision", "pressure", "slip", "imu"],
+    "MOVE_cup_ab": ["vision", "pressure", "slip", "imu"],
+    "PLACE_DOWN_cup": ["vision", "pressure", "slip", "imu"],
+    "RELEASE_cup": ["vision", "pressure", "slip"],
+    "MOVE_back_hand": ["vision", "imu", "piezo"]
+  },
+  "sensor_configs": {
+    "imu": {
+      "port": null,
+      "baudrate": 115200,
+      "auto_detect": true
+    },
+    "vision": {
+      "camera_device_id": 0,
+      "target_fps": 30.0,
+      "calibration_file": "vision/tags/camera_calibration.json"
+    },
+    "pressure": {
+      "threshold": 0.5,
+      "sample_rate": 100
+    },
+    "slip": {
+      "threshold": 0.3,
+      "sample_rate": 100
+    },
+    "piezo": {
+      "contact_threshold": 0.5,
+      "vibration_threshold": 0.2,
+      "sample_rate": 100
+    }
+  },
+  "robot_config": {
+    "connection_type": "ethernet",
+    "ip_address": "192.168.1.100",
+    "port": 502,
+    "speed": 0.1,
+    "acceleration": 0.05
+  }
+}
