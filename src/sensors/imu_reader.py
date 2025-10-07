@@ -14,6 +14,14 @@ import time
 import threading
 from typing import Optional, Dict, Any
 from queue import Queue, Empty
+from dataclasses import dataclass
+
+@dataclass
+class IMUData:
+    """IMU data structure."""
+    angular_velocity: np.ndarray  # [wx, wy, wz] in rad/s
+    linear_acceleration: np.ndarray  # [ax, ay, az] in m/s²
+    timestamp: float  # seconds
 
 class IMUReader:
     """Python interface to ESP32 IMU sensor via serial communication."""
@@ -39,14 +47,9 @@ class IMUReader:
         self.last_read_time = None
         self.boot_time = None
         
-        # Import IMUData from data fusion system
-        try:
-            from data_fusion.smoothing import IMUData
-            self.IMUData = IMUData
-        except ImportError:
-            print("Warning: Could not import IMUData from fusion system")
-            self.IMUData = None
-        
+        # IMUData is a class, not an instance
+        self.IMUData = IMUData
+       
         print(f"IMUReader initialized (port: {self.port or 'auto-detect'}, baudrate: {self.baudrate})")
     
     def activate(self) -> bool:
@@ -191,23 +194,19 @@ class IMUReader:
                 data = json.loads(line)
                 
                 # Convert to IMUData format if available
-                if self.IMUData:
-                    imu_data = self.IMUData(
-                        angular_velocity=np.array([
-                            data.get('gyro', {}).get('x', 0.0),
-                            data.get('gyro', {}).get('y', 0.0),
-                            data.get('gyro', {}).get('z', 0.0)
-                        ], dtype=np.float64),
-                        linear_acceleration=np.array([
-                            data.get('accel', {}).get('x', 0.0),
-                            data.get('accel', {}).get('y', 0.0),
-                            data.get('accel', {}).get('z', 0.0)
-                        ], dtype=np.float64),
-                        timestamp=data.get('timestamp', time.time())
-                    )
-                else:
-                    # Fallback to raw data
-                    imu_data = data
+                imu_data = self.IMUData(
+                    angular_velocity=np.array([
+                        data.get('gyro', {}).get('x', 0.0),
+                        data.get('gyro', {}).get('y', 0.0),
+                        data.get('gyro', {}).get('z', 0.0)
+                    ], dtype=np.float64),
+                    linear_acceleration=np.array([
+                        data.get('accel', {}).get('x', 0.0),
+                        data.get('accel', {}).get('y', 0.0),
+                        data.get('accel', {}).get('z', 0.0)
+                    ], dtype=np.float64),
+                    timestamp=data.get('timestamp', time.time())
+                )
                 
                 # Add to queue (non-blocking)
                 try:
