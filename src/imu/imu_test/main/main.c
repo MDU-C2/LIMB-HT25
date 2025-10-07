@@ -13,6 +13,7 @@
 // #include "esp_driver_i2c.h"  // Not needed for legacy I2C driver
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/uart.h"
 
 static const char *TAG = "LSM6DSO32";
 
@@ -45,6 +46,13 @@ static const char *TAG = "LSM6DSO32";
 #define LSM6DSO32_OUTY_H_A          0x2B        /*!< Accel Y output H */
 #define LSM6DSO32_OUTZ_L_A          0x2C        /*!< Accel Z output L */
 #define LSM6DSO32_OUTZ_H_A          0x2D        /*!< Accel Z output H */
+
+// Add UART configuration
+#define UART_NUM UART_NUM_0
+#define UART_TX_PIN 1
+#define UART_RX_PIN 3
+#define UART_BAUD_RATE 115200
+#define UART_BUF_SIZE 256
 
 // Data structures
 typedef struct {
@@ -172,20 +180,56 @@ static esp_err_t lsm6dso32_read_data(lsm6dso32_data_t *data)
     return ESP_OK;
 }
 
+/**
+ * @brief Initialize UART
+ */
+ static esp_err_t uart_init(void) {
+    uart_config_t uart_config = {
+        .baud_rate = UART_BAUD_RATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    
+    uart_driver_install(UART_NUM, UART_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM, &uart_config);
+    uart_set_pin(UART_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    return ESP_OK;
+}
+
+/**
+ * @brief Send IMU data to UART
+ */
+static void send_imu_data_json(const lsm6dso32_data_t *data) {
+    printf("{\"accel\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f},\"gyro\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f},\"temp\":%.1f}\n",
+        data->accel.x, data->accel.y, data->accel.z,
+        data->gyro.x, data->gyro.y, data->gyro.z,
+        data->temperature);
+}
+
+
 void app_main(void)
 {
     uint8_t data;
     esp_err_t ret;
 
+    // Disable logging on UART0 to keep JSON output clean
+    esp_log_level_set("*", ESP_LOG_NONE);
+    
     ESP_ERROR_CHECK(i2c_master_init());
-    ESP_LOGI(TAG, "I2C initialized successfully");
+    //ESP_LOGI(TAG, "I2C initialized successfully");
+
+    //ESP_ERROR_CHECK(uart_init());
+    //ESP_LOGI(TAG, "UART initialized successfully");
 
     /* Read the LSM6DSO32 WHO_AM_I register, on power up the register should have the value 0x6C */
     ESP_ERROR_CHECK(lsm6dso32_register_read(LSM6DSO32_WHO_AM_I_REG, &data, 1));
-    ESP_LOGI(TAG, "WHO_AM_I = 0x%02X (expected: 0x6C)", data);
+    //ESP_LOGI(TAG, "WHO_AM_I = 0x%02X (expected: 0x6C)", data);
 
     if (data != 0x6C) {
-        ESP_LOGE(TAG, "WHO_AM_I register value incorrect. Expected 0x6C, got 0x%02X", data);
+        //ESP_LOGE(TAG, "WHO_AM_I register value incorrect. Expected 0x6C, got 0x%02X", data);
         return;
     }
 
@@ -196,15 +240,11 @@ void app_main(void)
     while (1) {
         ret = lsm6dso32_read_data(&imu_data);
         if (ret == ESP_OK) {
-            ESP_LOGI(TAG, "Accel: X=%.2f, Y=%.2f, Z=%.2f m/s²", 
-                     imu_data.accel.x, imu_data.accel.y, imu_data.accel.z);
-            ESP_LOGI(TAG, "Gyro:  X=%.2f, Y=%.2f, Z=%.2f rad/s", 
-                     imu_data.gyro.x, imu_data.gyro.y, imu_data.gyro.z);
-            ESP_LOGI(TAG, "Temp:  %.1f °C", imu_data.temperature);
-            ESP_LOGI(TAG, "---");
-        } else {
-            ESP_LOGE(TAG, "Failed to read IMU data");
+
+            // Send data via UART
+            send_imu_data_json(&imu_data);
+
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
