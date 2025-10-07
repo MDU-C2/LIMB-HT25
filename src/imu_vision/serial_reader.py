@@ -31,11 +31,13 @@ class IMUSerialReader:
 
     def read_imu_data(self):
         """Read IMU data from the serial port."""
+        #print(self.running, self.serial_conn)
         if not self.running or not self.serial_conn:
             return None
 
         try:
             line = self.serial_conn.readline().decode('utf-8').strip()
+            #print("line:", line)
             if line:
                 data = json.loads(line)
                 return data

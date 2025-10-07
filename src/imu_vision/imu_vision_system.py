@@ -30,13 +30,13 @@ def main():
     # 2. Create fusion system
     fusion_system = FiducialDepthSystem(
         camera_matrix=camera_matrix,
-        enable_imu_smoothin=True,
+        enable_imu_smoothing=True,
         smoothing_method="complementary"
     )
     print("Fusion system created successfully")
 
     # 3. Connect to IMU
-    imu_reader = IMUSerialReader(port="/dev/usbmodem1101") # CHECK IF THIS IS CORRECT
+    imu_reader = IMUSerialReader(port="/dev/cu.usbmodem1101") # CHECK IF THIS IS CORRECT
     if not imu_reader.connect():
         print("Failed to connect to IMU")
         return
@@ -59,7 +59,7 @@ def main():
             # Read IMU data
             imu_raw = imu_reader.read_imu_data()
             imu_data = None
-
+            #print(imu_raw)
             if imu_raw:
                     # Convert to IMUData format
                     imu_data = IMUData(
@@ -77,17 +77,18 @@ def main():
                     )
 
             result = fusion_system.process_frame(
-                tag_detection=None,
-                cup_detection=None,
+                tag_detection_result=None,
+                cup_detection_result=None,
                 imu_data=imu_data
             )
 
             # Display results
-            print(f"Hand pose detected: {result['hand_pose']['detected']}")
+            #print(f"Hand pose detected: {result['hand_pose']['detected']}")
+            #print(imu_data)
             if imu_data:
                 print(f"IMU: Accel=({imu_data.linear_acceleration[0]:.2f}, "
                       f"{imu_data.linear_acceleration[1]:.2f}, "
-                      f"{imu_data.linear_acceleration[2]:.2f})")
+                      f"{imu_data.linear_acceleration[2]:.2f})       ", end="\r", flush=True)
             
             # Show camera frame
             cv2.imshow("IMU-Vision Integration", frame)

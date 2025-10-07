@@ -203,14 +203,10 @@ static esp_err_t lsm6dso32_read_data(lsm6dso32_data_t *data)
  * @brief Send IMU data to UART
  */
 static void send_imu_data_json(const lsm6dso32_data_t *data) {
-    char json_buffer[200];
-    int len = snprintf(json_buffer, sizeof(json_buffer),
-        "{\"accel\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f},\"gyro\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f},\"temp\":%.1f}\n",
+    printf("{\"accel\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f},\"gyro\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f},\"temp\":%.1f}\n",
         data->accel.x, data->accel.y, data->accel.z,
         data->gyro.x, data->gyro.y, data->gyro.z,
         data->temperature);
-    
-    uart_write_bytes(UART_NUM, json_buffer, len);
 }
 
 
@@ -219,18 +215,21 @@ void app_main(void)
     uint8_t data;
     esp_err_t ret;
 
+    // Disable logging on UART0 to keep JSON output clean
+    esp_log_level_set("*", ESP_LOG_NONE);
+    
     ESP_ERROR_CHECK(i2c_master_init());
-    ESP_LOGI(TAG, "I2C initialized successfully");
+    //ESP_LOGI(TAG, "I2C initialized successfully");
 
-    ESP_ERROR_CHECK(uart_init());
-    ESP_LOGI(TAG, "UART initialized successfully");
+    //ESP_ERROR_CHECK(uart_init());
+    //ESP_LOGI(TAG, "UART initialized successfully");
 
     /* Read the LSM6DSO32 WHO_AM_I register, on power up the register should have the value 0x6C */
     ESP_ERROR_CHECK(lsm6dso32_register_read(LSM6DSO32_WHO_AM_I_REG, &data, 1));
-    ESP_LOGI(TAG, "WHO_AM_I = 0x%02X (expected: 0x6C)", data);
+    //ESP_LOGI(TAG, "WHO_AM_I = 0x%02X (expected: 0x6C)", data);
 
     if (data != 0x6C) {
-        ESP_LOGE(TAG, "WHO_AM_I register value incorrect. Expected 0x6C, got 0x%02X", data);
+        //ESP_LOGE(TAG, "WHO_AM_I register value incorrect. Expected 0x6C, got 0x%02X", data);
         return;
     }
 
@@ -245,21 +244,6 @@ void app_main(void)
             // Send data via UART
             send_imu_data_json(&imu_data);
 
-
-            static int log_counter = 0;
-            if (++log_counter >= 10) {
-                ESP_LOGI(TAG, "Sent IMU data via UART");
-                ESP_LOGI(TAG, "Accel: X=%.2f, Y=%.2f, Z=%.2f m/s²", 
-                    imu_data.accel.x, imu_data.accel.y, imu_data.accel.z);
-                ESP_LOGI(TAG, "Gyro:  X=%.2f, Y=%.2f, Z=%.2f rad/s", 
-                        imu_data.gyro.x, imu_data.gyro.y, imu_data.gyro.z);
-                ESP_LOGI(TAG, "Temp:  %.1f °C", imu_data.temperature);
-                ESP_LOGI(TAG, "---");
-                log_counter = 0;
-            }
-            
-        } else {
-            ESP_LOGE(TAG, "Failed to read IMU data");
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
