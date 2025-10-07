@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import existing modules
 from imu_vision.fusion_system import FiducialDepthSystem
 from imu_vision.smoothing import IMUData
-from vision.tags.camera_calibration import load_calibration_json
+from vision.tags.utils.camera_calibration import load_calibration_json
 
 # Your IMU reader
 from serial_reader import IMUSerialReader

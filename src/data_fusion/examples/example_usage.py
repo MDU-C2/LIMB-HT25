@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
 # Import the existing vision system components
 from vision.system import VisionSystem
-from vision.tags.camera_calibration import load_calibration_json
+from vision.tags.utils.camera_calibration import load_calibration_json
 
 # Import the new fiducial depth system
 from imu_vision.fusion_system import FiducialDepthSystem

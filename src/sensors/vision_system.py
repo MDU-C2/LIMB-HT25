@@ -44,12 +44,12 @@ class VisionSystemWrapper:
         try:
             # Import vision system components
             from vision.system import VisionSystem
-            from vision.tags.camera_calibration import load_calibration_json
+            from vision.tags.utils.camera_calibration import load_calibration_json
             
             # Load camera calibration
             if camera_matrix is None or dist_coeffs is None:
                 try:
-                    calibration_path = "vision/tags/camera_calibration.json"
+                    calibration_path = "vision/tags/utils/camera_calibration.json"
                     self.camera_matrix, self.dist_coeffs = load_calibration_json(calibration_path)
                     print(f"Loaded camera calibration from {calibration_path}")
                 except:

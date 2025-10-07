@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from system import VisionSystem
-from tags.camera_calibration import load_calibration_json
+from tags.utils.camera_calibration import load_calibration_json
 from utils.performance_monitor import get_performance_monitor
 
 

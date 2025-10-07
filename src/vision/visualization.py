@@ -4,6 +4,7 @@ import numpy as np
 from vision.tags.tag_detector import TagDetectionResult
 from vision.tags.tag_alignment import TagAlignmentDetector, TagAlignment
 from vision.cup import CupDetectionResult
+from vision.utils.geometry import calculate_camera_relative_coordinates
 
 def draw_axis_on_tag(frame, camera_matrix, dist_coeffs, rvecs, tvecs, length=0.01):
     """
@@ -46,73 +47,6 @@ def draw_axis_on_tag(frame, camera_matrix, dist_coeffs, rvecs, tvecs, length=0.0
         print(f"Error drawing axes: {e}")
 
     return frame
-
-
-def calculate_camera_relative_coordinates(tag_detection_result):
-    """
-    Calculate camera-relative coordinates for all detected tags.
-    
-    Args:
-        tag_detection_result: TagDetectionResult from TagDetector
-    
-    Returns:
-        Dictionary mapping tag_id to coordinate information
-    """
-    coordinates = {}
-    
-    if (tag_detection_result.tag_ids is None or 
-        tag_detection_result.tvecs is None or 
-        tag_detection_result.rvecs is None):
-        return coordinates
-    
-    for i, tag_id in enumerate(tag_detection_result.tag_ids):
-        if (i < len(tag_detection_result.tvecs) and 
-            i < len(tag_detection_result.rvecs)):
-            
-            # Get position and rotation
-            tvec = tag_detection_result.tvecs[i].flatten()
-            rvec = tag_detection_result.rvecs[i].flatten()
-            
-            # Convert rotation vector to rotation matrix
-            rotation_matrix, _ = cv2.Rodrigues(rvec)
-            
-            # Calculate Euler angles (roll, pitch, yaw)
-            sy = np.sqrt(rotation_matrix[0, 0] * rotation_matrix[0, 0] + rotation_matrix[1, 0] * rotation_matrix[1, 0])
-            singular = sy < 1e-6
-            
-            if not singular:
-                roll = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
-                pitch = np.arctan2(-rotation_matrix[2, 0], sy)
-                yaw = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-            else:
-                roll = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
-                pitch = np.arctan2(-rotation_matrix[2, 0], sy)
-                yaw = 0
-            
-            # Convert to degrees
-            roll_deg = np.degrees(roll)
-            pitch_deg = np.degrees(pitch)
-            yaw_deg = np.degrees(yaw)
-            
-            # Calculate distance from camera
-            distance = np.linalg.norm(tvec)
-            
-            coordinates[int(tag_id)] = {
-                'position': {
-                    'x': float(tvec[0]),  # meters
-                    'y': float(tvec[1]),  # meters
-                    'z': float(tvec[2])   # meters
-                },
-                'orientation': {
-                    'roll': float(roll_deg),   # degrees
-                    'pitch': float(pitch_deg), # degrees
-                    'yaw': float(yaw_deg)      # degrees
-                },
-                'distance': float(distance),  # meters from camera
-                'coordinate_system': 'camera_relative'
-            }
-    
-    return coordinates
 
 
 def calculate_tag_cup_distance(tag_detection_result, cup_detection_result, camera_matrix, target_tag_id=0):

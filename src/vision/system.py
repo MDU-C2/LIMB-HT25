@@ -10,7 +10,7 @@ import numpy as np
 from tags import TagDetector
 from cup import CupDetector
 from imu import IMUFusion
-from visualization import calculate_camera_relative_coordinates
+from utils.geometry import calculate_camera_relative_coordinates
 from utils.performance_monitor import get_performance_monitor, start_timer
 from utils.camera_optimizer import OptimizedCameraCapture, create_optimized_camera_config
 

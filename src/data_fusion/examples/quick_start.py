@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
 from imu_vision.fusion_system import FiducialDepthSystem
 from imu_vision.smoothing import IMUData
-from vision.tags.camera_calibration import load_calibration_json
+from vision.tags.utils.camera_calibration import load_calibration_json
 
 
 def main():
