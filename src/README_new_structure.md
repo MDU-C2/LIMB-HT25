@@ -8,6 +8,7 @@ src/
 │   ├── __init__.py
 │   ├── sensor_manager.py       # Central sensor coordinator
 │   ├── imu_reader.py          # ESP32 IMU interface
+│   ├── emg_reader.py          # 🆕 EMG sensor interface
 │   ├── vision_system.py       # Vision system wrapper
 │   ├── pressure_sensor.py     # Pressure sensor interface
 │   ├── slip_sensor.py         # Slip sensor interface
@@ -21,6 +22,8 @@ src/
 │   ├── __init__.py
 │   ├── fusion_system.py       # Main fusion system
 │   ├── smoothing.py           # IMU smoothing and validation
+│   ├── sensor_data_format.py  # 🆕 LSTM-ready data format (IMU+EMG)
+│   ├── imu_emg_lstm_example.py # 🆕 Example: collect data for LSTM
 │   ├── frames.py              # Coordinate frame definitions
 │   ├── hand_pose.py           # Hand pose estimation
 │   ├── cup_3d.py              # 3D cup position estimation
@@ -77,9 +80,21 @@ python3 main.py
 - **Modular Design**: Each sensor and action state is independent
 - **Dynamic Sensor Activation**: Only activates required sensors per state
 - **Data Fusion**: Advanced sensor fusion for pose estimation and tracking
+- **LSTM-Ready Data Format**: 🆕 Combines IMU + EMG data for neural networks
 - **Clean Integration**: Your existing IMU and vision code integrates seamlessly
 - **State Machine**: Implements the flowchart exactly as specified
 - **Configurable**: Easy to modify sensor requirements and parameters
+
+## 🧠 LSTM & Machine Learning
+
+The system now includes a unified data format for training LSTM neural networks:
+
+- **Combined IMU + EMG data** in a single feature vector
+- **Automatic sequence building** for time-series processing
+- **Normalized features** ready for PyTorch/TensorFlow
+- **Example collection script** for gathering training data
+
+See `src/data_fusion/QUICK_START_LSTM.md` for details!
 
 ## 📊 Sensor Usage Per State
 
