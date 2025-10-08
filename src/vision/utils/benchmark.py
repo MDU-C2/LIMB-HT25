@@ -396,7 +396,7 @@ def main():
     
     # Load camera calibration
     if args.calib and os.path.isfile(args.calib):
-        from tags.camera_calibration import load_calibration_json
+        from tags.utils.camera_calibration import load_calibration_json
         camera_matrix, dist_coeffs = load_calibration_json(args.calib)
     else:
         # Fallback calibration

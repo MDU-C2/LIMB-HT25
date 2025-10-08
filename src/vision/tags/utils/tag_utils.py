@@ -4,7 +4,7 @@ Utility functions for working with TagDetectionResult and its new fields.
 
 import numpy as np
 from typing import List, Optional, Tuple, Dict, Any
-from .tag_detector import TagDetectionResult
+from vision.tags.tag_detector import TagDetectionResult
 
 def get_tag_transform_by_id(tag_result: TagDetectionResult, tag_id: int) -> Optional[np.ndarray]:
     """

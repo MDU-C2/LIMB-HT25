@@ -1,3 +1,4 @@
+# Combine IMU and vision capture without using the tag or cup detection
 import sys
 import os
 import numpy as np
@@ -8,12 +9,12 @@ import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import existing modules
-from imu_vision.fusion_system import FiducialDepthSystem
-from imu_vision.smoothing import IMUData
-from vision.tags.camera_calibration import load_calibration_json
+from data_fusion.fusion_system import FiducialDepthSystem
+from data_fusion.smoothing import IMUData
+from vision.tags.utils.camera_calibration import load_calibration_json
 
-# Your IMU reader
-from serial_reader import IMUSerialReader
+# IMU reader
+from sensors.imu_reader import IMUReader
 
 def main():
     print("IMU-Vision System")
@@ -36,8 +37,8 @@ def main():
     print("Fusion system created successfully")
 
     # 3. Connect to IMU
-    imu_reader = IMUSerialReader(port="/dev/cu.usbmodem1101") # CHECK IF THIS IS CORRECT
-    if not imu_reader.connect():
+    imu_reader = IMUReader(port="/dev/cu.usbmodem1101")  # Or use None for auto-detect
+    if not imu_reader.activate():
         print("Failed to connect to IMU")
         return
     print("Connected to IMU successfully")
@@ -56,25 +57,8 @@ def main():
             if not ret:
                 continue
             
-            # Read IMU data
-            imu_raw = imu_reader.read_imu_data()
-            imu_data = None
-            #print(imu_raw)
-            if imu_raw:
-                    # Convert to IMUData format
-                    imu_data = IMUData(
-                        angular_velocity=np.array([
-                            imu_raw['gyro']['x'],
-                            imu_raw['gyro']['y'], 
-                            imu_raw['gyro']['z']
-                        ]),
-                        linear_acceleration=np.array([
-                            imu_raw['accel']['x'],
-                            imu_raw['accel']['y'],
-                            imu_raw['accel']['z']
-                        ]),
-                        timestamp=time.time()
-                    )
+            # Read IMU data (already in IMUData format from the reader)
+            imu_data = imu_reader.get_latest_data()
 
             result = fusion_system.process_frame(
                 tag_detection_result=None,
@@ -100,9 +84,10 @@ def main():
         print("\nStopping...")
     
     finally:
-        imu_reader.disconnect()
+        imu_reader.deactivate()
         camera.release()
         cv2.destroyAllWindows()
+        print("Cleanup completed")
 
 if __name__ == "__main__":
     main()

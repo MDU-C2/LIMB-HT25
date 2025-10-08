@@ -18,7 +18,7 @@ if __name__ == "__main__":
         sys.path.insert(0, parent_dir)
 
 from vision.system import VisionSystem
-from vision.tags.camera_calibration import load_calibration_json
+from vision.tags.utils.camera_calibration import load_calibration_json
 from imu_vision.fusion_system import FiducialDepthSystem
 from imu_vision.smoothing import IMUData
 
