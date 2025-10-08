@@ -1,3 +1,4 @@
+# Combine IMU and vision capture without using the tag or cup detection
 import sys
 import os
 import numpy as np
