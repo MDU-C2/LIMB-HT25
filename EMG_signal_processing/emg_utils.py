@@ -368,8 +368,37 @@ def extract_time_domain_features(window_matrix, num_channels):
     return np.array(features_dataset)
 
 
+# Creating sequences
 
-
+def create_sequences(features, labels, seq_length=10):
+    """
+    Converts the 2D feature matrix of a single, continuous recording 
+    into a 3D array of overlapping sequences for the LSTM.
+    
+    """
+    # Lists to store the generated sequences and their corresponding labels
+    sequences = []
+    sequence_labels = []
+    
+    # Iterate through the features using a sliding window approach
+    # The loop stops when there are not enough remaining windows to form a full sequence
+    for i in range(len(features) - seq_length + 1):
+        
+        # Extract a slice of 'seq_length' consecutive windows
+        sequence = features[i:i + seq_length]
+        sequences.append(sequence)
+        
+        # The label for the entire sequence is the label of its LAST window
+        # This teaches the model to classify the gesture at the end of the temporal pattern
+        label = labels[i + seq_length - 1]
+        sequence_labels.append(label)
+    
+    # Only return data if at least one sequence was successfully created
+    if len(sequences) > 0:
+        return np.array(sequences), np.array(sequence_labels)
+    else:
+        # Return empty arrays if the input recording was shorter than the sequence length
+        return np.array([]), np.array([])
 
 
 
