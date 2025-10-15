@@ -1,0 +1,100 @@
+// ESP32 #4 - MONITOR NODE (Monitor/Logger Node)
+// Priority: LOW (ID base: 0x040)
+// Function: Listens to ALL CAN bus traffic and logs it
+
+#include <stdio.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "can_driver.h"
+#include "esp_log.h"
+
+#define TAG "MONITOR"
+
+// Monitor ID
+#define ID_MONITOR_STATUS   0x040
+
+// Message counter
+typedef struct {
+    uint32_t total;
+    uint32_t master;
+    uint32_t sensor;
+    uint32_t actuator;
+    uint32_t others;
+} msg_stats_t;
+
+const char* get_node_name(uint32_t id) {
+    if (id >= 0x010 && id <= 0x01F) return "MASTER";
+    if (id >= 0x020 && id <= 0x02F) return "SENSOR";
+    if (id >= 0x030 && id <= 0x03F) return "ACTUATOR";
+    if (id >= 0x040 && id <= 0x04F) return "MONITOR";
+    return "UNKNOWN";
+}
+
+void app_main(void) {
+    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "   ESP32 #4 - MONITOR NODE STARTED");
+    ESP_LOGI(TAG, "   Priority: LOW (ID: 0x040)");
+    ESP_LOGI(TAG, "   Listening to ALL CAN traffic...");
+    ESP_LOGI(TAG, "========================================");
+
+    uint8_t msg_rx[8];
+    uint32_t rx_id;
+    uint8_t rx_len = sizeof(msg_rx);
+    
+    msg_stats_t stats = {0};
+    uint32_t last_report_time = 0;
+    
+    // Announce presence
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    can_send(ID_MONITOR_STATUS, (uint8_t*)"ONLINE", 6);
+    ESP_LOGI(TAG, "Monitor ONLINE - Starting traffic capture");
+
+    while (1) {
+        // Listen to ALL bus messages
+        if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
+            msg_rx[rx_len] = '\0';
+            stats.total++;
+            
+            // Classify message by source
+            if (rx_id >= 0x010 && rx_id <= 0x01F) stats.master++;
+            else if (rx_id >= 0x020 && rx_id <= 0x02F) stats.sensor++;
+            else if (rx_id >= 0x030 && rx_id <= 0x03F) stats.actuator++;
+            else stats.others++;
+            
+            // Log the message
+            ESP_LOGI(TAG, "📨 [0x%03lX] %s: %s (DLC=%d)", 
+                     rx_id, get_node_name(rx_id), msg_rx, rx_len);
+            }
+        }
+
+        // Statistical report every 10 seconds
+        uint32_t current_time = xTaskGetTickCount() / 1000;
+        if (current_time - last_report_time >= 10) {
+            ESP_LOGI(TAG, "Total messages:     %5lu ", stats.total);
+            ESP_LOGI(TAG, "From Master:        %5lu ", stats.master);
+            ESP_LOGI(TAG, "From Sensor:        %5lu ", stats.sensor);
+            ESP_LOGI(TAG, "From Actuator:      %5lu ", stats.actuator);
+            ESP_LOGI(TAG, "Others:             %5lu ", stats.others);
+
+            // Send report to bus
+            if (stats.total > 0) {
+                can_send(ID_MONITOR_STATUS, (uint8_t*)"OK", 2);
+            } else {
+                can_send(ID_MONITOR_STATUS, (uint8_t*)"QUIET", 5);
+                ESP_LOGW(TAG, "WARNING: No traffic detected on the bus");
+            }
+            
+            // Reset counters
+            stats.total = 0;
+            stats.master = 0;
+            stats.sensor = 0;
+            stats.actuator = 0;
+            stats.others = 0;
+            last_report_time = current_time;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}

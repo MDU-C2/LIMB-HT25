@@ -1,0 +1,107 @@
+// ESP32 #3 - ACTUATOR NODE
+// Priority: MEDIUM (ID base: 0x030)
+// Function: Receives commands and controls actuators (LED, Motor, etc.)
+
+#include <stdio.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "can_driver.h"
+#include "esp_log.h"
+#include "driver/gpio.h"
+
+#define TAG "ACTUATOR"
+
+// ACTUATOR message IDs
+#define ID_ACTUATOR_STATUS  0x030  // Actuator status
+
+// IDs this node listens to
+#define ID_MASTER_CMD       0x010
+#define ID_MASTER_FAN       0x011
+#define ID_MASTER_LED       0x012
+
+// Output pins (example, adjust according to your hardware)
+#define PIN_FAN_LED         GPIO_NUM_2  // Onboard LED or pin for fan
+#define PIN_LED             GPIO_NUM_8  // Pin for additional LED
+
+void app_main(void) {
+    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "   ESP32 #3 - ACTUATOR NODE STARTED");
+    ESP_LOGI(TAG, "   Priority: MEDIUM (ID: 0x030)");
+    ESP_LOGI(TAG, "========================================");
+
+    // Configure GPIOs
+    gpio_set_direction(PIN_FAN_LED, GPIO_MODE_OUTPUT);
+    gpio_set_direction(PIN_LED, GPIO_MODE_OUTPUT);
+    gpio_set_level(PIN_FAN_LED, 0);
+    gpio_set_level(PIN_LED, 0);
+
+    uint8_t msg_rx[8];
+    uint32_t rx_id;
+    uint8_t rx_len = sizeof(msg_rx);
+    
+    bool fan_on = false;
+    bool led_on = false;
+    bool system_active = false;
+
+    while (1) {
+        // Listen for commands
+        if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
+            msg_rx[rx_len] = '\0';
+            
+            switch (rx_id) {
+                case ID_MASTER_CMD:
+                    if (strcmp((char*)msg_rx, "START") == 0) {
+                        ESP_LOGI(TAG, "System STARTED");
+                        system_active = true;
+                    } else if (strcmp((char*)msg_rx, "STOP") == 0) {
+                        ESP_LOGI(TAG, "System STOPPED");
+                        system_active = false;
+                        // Turn everything off
+                        gpio_set_level(PIN_FAN_LED, 0);
+                        gpio_set_level(PIN_LED, 0);
+                        fan_on = false;
+                        led_on = false;
+                    } else if (strcmp((char*)msg_rx, "STATUS?") == 0) {
+                        // Send current status
+                        char status[8];
+                        snprintf(status, sizeof(status), "F:%d,L:%d", fan_on, led_on);
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)status, strlen(status));
+                        ESP_LOGI(TAG, "Status sent: %s", status);
+                    }
+                    break;
+                
+                case ID_MASTER_FAN:
+                    if (strcmp((char*)msg_rx, "FAN_ON") == 0) {
+                        gpio_set_level(PIN_FAN_LED, 1);
+                        fan_on = true;
+                        ESP_LOGI(TAG, "FAN TURNED ON");
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"FAN:ON", 6);
+                    } else if (strcmp((char*)msg_rx, "FAN_OFF") == 0) {
+                        gpio_set_level(PIN_FAN_LED, 0);
+                        fan_on = false;
+                        ESP_LOGI(TAG, "FAN TURNED OFF");
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"FAN:OFF", 7);
+                    }
+                    break;
+                
+                case ID_MASTER_LED:
+                    if (strcmp((char*)msg_rx, "LED_ON") == 0) {
+                        gpio_set_level(PIN_LED, 1);
+                        led_on = true;
+                        ESP_LOGI(TAG, "LED TURNED ON");
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"LED:ON", 6);
+                    } else if (strcmp((char*)msg_rx, "LED_OFF") == 0) {
+                        gpio_set_level(PIN_LED, 0);
+                        led_on = false;
+                        ESP_LOGI(TAG, "LED TURNED OFF");
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"LED:OFF", 7);
+                    }
+                    break;
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(50)); // Small delay to not saturate CPU
+    }
+}
