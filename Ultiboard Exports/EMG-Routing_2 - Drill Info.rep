@@ -1,0 +1,20 @@
+ULTIBOARD DRILL REPORT
+
+Design: EMG-Routing_2
+
+DRILL FILE SETTINGS
+Excellon 2, Absolute, Metric, 3.4 
+
+
+DEFINITION COPPER LAYERS
+Copper Top
+Copper Bottom
+
+
+--------------------------------------------------------------------
+
+DRILLFILE                                      LAMINATION
+EMG-Routing_2 - Copper Top-Copper Bottom.drl   Copper Top .. Copper Bottom
+
+TOOL     SIZE   TYPE  COUNT
+   1   0.8000    PTH     24
