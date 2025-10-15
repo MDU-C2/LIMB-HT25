@@ -1,24 +1,19 @@
-# ESP32-C3 CAN Bus Communication 
+
+## CAN Bus Setup
+
 
 ## Project Structure
 
 ```
 Esp_32_CAN_BUS/
 ├── main/
-│   ├── ca- **WCMCU-230 modules in middle positions** (ESP#2, ESP#3) must have their termination resistors removed
-
-
-## WCMCU-230 Module Pinout Reference
-
-### **Module Connections:**er.c              # CAN driver implementation
+│   ├── can_driver.c              # CAN driver implementation
 │   ├── can_driver.h              # CAN driver header
 │   ├── main.c                    # Current active code
-│   ├── node1_master.c.example    # Master node 
-│   ├── node2_sensor.c.example    # Sensor node 
-│   ├── node3_actuator.c.example  # Actuator node 
-│   └── node4_monitor.c.example   # Monitor node 
-├── ARCHITECTURE_4_NODES.md       # System architecture
-├── QUICK_GUIDE_4_NODES.md        # Quick start guide 
+│   ├── node1_master.c.example    # Master node
+│   ├── node2_sensor.c.example    # Sensor node
+│   ├── node3_actuator.c.example  # Actuator node
+│   └── node4_monitor.c.example   # Monitor node
 ├── CMakeLists.txt
 └── sdkconfig
 ```
@@ -27,21 +22,21 @@ Esp_32_CAN_BUS/
 
 ## Hardware Requirements
 
-### **Per Node:**
+### Per Node
 - 1× ESP32-C3 Mini (or compatible)
-- 1× **WCMCU-230** CAN transceiver module
-  - **Important:** This module has built-in 120Ω termination resistors
-  - **Remove the onboard resistors** if the node is NOT at a bus endpoint
-  - **Keep the resistors** only for nodes at the physical ends of the bus
+- 1× WCMCU-230 CAN transceiver module
+  - Important: This module has built-in 120Ω termination resistors
+  - Remove the onboard resistors if the node is NOT at a bus endpoint
+  - Keep the resistors only for nodes at the physical ends of the bus
 - Power supply (3.3V or 5V depending on configuration)
 
-### **About WCMCU-230:**
-The WCMCU-230 is a compact CAN transceiver module based on the **SN65HVD230** chip with:
+### About WCMCU-230
+The WCMCU-230 is a compact CAN transceiver module based on the SN65HVD230 chip with:
 - Built-in 3.3V power supply
 - Onboard 120Ω termination resistor (can be removed by desoldering)
 - Compatible with 3.3V logic levels
 
-### **GPIO Configuration:**
+### GPIO Configuration
 - **GPIO 5** → CAN TX
 - **GPIO 4** → CAN RX
 - **3.3V** → Transceiver VCC
@@ -51,7 +46,7 @@ The WCMCU-230 is a compact CAN transceiver module based on the **SN65HVD230** ch
 
 ## CAN Bus Setup
 
-### **WCMCU-230 to ESP32-C3 Connection:**
+### WCMCU-230 to ESP32-C3 Connection
 
 ```
 ESP32-C3              WCMCU-230 Module
@@ -66,11 +61,11 @@ ESP32-C3              WCMCU-230 Module
                       │  CANL ───┤ To   │
                       │  GND  ───┘ Bus  │
                       └─────────────────┘
-                      │ [120Ω] Optional │ │
+                      │ [120Ω] Optional │
                       └─────────────────┘
 ```
 
-### **4-Node Bus Topology:**
+### 4-Node Bus Topology
 
 ```
  WCMCU-230   WCMCU-230   WCMCU-230   WCMCU-230
@@ -89,54 +84,15 @@ GND──┴───────────┴──────────�
 
  ENDPOINT    MIDDLE      MIDDLE     ENDPOINT
  Keep 120Ω  Remove 120Ω Remove 120Ω Keep 120Ω
-```
 
-### **Physical Connection:**
-
-```
-[120Ω]  ESP#1    ESP#2    ESP#3    ESP#4  [120Ω]
-  │   (Node 1) (Node 2) (Node 3) (Node 4)   │
-  │                                         │
-CANH──┬─────────┬────────┬────────┬─────────┤
-      │         │        │        │         │
-CANL──┴─────────┴────────┴────────┴─────────┤
-      │         │        │        │         │
-GND───┴─────────┴────────┴────────┴─────────┘
-```
-
-**Important:** 
-- 120Ω resistors **only at bus endpoints** (ESP#1 and ESP#4)
-- Common ground is **essential**
-- **WCMCU-230 modules in middle positions** (ESP#2, ESP#3) must have their termination resistors removed
-
-
-## � WCMCU-230 Module Pinout Reference
-
-### **Module Connections:**
-
-```
-┌─────────────────────────────────────┐
-│            WCMCU-230                │
-│      CAN Transceiver Module         │
-├─────────────────────────────────────┤
-│                                     │
-│  [Screw Terminals - CAN Bus]        │
-│   CANH  ─── To CAN High             │
-│   CANL  ─── To CAN Low              │
-│   GND   ─── To CAN Ground           │
-│                                     │
-│  [Pin Header - MCU Connection]      │
-│   3V3   ─── 3.3V Power (from ESP32) │
-│   GND   ─── Ground (from ESP32)     │
-│   CTX   ─── CAN TX (to ESP32 GPIO5) │
-│   CRX   ─── CAN RX (to ESP32 GPIO4) │
-└─────────────────────────────────────┘
-```
-
+Important:
+- 120Ω resistors only at bus endpoints (ESP#1 and ESP#4)
+- Common ground is essential
+- WCMCU-230 modules in middle positions (ESP#2, ESP#3) must have their termination resistors removed
 
 ## Quick Start
 
-### **1. Clone or Download the Project**
+### 1. Clone or Download the Project
 
 ```bash
 cd ~/esp
@@ -144,22 +100,22 @@ git clone <your-repo-url>
 cd Esp_32_CAN_BUS
 ```
 
-### **2. Configure ESP-IDF**
+### 2. Configure ESP-IDF
 
 ```bash
 idf.py set-target esp32c3
 idf.py menuconfig
 ```
 
-### **3. Select Node Configuration**
+### 3. Select Node Configuration
 
-For **Node 1 (Master)**:
+For Node 1 (Master):
 ```bash
 cd main
 cp node1_master.c.example main.c
 ```
 
-For **Node 2 (Sensor)**:
+For Node 2 (Sensor):
 ```bash
 cd main
 cp node2_sensor.c.example main.c
@@ -167,7 +123,7 @@ cp node2_sensor.c.example main.c
 
 And so on for Nodes 3 and 4.
 
-### **4. Build and Flash**
+### 4. Build and Flash
 
 ```bash
 idf.py build
@@ -176,12 +132,11 @@ idf.py -p COMx flash monitor  # Replace COMx with your port
 
 ---
 
-### **4-Node Priority System Example**
-- Node 1: **Master** (0x010) - System coordinator
-- Node 2: **Sensor** (0x020) - Temperature & humidity
-- Node 3: **Actuator** (0x030) - Fan & LED control
-- Node 4: **Monitor** (0x040) - Traffic logger
-
+### 4-Node Priority System Example
+- Node 1: Master (0x010) - System coordinator
+- Node 2: Sensor (0x020) - Temperature & humidity
+- Node 3: Actuator (0x030) - Fan & LED control
+- Node 4: Monitor (0x040) - Traffic logger
 
 ## Configuration Options
 
