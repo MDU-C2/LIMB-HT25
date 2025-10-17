@@ -14,6 +14,7 @@ Esp_32_CAN_BUS/
 │   ├── node2_sensor.c.example    # Sensor node
 │   ├── node3_actuator.c.example  # Actuator node
 │   └── node4_monitor.c.example   # Monitor node
+|   └── CMakeLists.txt
 ├── CMakeLists.txt
 └── sdkconfig
 ```
