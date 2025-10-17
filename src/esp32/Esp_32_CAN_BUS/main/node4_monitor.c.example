@@ -28,82 +28,84 @@ const char* get_node_name(uint32_t id) {
     if (id >= 0x020 && id <= 0x02F) return "SENSOR";
     if (id >= 0x030 && id <= 0x03F) return "ACTUATOR";
     if (id >= 0x040 && id <= 0x04F) return "MONITOR";
+    if (id == 0x123) return "ORIN";
     return "UNKNOWN";
 }
 
 void app_main(void) {
-    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    can_init(5, 4, 500000); // TX=5, RX=4, 500 kbps (matches Orin interface)
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "   ESP32 #4 - MONITOR NODE STARTED");
     ESP_LOGI(TAG, "   Priority: LOW (ID: 0x040)");
     ESP_LOGI(TAG, "   Listening to ALL CAN traffic...");
     ESP_LOGI(TAG, "========================================");
 
-    uint8_t msg_rx[8];
-    uint32_t rx_id;
-    uint8_t rx_len = sizeof(msg_rx);
-    
+    // Use larger buffer to support CAN FD frames up to 64 bytes
+    uint8_t msg_rx[64];
+    const uint8_t max_len = sizeof(msg_rx);
+    uint8_t rx_len = max_len;
+    uint32_t rx_id = 0;
+
     msg_stats_t stats = {0};
-    uint32_t last_report_time = 0;
-    
+    uint32_t last_report_time_ms = 0;
+
     // Announce presence
     vTaskDelay(pdMS_TO_TICKS(1000));
     can_send(ID_MONITOR_STATUS, (uint8_t*)"ONLINE", 6);
     ESP_LOGI(TAG, "Monitor ONLINE - Starting traffic capture");
 
     while (1) {
-        // Listen to ALL bus messages
+        // Reset rx_len before call
+        rx_len = max_len;
+
+        // Listen to any bus messages (blocking up to 100 ms)
         if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
-            msg_rx[rx_len] = '\0';
+            // Update statistics
             stats.total++;
-            
-            // Classify message by source
             if (rx_id >= 0x010 && rx_id <= 0x01F) stats.master++;
             else if (rx_id >= 0x020 && rx_id <= 0x02F) stats.sensor++;
             else if (rx_id >= 0x030 && rx_id <= 0x03F) stats.actuator++;
             else stats.others++;
-            
-            // Log the message
-            ESP_LOGI(TAG, "[0x%03lX] %s: %s (DLC=%d)", 
-                     rx_id, get_node_name(rx_id), msg_rx, rx_len);
-            
-            // Special analysis for certain messages
-            if (rx_id == 0x020 && msg_rx[0] == 'T') {
-                int temp = atoi((char*)&msg_rx[2]);
-                if (temp > 32) {
-                    ESP_LOGW(TAG, "ALERT: High temperature detected (%d°C)", temp);
+
+            if (rx_len > max_len) rx_len = max_len;
+
+            // Log safely: if data is printable ASCII, log as string; otherwise hex
+            bool printable = true;
+            for (uint8_t i = 0; i < rx_len; ++i) {
+                if ((unsigned)msg_rx[i] < 0x20 || (unsigned)msg_rx[i] > 0x7E) { printable = false; break; }
+            }
+
+            if (rx_len == 0) {
+                ESP_LOGI(TAG, "📨 [0x%03X] %s: <no data> (DLC=0)", (unsigned)rx_id, get_node_name(rx_id));
+            } else if (printable) {
+                char textbuf[65];
+                uint8_t copy_len = (rx_len < sizeof(textbuf)-1) ? rx_len : (sizeof(textbuf)-1);
+                memcpy(textbuf, msg_rx, copy_len);
+                textbuf[copy_len] = '\0';
+                ESP_LOGI(TAG, "📨 [0x%03X] %s: '%s' (DLC=%d)", (unsigned)rx_id, get_node_name(rx_id), textbuf, rx_len);
+                if (rx_id == 0x123) {
+                    ESP_LOGI(TAG, "--- ORIN MESSAGE RECEIVED: %s ---", textbuf);
+                }
+            } else {
+                char hexbuf[3 * 64 + 1];
+                char *p = hexbuf;
+                size_t rem = sizeof(hexbuf);
+                for (uint8_t i = 0; i < rx_len; ++i) {
+                    int w = snprintf(p, rem, "%02X", msg_rx[i]);
+                    if (w < 0 || (size_t)w >= rem) break;
+                    p += w; rem -= w;
+                    if (i < rx_len - 1 && rem > 1) { *p++ = ' '; rem--; }
+                }
+                *p = '\0';
+                ESP_LOGI(TAG, "📨 [0x%03X] %s: %s (DLC=%d)", (unsigned)rx_id, get_node_name(rx_id), hexbuf, rx_len);
+                if (rx_id == 0x123) {
+                    ESP_LOGI(TAG, "--- ORIN MESSAGE RECEIVED (hex): %s ---", hexbuf);
                 }
             }
-        }
 
-        // Statistical report every 10 seconds
-        uint32_t current_time = xTaskGetTickCount() / 1000;
-        if (current_time - last_report_time >= 10) {
-            ESP_LOGI(TAG, "\n╔════════════════════════════════════════╗");
-            ESP_LOGI(TAG, "║   CAN TRAFFIC STATISTICS (10s)        ║");
-            ESP_LOGI(TAG, "╠════════════════════════════════════════╣");
-            ESP_LOGI(TAG, "║ Total messages:     %5lu              ║", stats.total);
-            ESP_LOGI(TAG, "║ From Master:        %5lu              ║", stats.master);
-            ESP_LOGI(TAG, "║ From Sensor:        %5lu              ║", stats.sensor);
-            ESP_LOGI(TAG, "║ From Actuator:      %5lu              ║", stats.actuator);
-            ESP_LOGI(TAG, "║ Others:             %5lu              ║", stats.others);
-            ESP_LOGI(TAG, "╚════════════════════════════════════════╝\n");
-            
-            // Send report to bus
-            if (stats.total > 0) {
-                can_send(ID_MONITOR_STATUS, (uint8_t*)"OK", 2);
-            } else {
-                can_send(ID_MONITOR_STATUS, (uint8_t*)"QUIET", 5);
-                ESP_LOGW(TAG, "WARNING: No traffic detected on the bus");
-            }
-            
-            // Reset counters
-            stats.total = 0;
-            stats.master = 0;
-            stats.sensor = 0;
-            stats.actuator = 0;
-            stats.others = 0;
-            last_report_time = current_time;
+            /* Print updated statistics immediately (continuous output) */
+            ESP_LOGI(TAG, "STATS -> total:%lu master:%lu sensor:%lu actuator:%lu others:%lu",
+                     stats.total, stats.master, stats.sensor, stats.actuator, stats.others);
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
