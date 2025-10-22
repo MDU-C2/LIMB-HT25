@@ -22,21 +22,18 @@ enum {
   kEmgNewSamplesPerWindow = kEmgSamplesPerWindow - kEmgSamplesPerOverlap,
   kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
   kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample,
-  kEmgBufInMs = 1000 * kEmgSamplesToSend / kEmgFrequency,
 
   kImuSamplesPerWindow = kImuMsPerWindow * kImuFrequency / 1000,
   kImuSamplesPerOverlap = kImuMsPerOverlap * kImuFrequency / 1000,
   kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
   kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
   kImuBufSize = kImuSamplesToSend * kImuBytesPerSample,
-  kImuBufInMs = 1000 * kImuSamplesToSend / kImuFrequency,
 
   kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
   kPiezoSamplesPerOverlap = kPiezoMsPerOverlap * kPiezoFrequency / 1000,
   kPiezoNewSamplesPerWindow = kPiezoSamplesPerWindow - kPiezoSamplesPerOverlap,
   kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
   kPiezoBufSize = kPiezoSamplesToSend * kPiezoBytesPerSample,
-  kPiezoBufInMs = 1000 * kPiezoSamplesToSend / kPiezoFrequency,
 };
 
 static const char* const kCharacteristicTag = "Char";
