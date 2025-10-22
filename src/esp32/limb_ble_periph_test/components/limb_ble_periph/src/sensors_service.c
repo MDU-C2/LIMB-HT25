@@ -60,9 +60,13 @@ CharacteristicBuffer get_emg_buf(void) {
 
 bool TryNotifyEmgSubscribers(void) {
   if (gEmgPeerNotifyEnabled) {
-    ble_gatts_notify(gEmgSubscriptionHandle, gEmgValHandle);
-    ESP_LOGI(kEmgLogTag, "sensor notification sent!");
-    return true;
+    int err = ble_gatts_notify(gEmgSubscriptionHandle, gEmgValHandle);
+    if (err) {
+      ESP_LOGW(kEmgLogTag, "Failed to send notification.");
+    } else {
+      ESP_LOGI(kEmgLogTag, "Sensor notification sent.");
+    }
+    return !err;
   }
   return false;
 }
@@ -87,9 +91,13 @@ CharacteristicBuffer get_imu_buf(void) {
 
 bool TryNotifyImuSubscribers(void) {
   if (gImuPeerNotifyEnabled) {
-    ble_gatts_notify(gImuSubscriptionHandle, gImuValHandle);
-    ESP_LOGI(kImuLogTag, "sensor notification sent!");
-    return true;
+    int err = ble_gatts_notify(gImuSubscriptionHandle, gImuValHandle);
+    if (err) {
+      ESP_LOGW(kImuLogTag, "Failed to send notification.");
+    } else {
+      ESP_LOGI(kImuLogTag, "Sensor notification sent.");
+    }
+    return !err;
   }
   return false;
 }
@@ -114,11 +122,15 @@ CharacteristicBuffer get_piezo_buf(void) {
 
 bool TryNotifyPiezoSubscribers(void) {
   if (gPiezoPeerNotifyEnabled) {
-    // TODO(johan): Figure out if this function is blocking. If it is, we can
-    // probably get by without any synchronization.
-    ble_gatts_notify(gPiezoSubscriptionHandle, gPiezoValHandle);
-    ESP_LOGI(kPiezoLogTag, "sensor notification sent!");
-    return true;
+    // TODO(johan): Figure out if this function is blocking. If not, we might
+    // need use a mutex for the buffer.
+    int err = ble_gatts_notify(gPiezoSubscriptionHandle, gPiezoValHandle);
+    if (err) {
+      ESP_LOGW(kPiezoLogTag, "Failed to send notification.");
+    } else {
+      ESP_LOGI(kPiezoLogTag, "Sensor notification sent.");
+    }
+    return !err;
   }
   return false;
 }
