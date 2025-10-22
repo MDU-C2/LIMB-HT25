@@ -10,6 +10,35 @@
 // ble_gatts_start, which seems to get started in nimble_port_run, effectively
 // meaning they might as well have static storage duration, so globals it is!
 
+// Constants to determine the characteristic buffer sizes.
+enum {
+  // The amount of the new samples in a window that should be buffered before
+  // being sent. E.g. 30 means one 30th of the new samples are buffered before
+  // being sent.
+  kPartOfWindowPerSend = 30,
+
+  kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,
+  kEmgSamplesPerOverlap = kEmgMsPerOverlap * kEmgFrequency / 1000,
+  kEmgNewSamplesPerWindow = kEmgSamplesPerWindow - kEmgSamplesPerOverlap,
+  kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
+  kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample,
+  kEmgBufInMs = 1000 * kEmgSamplesToSend / kEmgFrequency,
+
+  kImuSamplesPerWindow = kImuMsPerWindow * kImuFrequency / 1000,
+  kImuSamplesPerOverlap = kImuMsPerOverlap * kImuFrequency / 1000,
+  kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
+  kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
+  kImuBufSize = kImuSamplesToSend * kImuBytesPerSample,
+  kImuBufInMs = 1000 * kImuSamplesToSend / kImuFrequency,
+
+  kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
+  kPiezoSamplesPerOverlap = kPiezoMsPerOverlap * kPiezoFrequency / 1000,
+  kPiezoNewSamplesPerWindow = kPiezoSamplesPerWindow - kPiezoSamplesPerOverlap,
+  kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
+  kPiezoBufSize = kPiezoSamplesToSend * kPiezoBytesPerSample,
+  kPiezoBufInMs = 1000 * kPiezoSamplesToSend / kPiezoFrequency,
+};
+
 static const char* const kCharacteristicTag = "Char";
 
 static const char* const kEmgLogTag = "EmgChar";

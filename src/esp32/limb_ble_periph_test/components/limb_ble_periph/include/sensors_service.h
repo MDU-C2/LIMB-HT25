@@ -2,40 +2,23 @@
 #include "host/ble_gap.h"
 #include "host/ble_gatt.h"
 
-// The sizes of the characteristic buffers returned by get_*_buf.
+// The settings for the sensors used. These are used to calculate the buffer
+// sizes for the different characteristics.
 enum {
-  kPartOfWindowPerSend = 30,
-
   kEmgFrequency = 5000,
-  kEmgSamplesPerWindow = kEmgFrequency / 5,
-  kEmgWindowOverlapDivisor = 4,
-  kEmgNewSamplesPerWindow =
-      kEmgSamplesPerWindow - (kEmgSamplesPerWindow / kEmgWindowOverlapDivisor),
-  kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
+  kEmgMsPerWindow = 200,
+  kEmgMsPerOverlap = 50,
   kEmgBytesPerSample = 4,
-  kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample,
-  kEmgBufInMs = 1000 * kEmgSamplesToSend / kEmgFrequency,
 
   kImuFrequency = 1000,
-  kImuSamplesPerWindow = kImuFrequency / 5,
-  kImuWindowOverlapDivisor = 4,
-  kImuNewSamplesPerWindow =
-      kImuSamplesPerWindow - (kImuSamplesPerWindow / kImuWindowOverlapDivisor),
-  kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
+  kImuMsPerWindow = 200,
+  kImuMsPerOverlap = 50,
   kImuBytesPerSample = 24,
-  kImuBufSize = kImuSamplesToSend * kImuBytesPerSample,
-  kImuBufInMs = 1000 * kImuSamplesToSend / kImuFrequency,
 
   kPiezoFrequency = 5000,
-  kPiezoSamplesPerWindow = kPiezoFrequency / 5,
-  kPiezoWindowOverlapDivisor = 4,
-  kPiezoNewSamplesPerWindow =
-      kPiezoSamplesPerWindow -
-      (kPiezoSamplesPerWindow / kPiezoWindowOverlapDivisor),
-  kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
+  kPiezoMsPerWindow = 200,
+  kPiezoMsPerOverlap = 50,
   kPiezoBytesPerSample = 4,
-  kPiezoBufSize = kPiezoSamplesToSend * kPiezoBytesPerSample,
-  kPiezoBufInMs = 1000 * kPiezoSamplesToSend / kPiezoFrequency,
 };
 
 // Gets an array containing the sensors service.
