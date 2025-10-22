@@ -4,11 +4,6 @@
 #include "host/ble_gatt.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
-#include "services/gatt/ble_svc_gatt.h"
-
-// It seems like the GATT definitions have to live at least until
-// ble_gatts_start, which seems to get started in nimble_port_run, effectively
-// meaning they might as well have static storage duration, so globals it is!
 
 // Constants to determine the characteristic buffer sizes.
 enum {
@@ -38,6 +33,7 @@ enum {
 
 static const char* const kLimbTag = "LIMB BLE Periph";
 
+// UUID corresponds to 24011525-1212-efde-1523-785feabcd122.
 static const ble_uuid128_t kEmgCharUuid =
     BLE_UUID128_INIT(0x22, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
                      0x12, 0x12, 0x25, 0x15, 0x01, 0x24);
@@ -68,6 +64,7 @@ bool TryNotifyEmgSubscribers(void) {
 
 // IMU characteristic.
 
+// UUID corresponds to 25011525-1212-efde-1523-785feabcd122.
 static const ble_uuid128_t kImuCharUuid =
     BLE_UUID128_INIT(0x22, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
                      0x12, 0x12, 0x25, 0x15, 0x01, 0x25);
@@ -98,6 +95,7 @@ bool TryNotifyImuSubscribers(void) {
 
 // Piezo characteristic.
 
+// UUID corresponds to 26011525-1212-efde-1523-785feabcd122.
 static const ble_uuid128_t kPiezoCharUuid =
     BLE_UUID128_INIT(0x22, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
                      0x12, 0x12, 0x25, 0x15, 0x01, 0x26);
@@ -187,11 +185,12 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
   return 0;
 }
 
-// Sensor service.
+// UUID corresponds to 23011525-1212-efde-1523-785feabcd122
 static const ble_uuid128_t kServiceUuid =
     BLE_UUID128_INIT(0x22, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
                      0x12, 0x12, 0x25, 0x15, 0x01, 0x23);
 
+// The definition for the BLE characteristics.
 static const struct ble_gatt_chr_def kServiceChars[] = {
     {
         .uuid = &kEmgCharUuid.u,
@@ -217,6 +216,7 @@ static const struct ble_gatt_chr_def kServiceChars[] = {
 
 };
 
+// The definition for the BLE service.
 static const struct ble_gatt_svc_def kServices[] = {
     {
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
@@ -242,6 +242,7 @@ void SensorSubscribe(struct ble_gap_event* event) {
   }
 
   // NOTE(johan): I don't know if it's guaranteed to always have the same value.
+  // It's not used for anything critical, so it doesn't really matter.
   enum { kServiceChangedAttributeHandle = 8 };
 
   const bool cur_notify = event->subscribe.cur_notify;
@@ -260,8 +261,8 @@ void SensorSubscribe(struct ble_gap_event* event) {
     gPiezoPeerNotifyEnabled = cur_notify;
     ESP_LOGI(kLimbTag, "Piezo characteristic %s!", notify_status);
   } else if (attr_handle == kServiceChangedAttributeHandle) {
+    // This indication is used to tell bonded clients if the service has
     // changed between connections.
-    // TODO(johan): We probably don't have to worry about it?
     const char* sub_status =
         event->subscribe.cur_indicate ? "subscribed" : "unsubscribed";
     ESP_LOGI(kLimbTag, "Service Changed characteristic %s.", sub_status,
