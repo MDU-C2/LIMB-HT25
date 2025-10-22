@@ -36,9 +36,7 @@ enum {
   kPiezoBufSize = kPiezoSamplesToSend * kPiezoBytesPerSample,
 };
 
-static const char* const kCharacteristicTag = "Char";
-
-static const char* const kEmgLogTag = "EmgChar";
+static const char* const kLimbTag = "LIMB BLE Periph";
 
 static const ble_uuid128_t kEmgCharUuid =
     BLE_UUID128_INIT(0x22, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
@@ -59,9 +57,9 @@ bool TryNotifyEmgSubscribers(void) {
   if (gEmgPeerNotifyEnabled) {
     int err = ble_gatts_notify(gEmgSubscriptionHandle, gEmgValHandle);
     if (err) {
-      ESP_LOGW(kEmgLogTag, "Failed to send notification.");
+      ESP_LOGW(kLimbTag, "Failed to send EMG notification.");
     } else {
-      ESP_LOGI(kEmgLogTag, "Sensor notification sent.");
+      ESP_LOGI(kLimbTag, "EMG notification sent.");
     }
     return !err;
   }
@@ -69,7 +67,6 @@ bool TryNotifyEmgSubscribers(void) {
 }
 
 // IMU characteristic.
-static const char* const kImuLogTag = "ImuChar";
 
 static const ble_uuid128_t kImuCharUuid =
     BLE_UUID128_INIT(0x22, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
@@ -90,9 +87,9 @@ bool TryNotifyImuSubscribers(void) {
   if (gImuPeerNotifyEnabled) {
     int err = ble_gatts_notify(gImuSubscriptionHandle, gImuValHandle);
     if (err) {
-      ESP_LOGW(kImuLogTag, "Failed to send notification.");
+      ESP_LOGW(kLimbTag, "Failed to send IMU notification.");
     } else {
-      ESP_LOGI(kImuLogTag, "Sensor notification sent.");
+      ESP_LOGI(kLimbTag, "IMU notification sent.");
     }
     return !err;
   }
@@ -100,7 +97,6 @@ bool TryNotifyImuSubscribers(void) {
 }
 
 // Piezo characteristic.
-static const char* const kPiezoLogTag = "PiezoChar";
 
 static const ble_uuid128_t kPiezoCharUuid =
     BLE_UUID128_INIT(0x22, 0xd1, 0xbc, 0xea, 0x5f, 0x78, 0x23, 0x15, 0xde, 0xef,
@@ -123,9 +119,9 @@ bool TryNotifyPiezoSubscribers(void) {
     // need use a mutex for the buffer.
     int err = ble_gatts_notify(gPiezoSubscriptionHandle, gPiezoValHandle);
     if (err) {
-      ESP_LOGW(kPiezoLogTag, "Failed to send notification.");
+      ESP_LOGW(kLimbTag, "Failed to send piezo notification.");
     } else {
-      ESP_LOGI(kPiezoLogTag, "Sensor notification sent.");
+      ESP_LOGI(kLimbTag, "Piezo notification sent.");
     }
     return !err;
   }
@@ -137,19 +133,19 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
                       struct ble_gatt_access_ctxt* context,
                       [[maybe_unused]] void* args) {
   if (context->op != BLE_GATT_ACCESS_OP_READ_CHR) {
-    ESP_LOGW(kCharacteristicTag,
-             "Unsupported access operation (non-read): [%d]", context->op);
+    ESP_LOGW(kLimbTag,
+             "Unsupported characteristic access operation (non-read): [%d]", context->op);
     assert(false && "Unsupported characteristic access.");
     // FIXME: Use the proper return code.
     return BLE_ATT_ERR_UNLIKELY;
   }
 
   if (connection_handle != BLE_HS_CONN_HANDLE_NONE) {
-    ESP_LOGI(kCharacteristicTag,
+    ESP_LOGI(kLimbTag,
              "characteristic read; conn_handle=%d attr_handle=%d",
              connection_handle, attribute_handle);
   } else {
-    ESP_LOGI(kCharacteristicTag,
+    ESP_LOGI(kLimbTag,
              "characteristic read by nimble stack; attr_handle=%d",
              attribute_handle);
   }
@@ -159,26 +155,28 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
 
   // Determine which characteristic we should send.
   if (attribute_handle == gEmgValHandle) {
-    ESP_LOGI(kEmgLogTag, "EMG read", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "EMG read request.", connection_handle, attribute_handle);
     buffer = gEmgVal;
     buffer_size = sizeof(gEmgVal);
   } else if (attribute_handle == gImuValHandle) {
-    ESP_LOGI(kImuLogTag, "IMU read", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "IMU read request.", connection_handle, attribute_handle);
     buffer = gImuVal;
     buffer_size = sizeof(gImuVal);
   } else if (attribute_handle == gPiezoValHandle) {
-    ESP_LOGI(kPiezoLogTag, "Piezo read", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "Piezo read request.", connection_handle, attribute_handle);
     buffer = gPiezoVal;
     buffer_size = sizeof(gPiezoVal);
   } else {
-    ESP_LOGW(kCharacteristicTag, "Char access with an invalid attribute_handle [%d].", attribute_handle);
+    ESP_LOGW(kLimbTag,
+             "Characteristic access with an invalid attribute_handle [%d].",
+             attribute_handle);
     assert(false && "Char access with an invalid attribute_handle.");
     return BLE_ATT_ERR_INVALID_HANDLE;
   }
 
   int err = os_mbuf_append(context->om, buffer, buffer_size);
   if (err != 0) {
-    ESP_LOGE(kCharacteristicTag,
+    ESP_LOGE(kLimbTag,
              "Error appending characterictic value to os memory buffer. [%d]",
              err);
     assert(false &&
@@ -231,43 +229,46 @@ static const struct ble_gatt_svc_def kServices[] = {
 };
 
 void SensorSubscribe(struct ble_gap_event* event) {
+  const uint16_t attr_handle = event->subscribe.attr_handle;
+  const uint16_t conn_handle = event->subscribe.conn_handle;
+
   // FIXME: Change some of the EMG tags to some generic tag.
-  if (event->subscribe.conn_handle != BLE_HS_CONN_HANDLE_NONE) {
-    ESP_LOGI(kEmgLogTag, "subscribe event; conn_handle=%d attr_handle=%d",
-             event->subscribe.conn_handle, event->subscribe.attr_handle);
+  if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+    ESP_LOGI(kLimbTag, "subscribe event; conn_handle=%d attr_handle=%d",
+             conn_handle, attr_handle);
   } else {
-    ESP_LOGI(kEmgLogTag, "subscribe by nimble stack; attr_handle=%d",
-             event->subscribe.attr_handle);
+    ESP_LOGI(kLimbTag, "subscribe by nimble stack; attr_handle=%d",
+             attr_handle);
   }
 
   // NOTE(johan): I don't know if it's guaranteed to always have the same value.
   enum { kServiceChangedAttributeHandle = 8 };
 
-  const char* notify_status =
-      event->subscribe.cur_notify ? "subscribed" : "unsubscribed";
-  if (event->subscribe.attr_handle == gEmgValHandle) {
-    gEmgSubscriptionHandle = event->subscribe.conn_handle;
-    gEmgPeerNotifyEnabled = event->subscribe.cur_notify;
-    ESP_LOGI(kEmgLogTag, "Emg %s!", notify_status);
-  } else if (event->subscribe.attr_handle == gImuValHandle) {
-    gImuSubscriptionHandle = event->subscribe.conn_handle;
-    gImuPeerNotifyEnabled = event->subscribe.cur_notify;
-    ESP_LOGI(kImuLogTag, "Imu %s!", notify_status);
-  } else if (event->subscribe.attr_handle == gPiezoValHandle) {
-    gPiezoSubscriptionHandle = event->subscribe.conn_handle;
-    gPiezoPeerNotifyEnabled = event->subscribe.cur_notify;
-    ESP_LOGI(kPiezoLogTag, "Piezo %s!", notify_status);
-  } else if (event->subscribe.attr_handle == kServiceChangedAttributeHandle) {
-    // NOTE: This indication is used to tell bonded clients if the service has
+  const bool cur_notify = event->subscribe.cur_notify;
+  const char* notify_status = cur_notify ? "subscribed" : "unsubscribed";
+
+  if (attr_handle == gEmgValHandle) {
+    gEmgSubscriptionHandle = conn_handle;
+    gEmgPeerNotifyEnabled = cur_notify;
+    ESP_LOGI(kLimbTag, "EMG characteristic %s!", notify_status);
+  } else if (attr_handle == gImuValHandle) {
+    gImuSubscriptionHandle = conn_handle;
+    gImuPeerNotifyEnabled = cur_notify;
+    ESP_LOGI(kLimbTag, "IMU characteristic %s!", notify_status);
+  } else if (attr_handle == gPiezoValHandle) {
+    gPiezoSubscriptionHandle = conn_handle;
+    gPiezoPeerNotifyEnabled = cur_notify;
+    ESP_LOGI(kLimbTag, "Piezo characteristic %s!", notify_status);
+  } else if (attr_handle == kServiceChangedAttributeHandle) {
     // changed between connections.
     // TODO(johan): We probably don't have to worry about it?
     const char* sub_status =
         event->subscribe.cur_indicate ? "subscribed" : "unsubscribed";
-    ESP_LOGI(kEmgLogTag, "Service Changed characteristic %s.", sub_status,
-             event->subscribe.attr_handle);
+    ESP_LOGI(kLimbTag, "Service Changed characteristic %s.", sub_status,
+             attr_handle);
   } else {
-    ESP_LOGW(kEmgLogTag, "Unknown subscription attribute handle [%d]",
-             event->subscribe.attr_handle);
+    ESP_LOGW(kLimbTag, "Unknown subscription attribute handle [%d]",
+             attr_handle);
   }
 }
 
