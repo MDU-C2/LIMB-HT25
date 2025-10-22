@@ -54,7 +54,9 @@ static uint16_t gEmgValHandle;
 static uint8_t gEmgVal[kEmgBufSize] = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-uint8_t* get_emg_buf(void) { return gEmgVal; }
+CharacteristicBuffer get_emg_buf(void) {
+  return (CharacteristicBuffer){.data = gEmgVal, .size = kEmgBufSize};
+}
 
 bool TryNotifyEmgSubscribers(void) {
   if (gEmgPeerNotifyEnabled) {
@@ -79,7 +81,9 @@ static uint16_t gImuValHandle;
 static uint8_t gImuVal[kImuBufSize] = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-uint8_t* get_imu_buf(void) { return gImuVal; }
+CharacteristicBuffer get_imu_buf(void) {
+  return (CharacteristicBuffer){.data = gImuVal, .size = kImuBufSize};
+}
 
 bool TryNotifyImuSubscribers(void) {
   if (gImuPeerNotifyEnabled) {
@@ -104,7 +108,9 @@ static uint16_t gPiezoValHandle;
 static uint8_t gPiezoVal[kPiezoBufSize] = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-uint8_t* get_piezo_buf(void) { return gPiezoVal; }
+CharacteristicBuffer get_piezo_buf(void) {
+  return (CharacteristicBuffer){.data = gPiezoVal, .size = kPiezoBufSize};
+}
 
 bool TryNotifyPiezoSubscribers(void) {
   if (gPiezoPeerNotifyEnabled) {
