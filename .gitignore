@@ -409,3 +409,7 @@ result-*
 
 # Ignore automatically generated direnv output
 .direnv
+
+# OAK D files
+oak-examples/
+oak-template/
