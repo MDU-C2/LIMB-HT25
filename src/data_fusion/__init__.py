@@ -1,16 +1,10 @@
 """
-Data Fusion System
+Data Fusion Module
 
-This module provides data fusion capabilities for combining sensor data from multiple sources.
-It includes IMU smoothing, vision fusion, and sensor validation components.
+Sensor fusion for combining IMU and vision data for arm pose estimation.
 """
 
-from .fusion_system import FiducialDepthSystem
-from .smoothing import IMUData, IMUSmoother, IMUValidator
+from .complementary_filter import ComplementaryFilter
+from .ekf_filter import ExtendedKalmanFilter, EKFState
 
-__all__ = [
-    'FiducialDepthSystem',
-    'IMUData',
-    'IMUSmoother', 
-    'IMUValidator'
-]
+__all__ = ['ComplementaryFilter', 'ExtendedKalmanFilter', 'EKFState']
