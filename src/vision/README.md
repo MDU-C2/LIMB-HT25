@@ -117,9 +117,13 @@ Z: 1523 mm
 
 ### AprilTags Window
 - Grayscale preprocessed image
-- Detected tags with green outlines (reference tag ID 0)
-- Non-reference tags with blue outlines
+- Detected tags with green outlines
 - Tag ID labels at center
+- **3D coordinate axes** overlaid on each tag:
+  - **Red axis (X)**: Points to the right edge of the tag
+  - **Green axis (Y)**: Points to the bottom edge of the tag
+  - **Blue axis (Z)**: Points out from the tag (toward camera)
+- Axes are 5cm long by default
 - Tag count displayed at top
 
 ## Code Structure
