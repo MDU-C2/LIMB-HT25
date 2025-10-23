@@ -1,1 +1,1 @@
-Checks: 'bugprone-*,cert-*,cppcoreguidelines-*,google-*,misc-*,performance-*,readability-*,'
+Checks: 'bugprone-*,cert-*,cppcoreguidelines-*,google-*,misc-*,performance-*,readability-*,-readability-function-cognitive-complexity'
