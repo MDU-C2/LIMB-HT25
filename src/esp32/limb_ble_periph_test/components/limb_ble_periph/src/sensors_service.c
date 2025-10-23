@@ -10,25 +10,27 @@ enum {
   // The amount of the new samples in a window that should be buffered before
   // being sent. E.g. 30 means one 30th of the new samples are buffered before
   // being sent.
+  // TODO(johan): Figure out what's a good value for this with regards to
+  // potential packet loss vs reduced overhead.
   kPartOfWindowPerSend = 30,
 
   kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,
   kEmgSamplesPerOverlap = kEmgMsPerOverlap * kEmgFrequency / 1000,
   kEmgNewSamplesPerWindow = kEmgSamplesPerWindow - kEmgSamplesPerOverlap,
   kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
-  kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample,
+  kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample * kEmgSensorCount,
 
   kImuSamplesPerWindow = kImuMsPerWindow * kImuFrequency / 1000,
   kImuSamplesPerOverlap = kImuMsPerOverlap * kImuFrequency / 1000,
   kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
   kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
-  kImuBufSize = kImuSamplesToSend * kImuBytesPerSample,
+  kImuBufSize = kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount,
 
   kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
   kPiezoSamplesPerOverlap = kPiezoMsPerOverlap * kPiezoFrequency / 1000,
   kPiezoNewSamplesPerWindow = kPiezoSamplesPerWindow - kPiezoSamplesPerOverlap,
   kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
-  kPiezoBufSize = kPiezoSamplesToSend * kPiezoBytesPerSample,
+  kPiezoBufSize = kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount,
 };
 
 static const char* const kLimbTag = "LIMB BLE Periph";

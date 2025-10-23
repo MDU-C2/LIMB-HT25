@@ -8,17 +8,20 @@ enum {
   kEmgFrequency = 5000,
   kEmgMsPerWindow = 200,
   kEmgMsPerOverlap = 50,
-  kEmgBytesPerSample = 4,
+  kEmgBytesPerSample = 2,
+  kEmgSensorCount = 2,
 
   kImuFrequency = 1000,
   kImuMsPerWindow = 200,
   kImuMsPerOverlap = 50,
-  kImuBytesPerSample = 24,
+  kImuBytesPerSample = 12,
+  kImuSensorCount = 2,
 
   kPiezoFrequency = 5000,
   kPiezoMsPerWindow = 200,
   kPiezoMsPerOverlap = 50,
-  kPiezoBytesPerSample = 4,
+  kPiezoBytesPerSample = 2,
+  kPiezoSensorCount = 1,
 };
 
 typedef struct {
