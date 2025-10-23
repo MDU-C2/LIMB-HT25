@@ -1,0 +1,6 @@
+hash: 64aa157cbe2d0450d1497033630fbb1e
+model_id: 2da6e0a5-4785-488d-8cf5-c35f7ec1a1ed
+model_version_id: 8b8d2995-11cb-4ee5-96fd-6cd51006f730
+model_instance_id: d14b9259-4fca-4032-8e1f-c3ac3b433633
+downloaded_files:
+  - mobilenet-ssd-300x300.rvc2.tar.xz

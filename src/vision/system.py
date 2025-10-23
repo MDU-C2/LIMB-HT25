@@ -326,6 +326,7 @@ class VisionSystem:
         Create and configure the DepthAI pipeline (non-blocking mode).
         """
         model_desc = dai.NNModelDescription("yolov6-nano")
+        #model_desc = dai.NNModelDescription("mobilenet-ssd")
         FPS = 30
         self.device = dai.Device()
 
@@ -341,7 +342,7 @@ class VisionSystem:
         stereo.setExtendedDisparity(True)
         platform = self.pipeline.getDefaultDevice().getPlatform()
         if platform == dai.Platform.RVC2:
-            stereo.setOutputSize(640, 400)
+            stereo.setOutputSize(480, 320)
 
         # 3. Create spatial detection network for cup detection
         spatial_detection_network = self.pipeline.create(dai.node.SpatialDetectionNetwork).build(
@@ -355,6 +356,7 @@ class VisionSystem:
         # 4. Create AprilTag detection node
         apriltag_node = self.pipeline.create(dai.node.AprilTag)
         apriltag_node.initialConfig.setFamily(self._get_apriltag_family())
+        apriltag_node.initialConfig.quadDecimate = 2 # Could add more settings here.
         
         # Configure AprilTag detector
         #try:
@@ -366,14 +368,14 @@ class VisionSystem:
         #    print(f"Warning: Could not set AprilTag config: {e}")
         
         # 5. Link cameras
-        mono_left.requestOutput((640, 400)).link(stereo.left)
-        mono_right.requestOutput((640, 400)).link(stereo.right)
+        mono_left.requestOutput((480, 320)).link(stereo.left)
+        mono_right.requestOutput((480, 320)).link(stereo.right)
         
         # Preprocessing for AprilTag: resize and convert to GRAY8
         manip = self.pipeline.create(dai.node.ImageManip)
-        manip.initialConfig.setOutputSize(640, 400)
+        manip.initialConfig.setOutputSize(480, 320)
         manip.initialConfig.setFrameType(dai.ImgFrame.Type.GRAY8)
-        cam_rgb.requestOutput((640, 400)).link(manip.inputImage)
+        cam_rgb.requestOutput((480, 320)).link(manip.inputImage)
         manip.out.link(apriltag_node.inputImage)
 
         # 6. Create output queues (non-blocking access for sensor fusion)
@@ -400,7 +402,7 @@ class VisionSystem:
 
         # 8. Load camera intrinsics
         self._load_camera_intrinsics("camera_calibration.json")
-        
+
         print("Pipeline created successfully")
 
     def _load_camera_intrinsics(self, calibration_file):
