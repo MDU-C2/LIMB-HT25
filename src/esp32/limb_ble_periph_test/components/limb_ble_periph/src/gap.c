@@ -107,6 +107,16 @@ static int GapEventHandler(struct ble_gap_event *event,
         // }
       }
 
+      // Request 2M PHY.
+      {
+        int err = ble_gap_set_prefered_le_phy(
+            event->connect.conn_handle, BLE_GAP_LE_PHY_2M_MASK,
+            BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_CODED_ANY);
+        if (err) {
+          ESP_LOGE(kGapTag, "Couldn't set 2M PHY.");
+        }
+      }
+
       // Get the description of the connection.
       uint16_t conn_handle = event->connect.conn_handle;
       struct ble_gap_conn_desc desc = {0};
