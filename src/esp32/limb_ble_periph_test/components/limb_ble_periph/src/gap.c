@@ -3,6 +3,7 @@
 #include "host/util/util.h"
 #include "sensors_service.h"
 #include "services/gap/ble_svc_gap.h"
+#include "sys/param.h"
 
 static void start_advertising(void);
 
@@ -120,11 +121,24 @@ static int GapEventHandler(struct ble_gap_event *event,
 
       print_conn_desc(&desc);
 
-      // TODO(johan): Why do we need to update the params for the connection?
+      // Sanity check so we know we can treat the packet send rate in a general
+      // fashion.
+      static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz &&
+                        kImuPacketSendRateHz == kPiezoPacketSendRateHz,
+                    "The sensor packets must have the same send rate.");
+      enum {
+        kPacketSendRateMs = 1000 / kEmgPacketSendRateHz,
+        // the itvl_min/max members represent 1.25 ms steps.
+        kDesiredBleInterval = (int)(kPacketSendRateMs / 1.25),
+        // Setting the interval to anything lower causes the call to
+        // ble_gap_update_params to fail.
+        kMinBleInterval = 6,
+      };
       struct ble_gap_upd_params params = {
-          .itvl_min = desc.conn_itvl,
-          .itvl_max = desc.conn_itvl,
-          .latency = 3,
+          // We want to make sure that the connection interval is as close to
+          // the send rate as possible.
+          .itvl_min = MAX(kDesiredBleInterval, kMinBleInterval),
+          .itvl_max = MAX(kDesiredBleInterval, kMinBleInterval),
           .supervision_timeout = desc.supervision_timeout,
       };
       {
