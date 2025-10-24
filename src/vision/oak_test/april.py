@@ -7,7 +7,7 @@ import time
 with dai.Pipeline() as pipeline:
     hostCamera = pipeline.create(dai.node.Camera).build()
     aprilTagNode = pipeline.create(dai.node.AprilTag)
-    aprilTagNode.initialConfig.setFamily(dai.AprilTagConfig.Family.TAG_16H5)
+    aprilTagNode.initialConfig.setFamily(dai.AprilTagConfig.Family.TAG_36H11)
     hostCamera.requestOutput((1920, 1080)).link(aprilTagNode.inputImage)
     passthroughOutputQueue = aprilTagNode.passthroughInputImage.createOutputQueue()
     outQueue = aprilTagNode.out.createOutputQueue()

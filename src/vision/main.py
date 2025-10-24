@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 Main entry point for OAK-D Vision System with SpatialVisualizer.
+
+This version uses pipeline.run() with SpatialVisualizer HostNode for proper visualization.
 """
 
 import cv2
@@ -8,43 +10,38 @@ from system import VisionSystem
 import time
 
 def main():
-    """Run the vision system with live visualization."""
+    """Run the vision system with SpatialVisualizer."""
     print("="*60)
     print("OAK-D Vision System with SpatialVisualizer")
     print("="*60)
     print("\nInitializing...")
     
-    # Create and start vision system
+    # Create vision system with visualization enabled
     vision_system = VisionSystem(
         confidence_threshold=0.5,
-        spatial_threshold=5000  # 5 meters
+        spatial_threshold=5000,  # 5 meters
+        tag_size=0.05,  # 5 cm AprilTags
+        enable_visualization=True  # Enable SpatialVisualizer
     )
     
-    print("Starting pipeline...")
-    if not vision_system.start_pipeline():
-        print("Failed to start pipeline!")
-        return 1
+    print("Starting pipeline with SpatialVisualizer...")
     
-    print("\nVision system running!")
-    print("Two windows will appear: 'RGB' and 'Depth'")
-    print("Press 'q' in either window to quit.\n")
-    
-
-    vision_system.start_pipeline()
-    # Main loop - visualization happens in the SpatialVisualizer node
+    # Create pipeline and start it directly with run() for SpatialVisualizer
     try:
-        while vision_system.is_pipeline_running():
-            time.sleep(1)
-            #key = cv2.waitKey(1)
-            #if key == ord('q'):
-            #    print("\nStopping pipeline...")
-            #    break
+        
+        vision_system.run_pipeline()
+        
+        print("\nVision system running with SpatialVisualizer!")
+        print("You should see three windows:")
+        print("  - RGB: Color video with cup detections")
+        print("  - Depth: Color-coded depth map")
+        print("  - AprilTags: Grayscale with 3D coordinate axes")
+        print("\nPress 'q' in any window to quit.\n")
+        
     except KeyboardInterrupt:
         print("\n\nInterrupted by user (Ctrl+C)")
     finally:
-        #print(f"is_pipeline_running: {vision_system.is_pipeline_running()}")
-        #vision_system.shutdown()
-        cv2.destroyAllWindows()
+        vision_system.shutdown()
         print("Vision system stopped.")
         print("="*60)
     
