@@ -1,4 +1,6 @@
 #pragma once
+
+#include "gap.h"
 #include "host/ble_gap.h"
 #include "host/ble_gatt.h"
 
@@ -36,12 +38,14 @@ enum {
   kEmgNewSamplesPerWindow = kEmgSamplesPerWindow - kEmgSamplesPerOverlap,
   kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
   kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample * kEmgSensorCount,
+  kEmgPacketSendRateHz = kEmgFrequency / kEmgSamplesToSend,
 
   kImuSamplesPerWindow = kImuMsPerWindow * kImuFrequency / 1000,
   kImuSamplesPerOverlap = kImuMsPerOverlap * kImuFrequency / 1000,
   kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
   kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
   kImuBufSize = kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount,
+  kImuPacketSendRateHz = kImuFrequency / kImuSamplesToSend,
 
   kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
   kPiezoSamplesPerOverlap = kPiezoMsPerOverlap * kPiezoFrequency / 1000,
@@ -49,6 +53,7 @@ enum {
   kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
   kPiezoBufSize =
       kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount,
+  kPiezoPacketSendRateHz = kPiezoFrequency / kPiezoSamplesToSend,
 };
 
 typedef struct {
@@ -76,3 +81,48 @@ bool TryNotifyImuSubscribers(void);
 CharacteristicBuffer get_piezo_buf(void);
 // Notify subscribers of current piezo data.
 bool TryNotifyPiezoSubscribers(void);
+
+// Sanity checks using static asserts.
+
+// We're comparing between enums defined in different places, but they represent
+// general buffer size constants, so it's fine.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wenum-compare"
+static_assert(kEmgBufSize <= kMaxAttDataSize,
+              "The sensor buffer sizes shouldn't exceed the max ATT data size "
+              "to avoid splitting the data into multiple packets.");
+static_assert(kImuBufSize <= kMaxAttDataSize,
+              "The sensor buffer sizes shouldn't exceed the max ATT data size "
+              "to avoid splitting the data into multiple packets.");
+static_assert(kPiezoBufSize <= kMaxAttDataSize,
+              "The sensor buffer sizes shouldn't exceed the max ATT data size "
+              "to avoid splitting the data into multiple packets.");
+#pragma GCC diagnostic pop
+
+// Since we make decisions based on time windows of sensor readings, we want to
+// send the same rate of packets for the different sensors.
+static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz &&
+                  kImuPacketSendRateHz == kPiezoPacketSendRateHz,
+              "The send rates for the sensor readings should be the same.");
+
+// Helper to include the variable name in the static_assert message.
+#define LIMB_STRINGIFY(x) #x
+
+// The part of the window to send must be a common factor between the different
+// sensor samples sent per packet (i.e. there shouldn't be any truncation when
+// dividing by it).
+static_assert(
+    (kEmgNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
+        kEmgNewSamplesPerWindow,
+    LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
+        kEmgNewSamplesPerWindow) ".");
+static_assert(
+    (kImuNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
+        kImuNewSamplesPerWindow,
+    LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
+        kImuNewSamplesPerWindow) ".");
+static_assert(
+    (kPiezoNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
+        kPiezoNewSamplesPerWindow,
+    LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
+        kPiezoNewSamplesPerWindow) ".");
