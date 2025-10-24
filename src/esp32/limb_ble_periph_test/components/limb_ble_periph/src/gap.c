@@ -78,25 +78,20 @@ static int GapEventHandler(struct ble_gap_event *event,
       }
 
       {
-        // FIXME: Figure out what this does and what values to use.
         enum {
-          kLlPacketLength = 251,
-          kLlPacketTime = 0x4290,
+          // FIXME: Figure out what the actual effect of changing this is.
+          // kLlPacketTime = 0x4290,
+          kLlPacketTime = 2120,
           // LL_PACKET_TIME = 2120,
         };
-        /* XXX Set packet length in controller for better throughput */
-        int err = ble_hs_hci_util_set_data_len(
-            event->connect.conn_handle, kLlPacketLength, kLlPacketTime);
+        int err = ble_hs_hci_util_set_data_len(event->connect.conn_handle,
+                                               kMaxLeDataLength, kLlPacketTime);
         if (err != 0) {
           ESP_LOGE(kGapTag, "Set packet length failed; rc = %d", err);
         }
       }
 
       {
-        // FIXME: Figure out good MTU.
-        enum {
-          kMtuSize = 512,
-        };
         int err = ble_att_set_preferred_mtu(kMtuSize);
         if (err != 0) {
           ESP_LOGE(kGapTag, "Failed to set preferred MTU; rc = %d", err);
