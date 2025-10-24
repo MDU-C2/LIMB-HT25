@@ -21,16 +21,23 @@ void SendEmgDataTask([[maybe_unused]] void* arg) {
       emg_buf.size, kEmgBytesPerSample, kEmgSensorCount, kEmgFrequency);
   const TickType_t delay_time = pdMS_TO_TICKS(emg_buf_size_in_ms);
 
+  bool is_sending = false;
+  uint16_t starting_value = 0;
+
   while (true) {
     bool sent = TryNotifyEmgSubscribers();
-    if (sent) {
-      ++emg_buf.data[0];
-    } else {
-      if (emg_buf.data[0]) {
-        printf("EMG times notified: %d\n", emg_buf.data[0]);
-      }
-      emg_buf.data[0] = 0;
+    if (!is_sending && sent) {
+      is_sending = true;
+      starting_value = *((uint16_t*)emg_buf.data);
+    } else if (is_sending && !sent) {
+      is_sending = false;
+      const uint16_t notifications_sent_count =
+          *((uint16_t*)emg_buf.data) - starting_value;
+      ESP_LOGW("emgsender", "Sent %d emg notifications in a row.",
+               notifications_sent_count);
     }
+
+    ++*((uint16_t*)emg_buf.data);
 
     vTaskDelay(delay_time);
   }
@@ -44,16 +51,23 @@ void SendImuDataTask([[maybe_unused]] void* arg) {
       imu_buf.size, kImuBytesPerSample, kImuSensorCount, kImuFrequency);
   const TickType_t delay_time = pdMS_TO_TICKS(imu_buf_size_in_ms);
 
+  bool is_sending = false;
+  uint16_t starting_value = 0;
+
   while (true) {
     bool sent = TryNotifyImuSubscribers();
-    if (sent) {
-      ++imu_buf.data[0];
-    } else {
-      if (imu_buf.data[0]) {
-        printf("IMU times notified: %d\n", imu_buf.data[0]);
-      }
-      imu_buf.data[0] = 0;
+    if (!is_sending && sent) {
+      is_sending = true;
+      starting_value = *((uint16_t*)imu_buf.data);
+    } else if (is_sending && !sent) {
+      is_sending = false;
+      const uint16_t notifications_sent_count =
+          *((uint16_t*)imu_buf.data) - starting_value;
+      ESP_LOGW("imusender", "Sent %d imu notifications in a row.",
+               notifications_sent_count);
     }
+
+    ++*((uint16_t*)imu_buf.data);
 
     vTaskDelay(delay_time);
   }
@@ -67,16 +81,23 @@ void SendPiezoDataTask([[maybe_unused]] void* arg) {
       piezo_buf.size, kPiezoBytesPerSample, kPiezoSensorCount, kPiezoFrequency);
   const TickType_t delay_time = pdMS_TO_TICKS(piezo_buf_size_in_ms);
 
+  bool is_sending = false;
+  uint16_t starting_value = 0;
+
   while (true) {
     bool sent = TryNotifyPiezoSubscribers();
-    if (sent) {
-      ++piezo_buf.data[0];
-    } else {
-      if (piezo_buf.data[0]) {
-        printf("Piezo times notified: %d\n", piezo_buf.data[0]);
-      }
-      piezo_buf.data[0] = 0;
+    if (!is_sending && sent) {
+      is_sending = true;
+      starting_value = *((uint16_t*)piezo_buf.data);
+    } else if (is_sending && !sent) {
+      is_sending = false;
+      const uint16_t notifications_sent_count =
+          *((uint16_t*)piezo_buf.data) - starting_value;
+      ESP_LOGW("piezosender", "Sent %d piezo notifications in a row.",
+               notifications_sent_count);
     }
+
+    ++*((uint16_t*)piezo_buf.data);
 
     vTaskDelay(delay_time);
   }
