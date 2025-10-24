@@ -5,7 +5,6 @@
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
 
-
 static const char* const kLimbTag = "LIMB BLE Periph";
 
 // UUID corresponds to 24011525-1212-efde-1523-785feabcd122.
@@ -107,19 +106,18 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
                       [[maybe_unused]] void* args) {
   if (context->op != BLE_GATT_ACCESS_OP_READ_CHR) {
     ESP_LOGW(kLimbTag,
-             "Unsupported characteristic access operation (non-read): [%d]", context->op);
+             "Unsupported characteristic access operation (non-read): [%d]",
+             context->op);
     assert(false && "Unsupported characteristic access.");
     // FIXME: Use the proper return code.
     return BLE_ATT_ERR_UNLIKELY;
   }
 
   if (connection_handle != BLE_HS_CONN_HANDLE_NONE) {
-    ESP_LOGI(kLimbTag,
-             "characteristic read; conn_handle=%d attr_handle=%d",
+    ESP_LOGI(kLimbTag, "characteristic read; conn_handle=%d attr_handle=%d",
              connection_handle, attribute_handle);
   } else {
-    ESP_LOGI(kLimbTag,
-             "characteristic read by nimble stack; attr_handle=%d",
+    ESP_LOGI(kLimbTag, "characteristic read by nimble stack; attr_handle=%d",
              attribute_handle);
   }
 
@@ -128,15 +126,18 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
 
   // Determine which characteristic we should send.
   if (attribute_handle == gEmgValHandle) {
-    ESP_LOGI(kLimbTag, "EMG read request.", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "EMG read request.", connection_handle,
+             attribute_handle);
     buffer = gEmgVal;
     buffer_size = sizeof(gEmgVal);
   } else if (attribute_handle == gImuValHandle) {
-    ESP_LOGI(kLimbTag, "IMU read request.", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "IMU read request.", connection_handle,
+             attribute_handle);
     buffer = gImuVal;
     buffer_size = sizeof(gImuVal);
   } else if (attribute_handle == gPiezoValHandle) {
-    ESP_LOGI(kLimbTag, "Piezo read request.", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "Piezo read request.", connection_handle,
+             attribute_handle);
     buffer = gPiezoVal;
     buffer_size = sizeof(gPiezoVal);
   } else {
