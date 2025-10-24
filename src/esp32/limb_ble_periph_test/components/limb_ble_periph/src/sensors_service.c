@@ -55,7 +55,7 @@ bool TryNotifyEmgSubscribers(void) {
   if (gEmgPeerNotifyEnabled) {
     int err = ble_gatts_notify(gEmgSubscriptionHandle, gEmgValHandle);
     if (err) {
-      ESP_LOGW(kLimbTag, "Failed to send EMG notification.");
+      ESP_LOGW(kLimbTag, "Failed to send EMG notification, err(%d).", err);
     } else {
       ESP_LOGI(kLimbTag, "EMG notification sent.");
     }
@@ -86,7 +86,7 @@ bool TryNotifyImuSubscribers(void) {
   if (gImuPeerNotifyEnabled) {
     int err = ble_gatts_notify(gImuSubscriptionHandle, gImuValHandle);
     if (err) {
-      ESP_LOGW(kLimbTag, "Failed to send IMU notification.");
+      ESP_LOGW(kLimbTag, "Failed to send IMU notification, err(%d).", err);
     } else {
       ESP_LOGI(kLimbTag, "IMU notification sent.");
     }
@@ -119,7 +119,7 @@ bool TryNotifyPiezoSubscribers(void) {
     // need use a mutex for the buffer.
     int err = ble_gatts_notify(gPiezoSubscriptionHandle, gPiezoValHandle);
     if (err) {
-      ESP_LOGW(kLimbTag, "Failed to send piezo notification.");
+      ESP_LOGW(kLimbTag, "Failed to send piezo notification, err(%d).", err);
     } else {
       ESP_LOGI(kLimbTag, "Piezo notification sent.");
     }
