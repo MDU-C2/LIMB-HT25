@@ -31,9 +31,11 @@ typedef struct {
  * All data is converted to standard physical units.
  */
 typedef struct {
-    imu_axis_data_t accel;      /**< Accelerometer data in meters/second^2 (m/s^2) */
-    imu_axis_data_t gyro;       /**< Gyroscope data in radians/second (rad/s) */
-    float temperature;          /**< Temperature data in degrees Celsius (°C) */
+    imu_axis_data_t accel;      /**< Datos Acelerómetro en m/s^2 */
+    imu_axis_data_t gyro;       /**< Datos Giroscopio en rad/s */
+    float temperature;          /**< Temperatura en °C */
+    float pitch;                /**< Calculated pitch angle (rad) */
+    float roll;                 /**< Calculated roll angle (rad) */
 } lsm6dso32_data_t;
 
 

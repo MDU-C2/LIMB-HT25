@@ -14,7 +14,9 @@
 #ifndef EMG_DRIVER_H
 #define EMG_DRIVER_H
 
-#include "esp_system.h" // Required for the 'esp_err_t' type
+#include "esp_system.h" 
+#include "freertos/FreeRTOS.h" 
+#include "freertos/task.h"     
 
 /**
  * @brief Set to 1 to enable two-channel sampling, 0 for single-channel.
@@ -109,5 +111,12 @@ void emg_driver_get_packet(emg_data_packet_t *packet);
  * new samples have been acquired.
  */
 void emg_driver_process_data(void);
+
+/**
+ * @brief Sets the task handle to be notified by the ADC ISR.
+ * MUST be called after the processing task is created and before emg_driver_start().
+ * @param task_handle The handle of the task waiting in emg_driver_process_data().
+ */
+void emg_driver_set_notify_task(TaskHandle_t task_handle);
 
 #endif // EMG_DRIVER_H

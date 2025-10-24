@@ -182,10 +182,6 @@ void emg_driver_process_data(void) {
     // On the first call, capture the handle of the *calling* task.
     // This ensures the ISR notifies the correct task (the 'emg_task')
     // instead of the task that called emg_driver_init() (the 'main' task).
-    if (s_task_handle == NULL) {
-        s_task_handle = xTaskGetCurrentTaskHandle();
-    }
-    // ---------------------------
 
     // Sleep this task until the ISR (s_conv_done_cb) gives a notification
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -248,6 +244,10 @@ void emg_driver_process_data(void) {
             s_window_is_ready = true; 
         }
     }
+}
+
+void emg_driver_set_notify_task(TaskHandle_t task_handle) {
+    s_task_handle = task_handle;
 }
 
 // --- Private Helper Function Implementations ---
