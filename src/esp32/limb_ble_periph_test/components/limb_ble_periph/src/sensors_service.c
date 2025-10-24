@@ -10,9 +10,7 @@ enum {
   // The amount of the new samples in a window that should be buffered before
   // being sent. E.g. 30 means one 30th of the new samples are buffered before
   // being sent.
-  // TODO(johan): Figure out what's a good value for this with regards to
-  // potential packet loss vs reduced overhead.
-  kPartOfWindowPerSend = 30,
+  kPartOfWindowPerSend = 15,
 
   kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,
   kEmgSamplesPerOverlap = kEmgMsPerOverlap * kEmgFrequency / 1000,

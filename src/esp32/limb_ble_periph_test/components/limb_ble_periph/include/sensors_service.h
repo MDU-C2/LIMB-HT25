@@ -5,19 +5,19 @@
 // The settings for the sensors used. These are used to calculate the buffer
 // sizes for the different characteristics.
 enum {
-  kEmgFrequency = 5000,
+  kEmgFrequency = 4000,
   kEmgMsPerWindow = 200,
   kEmgMsPerOverlap = 50,
   kEmgBytesPerSample = 2,
   kEmgSensorCount = 2,
 
-  kImuFrequency = 1000,
+  kImuFrequency = 100,
   kImuMsPerWindow = 200,
   kImuMsPerOverlap = 50,
   kImuBytesPerSample = 12,
   kImuSensorCount = 2,
 
-  kPiezoFrequency = 5000,
+  kPiezoFrequency = 100,
   kPiezoMsPerWindow = 200,
   kPiezoMsPerOverlap = 50,
   kPiezoBytesPerSample = 2,
