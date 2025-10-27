@@ -1,19 +1,16 @@
 import asyncio
 import platform
-import struct  # <-- ¡Importante! Para decodificar bytes
+import struct  
 from bleak import BleakScanner, BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
 
 # --- Configuración ---
-# El nombre que tu ESP32 está anunciando
 TARGET_NAME = "LIMBServer"
 
-# --- ¡IMPORTANTE! ---
 # Pega aquí los UUIDs que encontraste en el Paso 7.A
 # Deben ser strings (cadenas de texto).
 EMG_CHAR_UUID = "24011525-1212-efde-1523-785feabcd122"  
 IMU_CHAR_UUID = "25011525-1212-efde-1523-785feabcd122"  
-# (Tus UUIDs serán diferentes, pero se parecerán a estos)
 # --------------------------------------------------------------------
 
 
@@ -32,12 +29,7 @@ def notification_handler(characteristic: BleakGATTCharacteristic, data: bytearra
     # ----------------------------------------------------
     if char_uuid == EMG_CHAR_UUID:
         if len(data) >= 2:
-            # Tu ESP32 envió un uint16_t (2 bytes).
-            # Formato '<H':
-            #   < = Little-Endian (el ESP32 es little-endian)
-            #   H = Unsigned Short (un uint16_t de 2 bytes)
             try:
-                # struct.unpack devuelve un tuple, (valor,), por eso usamos [0]
                 emg_value = struct.unpack('<H', data[:2])[0]
                 print(f"Datos EMG recibidos: {emg_value}\n")
             except Exception as e:
@@ -57,7 +49,6 @@ def notification_handler(characteristic: BleakGATTCharacteristic, data: bytearra
             #   f = float (4 bytes)
             try:
                 pitch, roll = struct.unpack('<ff', data[:8])
-                # Multiplicamos por 57.29... para ver en grados (opcional)
                 pitch_deg = pitch * 57.2957795
                 roll_deg = roll * 57.2957795
                 
@@ -67,9 +58,6 @@ def notification_handler(characteristic: BleakGATTCharacteristic, data: bytearra
         else:
             print(f"Paquete IMU demasiado corto ({len(data)} bytes)\n")
 
-    # ----------------------------------------------------
-    # --- Para cualquier otro "Buzón" (ej: Piezo) ---
-    # ----------------------------------------------------
     else:
         print(f"Datos de UUID desconocido [ {char_uuid} ]:")
         data_hex = data[:16].hex(sep='-', bytes_per_sep=1)
@@ -104,8 +92,6 @@ async def main():
                     if "notify" in char.properties:
                         print(f"  > Encontrado 'buzón' (Característica): {char.uuid}")
                         
-                        # --- MODIFICACIÓN IMPORTANTE ---
-                        # Solo nos suscribimos a los "buzones" que conocemos
                         if str(char.uuid) in [EMG_CHAR_UUID, IMU_CHAR_UUID]:
                             try:
                                 print(f"  > Suscribiéndose a notificaciones...")
