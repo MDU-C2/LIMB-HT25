@@ -12,7 +12,8 @@ enum { kMsInS = 1000 };
 // The amount of milliseconds worth of data a sensor buffer can hold.
 static uint16_t BufSizeInMs(uint16_t buf_size, uint8_t bytes_per_sample,
                             uint8_t sensor_count, uint16_t frequency) {
-  return buf_size / (bytes_per_sample * sensor_count) * kMsInS / frequency;
+  return (buf_size - kSequenceNumberSize) / (bytes_per_sample * sensor_count) *
+         kMsInS / frequency;
 }
 
 void SendEmgDataTask([[maybe_unused]] void* arg) {

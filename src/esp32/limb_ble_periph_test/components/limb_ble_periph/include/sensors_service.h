@@ -32,19 +32,22 @@ enum {
   // being sent. E.g. 30 means one 30th of the new samples are buffered before
   // being sent.
   kPartOfWindowPerSend = 15,
+  kSequenceNumberSize = 4,
 
   kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,
   kEmgSamplesPerOverlap = kEmgMsPerOverlap * kEmgFrequency / 1000,
   kEmgNewSamplesPerWindow = kEmgSamplesPerWindow - kEmgSamplesPerOverlap,
   kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
-  kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample * kEmgSensorCount,
+  kEmgBufSize = (kEmgSamplesToSend * kEmgBytesPerSample * kEmgSensorCount) +
+                kSequenceNumberSize,
   kEmgPacketSendRateHz = kEmgFrequency / kEmgSamplesToSend,
 
   kImuSamplesPerWindow = kImuMsPerWindow * kImuFrequency / 1000,
   kImuSamplesPerOverlap = kImuMsPerOverlap * kImuFrequency / 1000,
   kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
   kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
-  kImuBufSize = kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount,
+  kImuBufSize = (kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount) +
+                kSequenceNumberSize,
   kImuPacketSendRateHz = kImuFrequency / kImuSamplesToSend,
 
   kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
@@ -52,7 +55,8 @@ enum {
   kPiezoNewSamplesPerWindow = kPiezoSamplesPerWindow - kPiezoSamplesPerOverlap,
   kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
   kPiezoBufSize =
-      kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount,
+      (kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount) +
+      kSequenceNumberSize,
   kPiezoPacketSendRateHz = kPiezoFrequency / kPiezoSamplesToSend,
 };
 
