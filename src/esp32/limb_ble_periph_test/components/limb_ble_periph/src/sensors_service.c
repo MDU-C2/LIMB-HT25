@@ -229,7 +229,6 @@ void SensorSubscribe(struct ble_gap_event* event) {
   const uint16_t attr_handle = event->subscribe.attr_handle;
   const uint16_t conn_handle = event->subscribe.conn_handle;
 
-  // FIXME: Change some of the EMG tags to some generic tag.
   if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
     ESP_LOGI(kLimbTag, "subscribe event; conn_handle=%d attr_handle=%d",
              conn_handle, attr_handle);
