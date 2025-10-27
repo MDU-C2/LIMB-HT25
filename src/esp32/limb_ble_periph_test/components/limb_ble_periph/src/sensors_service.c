@@ -1,6 +1,7 @@
 #include "sensors_service.h"
 
 #include "esp_log.h"
+#include "host/ble_att.h"
 #include "host/ble_gatt.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
@@ -105,11 +106,31 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
                       struct ble_gatt_access_ctxt* context,
                       [[maybe_unused]] void* args) {
   if (context->op != BLE_GATT_ACCESS_OP_READ_CHR) {
-    ESP_LOGW(kLimbTag,
-             "Unsupported characteristic access operation (non-read): [%d]",
-             context->op);
-    assert(false && "Unsupported characteristic access.");
-    // FIXME: Use the proper return code.
+    char uuid_buf[BLE_UUID_STR_LEN] = {0};
+    switch (context->op) {
+      case BLE_GATT_ACCESS_OP_WRITE_DSC:
+        ESP_LOGW(kLimbTag,
+                 "Invalid write access on characteristic descriptor, UUID: ",
+                 ble_uuid_to_str(context->dsc->uuid, uuid_buf));
+        return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+      case BLE_GATT_ACCESS_OP_WRITE_CHR: {
+        ESP_LOGW(kLimbTag, "Invalid read access on characteristic, UUID: ",
+                 ble_uuid_to_str(context->chr->uuid, uuid_buf));
+        return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+      }
+      case BLE_GATT_ACCESS_OP_READ_DSC: {
+        // We shouldn't have any descriptors for the characteristics.
+        ESP_LOGW(kLimbTag,
+                 "Invalid read access on characteristic descriptor, UUID: ",
+                 ble_uuid_to_str(context->dsc->uuid, uuid_buf));
+        return BLE_ATT_ERR_READ_NOT_PERMITTED;
+      }
+      default: {
+        // Unreachable.
+      };
+    }
+    assert(false &&
+           "GATT operation that isn't r/w on characteristic or descriptor.");
     return BLE_ATT_ERR_UNLIKELY;
   }
 
