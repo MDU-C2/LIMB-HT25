@@ -217,6 +217,15 @@ static int GapEventHandler(struct ble_gap_event *event,
       return 0;
     };
 
+    case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE: {
+      // FIXME: Seems like 1M is set instead of 2M.
+      ESP_LOGI(kGapTag,
+               "Phy update event: conn_handle=%d status=%d tx_phy=%d rx_phy=%d",
+               event->phy_updated.conn_handle, event->phy_updated.status,
+               event->phy_updated.tx_phy, event->phy_updated.rx_phy);
+      return 0;
+    }
+
     case BLE_GAP_EVENT_DATA_LEN_CHG: {
       ESP_LOGI(
           kGapTag,
@@ -225,6 +234,13 @@ static int GapEventHandler(struct ble_gap_event *event,
           event->data_len_chg.conn_handle, event->data_len_chg.max_tx_octets,
           event->data_len_chg.max_tx_time, event->data_len_chg.max_rx_octets,
           event->data_len_chg.max_rx_time);
+
+      return 0;
+    }
+
+    case BLE_GAP_EVENT_LINK_ESTAB: {
+      ESP_LOGI(kGapTag, "Link establishment event: conn_handle=%d status=%d",
+               event->link_estab.conn_handle, event->link_estab.status);
 
       return 0;
     }
