@@ -79,14 +79,10 @@ static int GapEventHandler(struct ble_gap_event *event,
       }
 
       {
-        enum {
-          // FIXME: Figure out what the actual effect of changing this is.
-          // kLlPacketTime = 0x4290,
-          kLlPacketTime = 2120,
-          // LL_PACKET_TIME = 2120,
-        };
-        int err = ble_hs_hci_util_set_data_len(event->connect.conn_handle,
-                                               kMaxLeDataLength, kLlPacketTime);
+        // We use Data Length Extension to set the max LL Data PDU payload
+        // length and the PDU's max transmission time.
+        int err = ble_hs_hci_util_set_data_len(
+            event->connect.conn_handle, kMaxLeDataLength, kMaxLeDataTimeUs);
         if (err != 0) {
           ESP_LOGE(kGapTag, "Set packet length failed; rc = %d", err);
         }
@@ -220,6 +216,18 @@ static int GapEventHandler(struct ble_gap_event *event,
                event->mtu.conn_handle, event->mtu.channel_id, event->mtu.value);
       return 0;
     };
+
+    case BLE_GAP_EVENT_DATA_LEN_CHG: {
+      ESP_LOGI(
+          kGapTag,
+          "Data len change event: conn_handle=%d max_tx_oct=%d max_tx_time=%d "
+          "max_rx_oct=%d max_rx_time=%d",
+          event->data_len_chg.conn_handle, event->data_len_chg.max_tx_octets,
+          event->data_len_chg.max_tx_time, event->data_len_chg.max_rx_octets,
+          event->data_len_chg.max_rx_time);
+
+      return 0;
+    }
 
     default: {
       ESP_LOGW(kGapTag, "Ignoring unknown GAP event: [%d]", event->type);
