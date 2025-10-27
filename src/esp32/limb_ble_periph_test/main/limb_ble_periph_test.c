@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "endian.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "portmacro.h"
@@ -27,18 +28,19 @@ void SendEmgDataTask([[maybe_unused]] void* arg) {
 
   while (true) {
     bool sent = TryNotifyEmgSubscribers();
+    uint32_t sequence_number = le32toh(*(uint32_t*)emg_buf.data);
     if (!is_sending && sent) {
       is_sending = true;
-      starting_value = *((uint32_t*)emg_buf.data);
+      starting_value = sequence_number;
     } else if (is_sending && !sent) {
       is_sending = false;
       const uint32_t notifications_sent_count =
-          *((uint32_t*)emg_buf.data) - starting_value;
+          sequence_number - starting_value;
       ESP_LOGW("emgsender", "Sent %d emg notifications in a row.",
                notifications_sent_count);
     }
 
-    ++*((uint32_t*)emg_buf.data);
+    *(uint32_t*)emg_buf.data = htole32(sequence_number + 1);
 
     vTaskDelay(delay_time);
   }
@@ -57,18 +59,19 @@ void SendImuDataTask([[maybe_unused]] void* arg) {
 
   while (true) {
     bool sent = TryNotifyImuSubscribers();
+    uint32_t sequence_number = le32toh(*(uint32_t*)imu_buf.data);
     if (!is_sending && sent) {
       is_sending = true;
-      starting_value = *((uint32_t*)imu_buf.data);
+      starting_value = sequence_number;
     } else if (is_sending && !sent) {
       is_sending = false;
       const uint32_t notifications_sent_count =
-          *((uint32_t*)imu_buf.data) - starting_value;
+          sequence_number - starting_value;
       ESP_LOGW("imusender", "Sent %d imu notifications in a row.",
                notifications_sent_count);
     }
 
-    ++*((uint32_t*)imu_buf.data);
+    *((uint32_t*)imu_buf.data) = htole32(sequence_number + 1);
 
     vTaskDelay(delay_time);
   }
@@ -87,18 +90,19 @@ void SendPiezoDataTask([[maybe_unused]] void* arg) {
 
   while (true) {
     bool sent = TryNotifyPiezoSubscribers();
+    uint32_t sequence_number = le32toh(*(uint32_t*)piezo_buf.data);
     if (!is_sending && sent) {
       is_sending = true;
-      starting_value = *((uint32_t*)piezo_buf.data);
+      starting_value = sequence_number;
     } else if (is_sending && !sent) {
       is_sending = false;
       const uint32_t notifications_sent_count =
-          *((uint32_t*)piezo_buf.data) - starting_value;
+          sequence_number - starting_value;
       ESP_LOGW("piezosender", "Sent %d piezo notifications in a row.",
                notifications_sent_count);
     }
 
-    ++*((uint32_t*)piezo_buf.data);
+    *((uint32_t*)piezo_buf.data) = htole32(sequence_number + 1);
 
     vTaskDelay(delay_time);
   }
