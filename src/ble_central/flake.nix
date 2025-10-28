@@ -13,6 +13,7 @@
           pkgs.mkShell {
             buildInputs = with pkgs; [
               python313Packages.bleak
+              python313Packages.numpy # This is v2.2.5, we're probably using 1.26.4?
             ];
           };
       }
