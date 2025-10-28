@@ -10,6 +10,8 @@ from bleak import (
     BleakScanner,
 )
 
+from sensor_packet_serialization import decode_packet
+
 if TYPE_CHECKING:
     from bleak.backends.characteristic import BleakGATTCharacteristic
 
@@ -17,11 +19,6 @@ SERVICE_UUID = "23011525-1212-efde-1523-785feabcd122"
 EMG_CHARACTERISTIC_UUID = "24011525-1212-efde-1523-785feabcd122"
 IMU_CHARACTERISTIC_UUID = "25011525-1212-efde-1523-785feabcd122"
 PIEZO_CHARACTERISTIC_UUID = "26011525-1212-efde-1523-785feabcd122"
-
-
-def decode_packet(view: memoryview[int]) -> tuple[int, memoryview[int]]:
-    """Extract the 32-bit sequence number and sensor data from the packet data."""
-    return (int.from_bytes(view[:4], "little"), view[4:])
 
 
 def print_received_packets_stats(packets: list[bytearray], sensor: str) -> None:
