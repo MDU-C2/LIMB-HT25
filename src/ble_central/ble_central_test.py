@@ -19,9 +19,9 @@ IMU_CHARACTERISTIC_UUID = "25011525-1212-efde-1523-785feabcd122"
 PIEZO_CHARACTERISTIC_UUID = "26011525-1212-efde-1523-785feabcd122"
 
 
-def decode_seq_num(arr: bytearray) -> int:
-    """Extract the sequence number from the packet data."""
-    return int.from_bytes(arr[:4], "little")
+def decode_packet(view: memoryview[int]) -> tuple[int, memoryview[int]]:
+    """Extract the 32-bit sequence number and sensor data from the packet data."""
+    return (int.from_bytes(view[:4], "little"), view[4:])
 
 
 def print_received_packets_stats(packets: list[bytearray], sensor: str) -> None:
@@ -29,14 +29,14 @@ def print_received_packets_stats(packets: list[bytearray], sensor: str) -> None:
     print(f"{sensor}")
     notification_count = len(packets)
     print(f"notification count: {notification_count}")
-    seq_nrs = [decode_seq_num(x) for x in packets]
+    seq_nrs = [decode_packet(memoryview(x))[0] for x in packets]
     print(
         f"seq nrs: {seq_nrs}",
     )
-    starting_sequence_number = decode_seq_num(packets[0])
+    starting_sequence_number, _ = decode_packet(memoryview(packets[0]))
     i = starting_sequence_number
     for arr in packets:
-        seqnr = decode_seq_num(arr)
+        seqnr, _ = decode_packet(memoryview(arr))
         if seqnr > i:
             print(f"{i} to {seqnr - 1} ({seqnr - i} packets) are missing.")
             i = seqnr
@@ -67,8 +67,7 @@ def set_up_notify_handler(
         characteristic: BleakGATTCharacteristic,
         data: bytearray,
     ) -> None:
-        # print(f"Read EMG [{characteristic.uuid}]")
-        i = decode_seq_num(data)
+        i, sensor_data = decode_packet(memoryview(data))
         nonlocal first_emg_sequence_number
         if first_emg_sequence_number == 0:
             first_emg_sequence_number = i
@@ -78,8 +77,7 @@ def set_up_notify_handler(
         characteristic: BleakGATTCharacteristic,
         data: bytearray,
     ) -> None:
-        # print(f"Read IMU [{characteristic.uuid}]")
-        i = decode_seq_num(data)
+        i, sensor_data = decode_packet(memoryview(data))
         nonlocal first_imu_sequence_number
         if first_imu_sequence_number == 0:
             first_imu_sequence_number = i
@@ -89,8 +87,7 @@ def set_up_notify_handler(
         characteristic: BleakGATTCharacteristic,
         data: bytearray,
     ) -> None:
-        # print(f"Read piezo [{characteristic.uuid}]")
-        i = decode_seq_num(data)
+        i, sensor_data = decode_packet(memoryview(data))
         nonlocal first_piezo_sequence_number
         if first_piezo_sequence_number == 0:
             first_piezo_sequence_number = i
