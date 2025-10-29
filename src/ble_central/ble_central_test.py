@@ -150,6 +150,24 @@ def print_received_packets_stats(packets: list[bytearray], sensor: str) -> None:
     print(f"missed packets: {missing} ({missing / i * 100:.2f}%)")
 
 
+def update_sample_windows(
+    sample_windows: list[SampleWindow],
+    new_sensor_samples: list[npt.NDArray],
+    sequence_number: int,
+    full_window_processing_cb: Callable[[int, npt.NDArray], None],
+) -> None:
+    """Add new samples to the windows and begin the processing of any full windows."""
+    for sensor_id, (sample_window, new_samples) in enumerate(
+        zip(sample_windows, new_sensor_samples),
+    ):
+        maybe_full_window = sample_window.append_samples(
+            new_samples,
+            sequence_number,
+        )
+        if maybe_full_window is not None:
+            full_window_processing_cb(sensor_id, maybe_full_window)
+
+
 def set_up_notify_handler(
     emg_buf: list[bytearray | None],
     imu_buf: list[bytearray | None],
