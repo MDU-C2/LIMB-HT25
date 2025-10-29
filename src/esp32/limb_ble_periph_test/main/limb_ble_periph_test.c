@@ -32,6 +32,7 @@ void SendEmgDataTask([[maybe_unused]] void* arg) {
   uint16_t* emg_buf_data = (uint16_t*)(emg_buf.data + 4);
   uint16_t emg_buf_data_size = (emg_buf.size - 4) / 2;
 
+  TickType_t wakeup_time = xTaskGetTickCount();
   while (true) {
     uint32_t sequence_number = le32toh(*(uint32_t*)emg_buf.data);
 
@@ -54,7 +55,7 @@ void SendEmgDataTask([[maybe_unused]] void* arg) {
                notifications_sent_count);
     }
 
-    vTaskDelay(delay_time);
+    xTaskDelayUntil(&wakeup_time, delay_time);
   }
 
   vTaskDelete(NULL);
@@ -75,6 +76,7 @@ void SendImuDataTask([[maybe_unused]] void* arg) {
   uint16_t* imu_buf_data = (uint16_t*)(imu_buf.data + 4);
   uint16_t imu_buf_data_size = (imu_buf.size - 4) / kImuBytesPerValue;
 
+  TickType_t wakeup_time = xTaskGetTickCount();
   while (true) {
     uint32_t sequence_number = le32toh(*(uint32_t*)imu_buf.data);
 
@@ -96,7 +98,7 @@ void SendImuDataTask([[maybe_unused]] void* arg) {
                notifications_sent_count);
     }
 
-    vTaskDelay(delay_time);
+    xTaskDelayUntil(&wakeup_time, delay_time);
   }
 
   vTaskDelete(NULL);
@@ -117,6 +119,7 @@ void SendPiezoDataTask([[maybe_unused]] void* arg) {
   uint16_t* piezo_buf_data = (uint16_t*)(piezo_buf.data + 4);
   uint16_t piezo_buf_data_size = (piezo_buf.size - 4) / kPiezoBytesPerSample;
 
+  TickType_t wakeup_time = xTaskGetTickCount();
   while (true) {
     uint32_t sequence_number = le32toh(*(uint32_t*)piezo_buf.data);
 
@@ -139,7 +142,7 @@ void SendPiezoDataTask([[maybe_unused]] void* arg) {
                notifications_sent_count);
     }
 
-    vTaskDelay(delay_time);
+    xTaskDelayUntil(&wakeup_time, delay_time);
   }
 
   vTaskDelete(NULL);
