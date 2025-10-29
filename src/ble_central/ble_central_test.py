@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Callable
 
+import numpy as np
+import numpy.typing as npt
 from bleak import (
     BleakClient,
     BleakScanner,
@@ -19,6 +21,81 @@ SERVICE_UUID = "23011525-1212-efde-1523-785feabcd122"
 EMG_CHARACTERISTIC_UUID = "24011525-1212-efde-1523-785feabcd122"
 IMU_CHARACTERISTIC_UUID = "25011525-1212-efde-1523-785feabcd122"
 PIEZO_CHARACTERISTIC_UUID = "26011525-1212-efde-1523-785feabcd122"
+
+
+class SampleWindow:
+    """A sliding window of sensor samples."""
+
+    def __init__(
+        self,
+        samples_per_window: int,
+        samples_per_overlap: int,
+        values_per_sample: int,
+    ) -> None:
+        """Create a sliding window capable of storing sensor samples."""
+        self._capacity = samples_per_window
+        self._overlap_length = samples_per_overlap
+        self._length = 0
+        self._last_sequence_number_received = 0
+        # Preallocate space.
+        self._samples = np.array([np.array([0] * values_per_sample)] * self._capacity)
+
+    def append_samples(
+        self,
+        new_samples: npt.NDArray,
+        sequence_number: int,
+    ) -> npt.NDArray | None:
+        """Append the samples to the window.
+
+        :return: A copy of the full window or None if it's not full.
+        """
+        if self._last_sequence_number_received == 0:
+            self._last_sequence_number_received = sequence_number - 1
+
+        if self._last_sequence_number_received != sequence_number - 1:
+            # We've dropped packets.
+            dropped_packets_count = (
+                sequence_number - self._last_sequence_number_received - 1
+            )
+            # TODO(johan): Actually handle dropped packets.
+            print(f"Dropped {dropped_packets_count} packets.")
+
+        self._last_sequence_number_received = sequence_number
+
+        # NOTE: This assumes that the length of the window is evenly divisible by the
+        # amount of new samples received.
+        if self._length + len(new_samples) > self._capacity:
+            err = (
+                f"Trying to add {len(new_samples)} samples to a "
+                f"full({self._length}/{self._capacity}) sample window."
+            )
+            raise BufferError(err)
+
+        self._samples[self._length : self._length + len(new_samples)] = new_samples
+        self._length += len(new_samples)
+
+        # If we've filled up a full window, we return a copy of it and prepare filling
+        # up the next window by moving the overlap to the start.
+        if self._length == self._capacity:
+            full_window = self._samples[: self._capacity].copy()
+            self._samples[: self._overlap_length] = self._samples[
+                -self._overlap_length :
+            ]
+            self._length = self._overlap_length
+            return full_window
+
+        return None
+
+    def __str__(self) -> str:
+        """Return the string representation of the window."""
+        return str(self._samples)
+
+    _length: int
+    _capacity: int
+    _overlap_length: int
+    # 2D array of samples: _samples[0] -> sample, _samples[0][0] -> value in sample.
+    _samples: npt.NDArray
+    _last_sequence_number_received: int
 
 
 def print_received_packets_stats(packets: list[bytearray], sensor: str) -> None:
