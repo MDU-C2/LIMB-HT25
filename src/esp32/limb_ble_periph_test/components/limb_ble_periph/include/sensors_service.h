@@ -10,19 +10,25 @@ enum {
   kEmgFrequency = 4000,
   kEmgMsPerWindow = 200,
   kEmgMsPerOverlap = 50,
-  kEmgBytesPerSample = 2,
+  kEmgBytesPerValue = 2,
+  kEmgValuesPerSample = 1,
+  kEmgBytesPerSample = kEmgBytesPerValue * kEmgValuesPerSample,
   kEmgSensorCount = 2,
 
   kImuFrequency = 100,
   kImuMsPerWindow = 200,
   kImuMsPerOverlap = 50,
-  kImuBytesPerSample = 12,
+  kImuBytesPerValue = 2,
+  kImuValuesPerSample = 6,
+  kImuBytesPerSample = kImuBytesPerValue * kImuValuesPerSample,
   kImuSensorCount = 2,
 
   kPiezoFrequency = 100,
   kPiezoMsPerWindow = 200,
   kPiezoMsPerOverlap = 50,
-  kPiezoBytesPerSample = 2,
+  kPiezoBytesPerValue = 2,
+  kPiezoValuesPerSample = 1,
+  kPiezoBytesPerSample = kPiezoBytesPerValue * kPiezoValuesPerSample,
   kPiezoSensorCount = 1,
 };
 
