@@ -12,7 +12,7 @@ from bleak import (
     BleakScanner,
 )
 
-from sensor_packet_serialization import decode_packet
+from sensor_packet_serialization import decode_packet, deserialize_packet_data
 
 if TYPE_CHECKING:
     from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -48,6 +48,17 @@ PIEZO_MS_PER_WINDOW = 200
 PIEZO_MS_PER_OVERLAP = 50
 PIEZO_SAMPLES_PER_WINDOW = int(PIEZO_FREQUENCY * PIEZO_MS_PER_WINDOW / 1000)
 PIEZO_SAMPLES_PER_OVERLAP = int(PIEZO_FREQUENCY * PIEZO_MS_PER_OVERLAP / 1000)
+
+first_emg_sequence_number = 0
+first_imu_sequence_number = 0
+first_piezo_sequence_number = 0
+latest_emg_sequence_number = 0
+latest_imu_sequence_number = 0
+latest_piezo_sequence_number = 0
+
+dropped_emg_packet_count = 0
+dropped_imu_packet_count = 0
+dropped_piezo_packet_count = 0
 
 
 class SampleWindow:
@@ -125,29 +136,28 @@ class SampleWindow:
     _last_sequence_number_received: int
 
 
-def print_received_packets_stats(packets: list[bytearray], sensor: str) -> None:
-    """Print details about the packets received."""
-    print(f"{sensor}")
-    notification_count = len(packets)
-    print(f"notification count: {notification_count}")
-    seq_nrs = [decode_packet(memoryview(x))[0] for x in packets]
-    print(
-        f"seq nrs: {seq_nrs}",
-    )
-    starting_sequence_number, _ = decode_packet(memoryview(packets[0]))
-    i = starting_sequence_number
-    for arr in packets:
-        seqnr, _ = decode_packet(memoryview(arr))
-        if seqnr > i:
-            print(f"{i} to {seqnr - 1} ({seqnr - i} packets) are missing.")
-            i = seqnr
-        i += 1
-    print(f"last seq nr received: {i - 1}")
-    seq_nr_range = i - starting_sequence_number
-    print(f"total range of seq nr: {seq_nr_range}")
-    missing = seq_nr_range - notification_count
+def process_emg_window(sensor_id: int, window_buf: npt.NDArray) -> None:
+    """Start processing the full EMG window."""
+    # This needs to in some way send the data to the part of the system processing the
+    # window in a non-blocking fashion.
+    print(f"Full EMG{sensor_id} window:")
+    print(f"{window_buf}")
 
-    print(f"missed packets: {missing} ({missing / i * 100:.2f}%)")
+
+def process_imu_window(sensor_id: int, window_buf: npt.NDArray) -> None:
+    """Start processing the full IMU window."""
+    # This needs to in some way send the data to the part of the system processing the
+    # window in a non-blocking fashion.
+    print(f"Full IMU{sensor_id} window:")
+    print(f"{window_buf}")
+
+
+def process_piezo_window(sensor_id: int, window_buf: npt.NDArray) -> None:
+    """Start processing the full piezo window."""
+    # This needs to in some way send the data to the part of the system processing the
+    # window in a non-blocking fashion.
+    print(f"Full piezo{sensor_id} window:")
+    print(f"{window_buf}")
 
 
 def update_sample_windows(
@@ -169,48 +179,102 @@ def update_sample_windows(
 
 
 def set_up_notify_handler(
-    emg_buf: list[bytearray | None],
-    imu_buf: list[bytearray | None],
-    piezo_buf: list[bytearray | None],
+    emg_sample_windows: list[SampleWindow],
+    imu_sample_windows: list[SampleWindow],
+    piezo_sample_windows: list[SampleWindow],
 ) -> tuple[
     Callable[[BleakGATTCharacteristic, bytearray], None],
     Callable[[BleakGATTCharacteristic, bytearray], None],
     Callable[[BleakGATTCharacteristic, bytearray], None],
 ]:
     """Return the EMG, IMU, and piezo characteristic handlers."""
-    first_emg_sequence_number = 0
-    first_imu_sequence_number = 0
-    first_piezo_sequence_number = 0
 
     def emg_notify_handler(
         characteristic: BleakGATTCharacteristic,
         data: bytearray,
     ) -> None:
-        i, sensor_data = decode_packet(memoryview(data))
-        nonlocal first_emg_sequence_number
+        sequence_number, sensor_data = decode_packet(memoryview(data))
+        sensors = deserialize_packet_data(
+            sensor_data,
+            bytes_per_value=EMG_BYTES_PER_VALUE,
+            values_per_sample=EMG_VALUES_PER_SAMPLE,
+            sensor_count=EMG_SENSOR_COUNT,
+        )
+        global first_emg_sequence_number
+        global latest_emg_sequence_number
         if first_emg_sequence_number == 0:
-            first_emg_sequence_number = i
-        emg_buf[i - first_emg_sequence_number] = data
+            first_emg_sequence_number = sequence_number
+            latest_emg_sequence_number = sequence_number - 1
+
+        global dropped_emg_packet_count
+        dropped_emg_packet_count += sequence_number - latest_emg_sequence_number - 1
+
+        update_sample_windows(
+            emg_sample_windows,
+            sensors,
+            sequence_number,
+            process_emg_window,
+        )
+
+        latest_emg_sequence_number = sequence_number
 
     def imu_notify_handler(
         characteristic: BleakGATTCharacteristic,
         data: bytearray,
     ) -> None:
-        i, sensor_data = decode_packet(memoryview(data))
-        nonlocal first_imu_sequence_number
+        sequence_number, sensor_data = decode_packet(memoryview(data))
+        sensors = deserialize_packet_data(
+            sensor_data,
+            bytes_per_value=IMU_BYTES_PER_VALUE,
+            values_per_sample=IMU_VALUES_PER_SAMPLE,
+            sensor_count=IMU_SENSOR_COUNT,
+        )
+        global first_imu_sequence_number
+        global latest_imu_sequence_number
         if first_imu_sequence_number == 0:
-            first_imu_sequence_number = i
-        imu_buf[i - first_imu_sequence_number] = data
+            first_imu_sequence_number = sequence_number
+            latest_imu_sequence_number = sequence_number - 1
+
+        global dropped_imu_packet_count
+        dropped_imu_packet_count += sequence_number - latest_imu_sequence_number - 1
+
+        update_sample_windows(
+            imu_sample_windows,
+            sensors,
+            sequence_number,
+            process_imu_window,
+        )
+
+        latest_imu_sequence_number = sequence_number
 
     def piezo_notify_handler(
         characteristic: BleakGATTCharacteristic,
         data: bytearray,
     ) -> None:
-        i, sensor_data = decode_packet(memoryview(data))
-        nonlocal first_piezo_sequence_number
+        sequence_number, sensor_data = decode_packet(memoryview(data))
+        sensors = deserialize_packet_data(
+            sensor_data,
+            bytes_per_value=PIEZO_BYTES_PER_VALUE,
+            values_per_sample=PIEZO_VALUES_PER_SAMPLE,
+            sensor_count=PIEZO_SENSOR_COUNT,
+        )
+        global first_piezo_sequence_number
+        global latest_piezo_sequence_number
         if first_piezo_sequence_number == 0:
-            first_piezo_sequence_number = i
-        piezo_buf[i - first_piezo_sequence_number] = data
+            first_piezo_sequence_number = sequence_number
+            latest_piezo_sequence_number = sequence_number - 1
+
+        global dropped_piezo_packet_count
+        dropped_piezo_packet_count += sequence_number - latest_piezo_sequence_number - 1
+
+        update_sample_windows(
+            piezo_sample_windows,
+            sensors,
+            sequence_number,
+            process_piezo_window,
+        )
+
+        latest_piezo_sequence_number = sequence_number
 
     return (emg_notify_handler, imu_notify_handler, piezo_notify_handler)
 
@@ -234,12 +298,37 @@ async def main() -> None:
     def disconnect_handler(bc: BleakClient) -> None:
         print(f"Disconnected from {bc.address}.")
 
-    emg_data_received: list[bytearray | None] = [None] * 10000
-    imu_data_received: list[bytearray | None] = [None] * 10000
-    piezo_data_received: list[bytearray | None] = [None] * 10000
+    emg_sample_windows: list[SampleWindow] = [
+        SampleWindow(
+            EMG_SAMPLES_PER_WINDOW,
+            EMG_SAMPLES_PER_OVERLAP,
+            EMG_VALUES_PER_SAMPLE,
+        )
+        for _ in range(EMG_SENSOR_COUNT)
+    ]
+    imu_sample_windows: list[SampleWindow] = [
+        SampleWindow(
+            IMU_SAMPLES_PER_WINDOW,
+            IMU_SAMPLES_PER_OVERLAP,
+            IMU_VALUES_PER_SAMPLE,
+        )
+        for _ in range(IMU_SENSOR_COUNT)
+    ]
+    piezo_sample_windows: list[SampleWindow] = [
+        SampleWindow(
+            PIEZO_SAMPLES_PER_WINDOW,
+            PIEZO_SAMPLES_PER_OVERLAP,
+            PIEZO_VALUES_PER_SAMPLE,
+        )
+        for _ in range(PIEZO_SENSOR_COUNT)
+    ]
 
     (emg_notify_handler, imu_notify_handler, piezo_notify_handler) = (
-        set_up_notify_handler(emg_data_received, imu_data_received, piezo_data_received)
+        set_up_notify_handler(
+            emg_sample_windows,
+            imu_sample_windows,
+            piezo_sample_windows,
+        )
     )
 
     async with BleakClient(device, disconnect_handler) as client:
@@ -304,17 +393,26 @@ async def main() -> None:
 
         print("Stopped subscription!")
 
-        filtered_emg_data_received = [x for x in emg_data_received if x is not None]
-        filtered_imu_data_received = [x for x in imu_data_received if x is not None]
-        filtered_piezo_data_received = [x for x in piezo_data_received if x is not None]
+        print(
+            f"EMG seq nr span: "
+            f"{first_emg_sequence_number}-{latest_emg_sequence_number} "
+            f"({latest_emg_sequence_number - first_emg_sequence_number + 1} total)",
+        )
+        print(f"Dropped EMG packets: {dropped_emg_packet_count}.")
 
-        print()
-        print_received_packets_stats(filtered_emg_data_received, "EMG")
-        print()
-        print_received_packets_stats(filtered_imu_data_received, "IMU")
-        print()
-        print_received_packets_stats(filtered_piezo_data_received, "Piezo")
-        print()
+        print(
+            f"IMU seq nr span: "
+            f"{first_imu_sequence_number}-{latest_imu_sequence_number} "
+            f"({latest_imu_sequence_number - first_imu_sequence_number + 1} total)",
+        )
+        print(f"Dropped IMU packets: {dropped_imu_packet_count}.")
+
+        print(
+            f"piezo seq nr span: "
+            f"{first_piezo_sequence_number}-{latest_piezo_sequence_number} "
+            f"({latest_piezo_sequence_number - first_piezo_sequence_number + 1} total)",
+        )
+        print(f"Dropped piezo packets: {dropped_piezo_packet_count}.")
 
 
 if __name__ == "__main__":
