@@ -1,37 +1,10 @@
 #include "sensors_service.h"
 
 #include "esp_log.h"
+#include "host/ble_att.h"
 #include "host/ble_gatt.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
-
-// Constants to determine the characteristic buffer sizes.
-enum {
-  // The amount of the new samples in a window that should be buffered before
-  // being sent. E.g. 30 means one 30th of the new samples are buffered before
-  // being sent.
-  // TODO(johan): Figure out what's a good value for this with regards to
-  // potential packet loss vs reduced overhead.
-  kPartOfWindowPerSend = 30,
-
-  kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,
-  kEmgSamplesPerOverlap = kEmgMsPerOverlap * kEmgFrequency / 1000,
-  kEmgNewSamplesPerWindow = kEmgSamplesPerWindow - kEmgSamplesPerOverlap,
-  kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
-  kEmgBufSize = kEmgSamplesToSend * kEmgBytesPerSample * kEmgSensorCount,
-
-  kImuSamplesPerWindow = kImuMsPerWindow * kImuFrequency / 1000,
-  kImuSamplesPerOverlap = kImuMsPerOverlap * kImuFrequency / 1000,
-  kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
-  kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
-  kImuBufSize = kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount,
-
-  kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
-  kPiezoSamplesPerOverlap = kPiezoMsPerOverlap * kPiezoFrequency / 1000,
-  kPiezoNewSamplesPerWindow = kPiezoSamplesPerWindow - kPiezoSamplesPerOverlap,
-  kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
-  kPiezoBufSize = kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount,
-};
 
 static const char* const kLimbTag = "LIMB BLE Periph";
 
@@ -55,7 +28,7 @@ bool TryNotifyEmgSubscribers(void) {
   if (gEmgPeerNotifyEnabled) {
     int err = ble_gatts_notify(gEmgSubscriptionHandle, gEmgValHandle);
     if (err) {
-      ESP_LOGW(kLimbTag, "Failed to send EMG notification.");
+      ESP_LOGW(kLimbTag, "Failed to send EMG notification, err(%d).", err);
     } else {
       ESP_LOGI(kLimbTag, "EMG notification sent.");
     }
@@ -86,7 +59,7 @@ bool TryNotifyImuSubscribers(void) {
   if (gImuPeerNotifyEnabled) {
     int err = ble_gatts_notify(gImuSubscriptionHandle, gImuValHandle);
     if (err) {
-      ESP_LOGW(kLimbTag, "Failed to send IMU notification.");
+      ESP_LOGW(kLimbTag, "Failed to send IMU notification, err(%d).", err);
     } else {
       ESP_LOGI(kLimbTag, "IMU notification sent.");
     }
@@ -119,7 +92,7 @@ bool TryNotifyPiezoSubscribers(void) {
     // need use a mutex for the buffer.
     int err = ble_gatts_notify(gPiezoSubscriptionHandle, gPiezoValHandle);
     if (err) {
-      ESP_LOGW(kLimbTag, "Failed to send piezo notification.");
+      ESP_LOGW(kLimbTag, "Failed to send piezo notification, err(%d).", err);
     } else {
       ESP_LOGI(kLimbTag, "Piezo notification sent.");
     }
@@ -133,20 +106,39 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
                       struct ble_gatt_access_ctxt* context,
                       [[maybe_unused]] void* args) {
   if (context->op != BLE_GATT_ACCESS_OP_READ_CHR) {
-    ESP_LOGW(kLimbTag,
-             "Unsupported characteristic access operation (non-read): [%d]", context->op);
-    assert(false && "Unsupported characteristic access.");
-    // FIXME: Use the proper return code.
+    char uuid_buf[BLE_UUID_STR_LEN] = {0};
+    switch (context->op) {
+      case BLE_GATT_ACCESS_OP_WRITE_DSC:
+        ESP_LOGW(kLimbTag,
+                 "Invalid write access on characteristic descriptor, UUID: ",
+                 ble_uuid_to_str(context->dsc->uuid, uuid_buf));
+        return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+      case BLE_GATT_ACCESS_OP_WRITE_CHR: {
+        ESP_LOGW(kLimbTag, "Invalid read access on characteristic, UUID: ",
+                 ble_uuid_to_str(context->chr->uuid, uuid_buf));
+        return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+      }
+      case BLE_GATT_ACCESS_OP_READ_DSC: {
+        // We shouldn't have any descriptors for the characteristics.
+        ESP_LOGW(kLimbTag,
+                 "Invalid read access on characteristic descriptor, UUID: ",
+                 ble_uuid_to_str(context->dsc->uuid, uuid_buf));
+        return BLE_ATT_ERR_READ_NOT_PERMITTED;
+      }
+      default: {
+        // Unreachable.
+      };
+    }
+    assert(false &&
+           "GATT operation that isn't r/w on characteristic or descriptor.");
     return BLE_ATT_ERR_UNLIKELY;
   }
 
   if (connection_handle != BLE_HS_CONN_HANDLE_NONE) {
-    ESP_LOGI(kLimbTag,
-             "characteristic read; conn_handle=%d attr_handle=%d",
+    ESP_LOGI(kLimbTag, "characteristic read; conn_handle=%d attr_handle=%d",
              connection_handle, attribute_handle);
   } else {
-    ESP_LOGI(kLimbTag,
-             "characteristic read by nimble stack; attr_handle=%d",
+    ESP_LOGI(kLimbTag, "characteristic read by nimble stack; attr_handle=%d",
              attribute_handle);
   }
 
@@ -155,15 +147,18 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
 
   // Determine which characteristic we should send.
   if (attribute_handle == gEmgValHandle) {
-    ESP_LOGI(kLimbTag, "EMG read request.", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "EMG read request.", connection_handle,
+             attribute_handle);
     buffer = gEmgVal;
     buffer_size = sizeof(gEmgVal);
   } else if (attribute_handle == gImuValHandle) {
-    ESP_LOGI(kLimbTag, "IMU read request.", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "IMU read request.", connection_handle,
+             attribute_handle);
     buffer = gImuVal;
     buffer_size = sizeof(gImuVal);
   } else if (attribute_handle == gPiezoValHandle) {
-    ESP_LOGI(kLimbTag, "Piezo read request.", connection_handle, attribute_handle);
+    ESP_LOGI(kLimbTag, "Piezo read request.", connection_handle,
+             attribute_handle);
     buffer = gPiezoVal;
     buffer_size = sizeof(gPiezoVal);
   } else {
@@ -234,7 +229,6 @@ void SensorSubscribe(struct ble_gap_event* event) {
   const uint16_t attr_handle = event->subscribe.attr_handle;
   const uint16_t conn_handle = event->subscribe.conn_handle;
 
-  // FIXME: Change some of the EMG tags to some generic tag.
   if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
     ESP_LOGI(kLimbTag, "subscribe event; conn_handle=%d attr_handle=%d",
              conn_handle, attr_handle);

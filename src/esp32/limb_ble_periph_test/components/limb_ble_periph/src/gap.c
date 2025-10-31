@@ -3,6 +3,7 @@
 #include "host/util/util.h"
 #include "sensors_service.h"
 #include "services/gap/ble_svc_gap.h"
+#include "sys/param.h"
 
 static void start_advertising(void);
 
@@ -78,25 +79,16 @@ static int GapEventHandler(struct ble_gap_event *event,
       }
 
       {
-        // FIXME: Figure out what this does and what values to use.
-        enum {
-          kLlPacketLength = 251,
-          kLlPacketTime = 0x4290,
-          // LL_PACKET_TIME = 2120,
-        };
-        /* XXX Set packet length in controller for better throughput */
+        // We use Data Length Extension to set the max LL Data PDU payload
+        // length and the PDU's max transmission time.
         int err = ble_hs_hci_util_set_data_len(
-            event->connect.conn_handle, kLlPacketLength, kLlPacketTime);
+            event->connect.conn_handle, kMaxLeDataLength, kMaxLeDataTimeUs);
         if (err != 0) {
           ESP_LOGE(kGapTag, "Set packet length failed; rc = %d", err);
         }
       }
 
       {
-        // FIXME: Figure out good MTU.
-        enum {
-          kMtuSize = 512,
-        };
         int err = ble_att_set_preferred_mtu(kMtuSize);
         if (err != 0) {
           ESP_LOGE(kGapTag, "Failed to set preferred MTU; rc = %d", err);
@@ -109,6 +101,16 @@ static int GapEventHandler(struct ble_gap_event *event,
         // if (err != 0) {
         //   ESP_LOGE(kGapTag, "Failed to negotiate MTU; rc = %d", err);
         // }
+      }
+
+      // Request 2M PHY.
+      {
+        int err = ble_gap_set_prefered_le_phy(
+            event->connect.conn_handle, BLE_GAP_LE_PHY_2M_MASK,
+            BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_CODED_ANY);
+        if (err) {
+          ESP_LOGE(kGapTag, "Couldn't set 2M PHY.");
+        }
       }
 
       // Get the description of the connection.
@@ -125,11 +127,24 @@ static int GapEventHandler(struct ble_gap_event *event,
 
       print_conn_desc(&desc);
 
-      // TODO(johan): Why do we need to update the params for the connection?
+      // Sanity check so we know we can treat the packet send rate in a general
+      // fashion.
+      static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz &&
+                        kImuPacketSendRateHz == kPiezoPacketSendRateHz,
+                    "The sensor packets must have the same send rate.");
+      enum {
+        kPacketSendRateMs = 1000 / kEmgPacketSendRateHz,
+        // the itvl_min/max members represent 1.25 ms steps.
+        kDesiredBleInterval = (int)(kPacketSendRateMs / 1.25),
+        // Setting the interval to anything lower causes the call to
+        // ble_gap_update_params to fail.
+        kMinBleInterval = 6,
+      };
       struct ble_gap_upd_params params = {
-          .itvl_min = desc.conn_itvl,
-          .itvl_max = desc.conn_itvl,
-          .latency = 3,
+          // We want to make sure that the connection interval is as close to
+          // the send rate as possible.
+          .itvl_min = MAX(kDesiredBleInterval, kMinBleInterval),
+          .itvl_max = MAX(kDesiredBleInterval, kMinBleInterval),
           .supervision_timeout = desc.supervision_timeout,
       };
       {
@@ -201,6 +216,34 @@ static int GapEventHandler(struct ble_gap_event *event,
                event->mtu.conn_handle, event->mtu.channel_id, event->mtu.value);
       return 0;
     };
+
+    case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE: {
+      // FIXME: Seems like 1M is set instead of 2M.
+      ESP_LOGI(kGapTag,
+               "Phy update event: conn_handle=%d status=%d tx_phy=%d rx_phy=%d",
+               event->phy_updated.conn_handle, event->phy_updated.status,
+               event->phy_updated.tx_phy, event->phy_updated.rx_phy);
+      return 0;
+    }
+
+    case BLE_GAP_EVENT_DATA_LEN_CHG: {
+      ESP_LOGI(
+          kGapTag,
+          "Data len change event: conn_handle=%d max_tx_oct=%d max_tx_time=%d "
+          "max_rx_oct=%d max_rx_time=%d",
+          event->data_len_chg.conn_handle, event->data_len_chg.max_tx_octets,
+          event->data_len_chg.max_tx_time, event->data_len_chg.max_rx_octets,
+          event->data_len_chg.max_rx_time);
+
+      return 0;
+    }
+
+    case BLE_GAP_EVENT_LINK_ESTAB: {
+      ESP_LOGI(kGapTag, "Link establishment event: conn_handle=%d status=%d",
+               event->link_estab.conn_handle, event->link_estab.status);
+
+      return 0;
+    }
 
     default: {
       ESP_LOGW(kGapTag, "Ignoring unknown GAP event: [%d]", event->type);
