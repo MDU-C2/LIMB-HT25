@@ -224,12 +224,11 @@ async def main() -> None:
 
         # Single read from characteristic.
         print()
-        emg_value_fut = client.read_gatt_char(emg_chr)
-        imu_value_fut = client.read_gatt_char(imu_chr)
-        piezo_value_fut = client.read_gatt_char(piezo_chr)
-        emg_value = await emg_value_fut
-        imu_value = await imu_value_fut
-        piezo_value = await piezo_value_fut
+        emg_value, imu_value, piezo_value = await asyncio.gather(
+            client.read_gatt_char(emg_chr),
+            client.read_gatt_char(imu_chr),
+            client.read_gatt_char(piezo_chr),
+        )
 
         print(f"EMG char (including sequence number): {emg_value}")
         print()
@@ -242,23 +241,21 @@ async def main() -> None:
         print(f"Starting subscription for {subscribe_period} seconds...")
 
         # Subscribe to characteristics.
-        emg_fut = client.start_notify(emg_chr, emg_notify_handler)
-        imu_fut = client.start_notify(imu_chr, imu_notify_handler)
-        piezo_fut = client.start_notify(piezo_chr, piezo_notify_handler)
-        await emg_fut
-        await imu_fut
-        await piezo_fut
+        await asyncio.gather(
+            client.start_notify(emg_chr, emg_notify_handler),
+            client.start_notify(imu_chr, imu_notify_handler),
+            client.start_notify(piezo_chr, piezo_notify_handler),
+        )
 
         # Sleeping for 1 second means the expected amount of packets received is
         # frequency / sample count per packet.
         await asyncio.sleep(subscribe_period)
 
-        emg_fut = client.stop_notify(emg_chr)
-        imu_fut = client.stop_notify(imu_chr)
-        piezo_fut = client.stop_notify(piezo_chr)
-        await emg_fut
-        await imu_fut
-        await piezo_fut
+        await asyncio.gather(
+            client.stop_notify(emg_chr),
+            client.stop_notify(imu_chr),
+            client.stop_notify(piezo_chr),
+        )
 
         print("Stopped subscription!")
 
