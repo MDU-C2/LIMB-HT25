@@ -1,0 +1,19 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "can_interface.c"
+        "imu_driver.c"
+        "motion_control.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        driver
+        esp_timer
+        nvs_flash
+        freertos
+        esp_system
+        esp_pm
+        esp_event
+        esp_hw_support
+)
+
