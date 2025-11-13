@@ -32,12 +32,17 @@
 #define STEPPER_DIR_GPIO               (GPIO_NUM_7)
 #define STEPPER_ENABLE_GPIO            (GPIO_NUM_10)
 
-#define MOTION_TIMER_RESOLUTION_HZ     (1000000)  // 1 MHz resolution for GPTimer
-#define MOTION_CONTROL_PERIOD_MS       (5)
+#define MOTION_CONTROL_PERIOD_MS       (10)       // Control loop period
 
 #define DEFAULT_MICROSTEPPING          (16)
 #define DEFAULT_STEPS_PER_REV          (200)      // full-step steps per revolution
 #define DEFAULT_GEAR_RATIO             (50.0f)    // gear ratio (motor revs per joint rev)
+
+// Motion profile parameters
+#define DEFAULT_MAX_VELOCITY_DPS      (30.0f)     // Maximum velocity in degrees per second
+#define DEFAULT_MIN_VELOCITY_DPS       (2.0f)      // Minimum reliable velocity while moving
+#define DEFAULT_MAX_ACCEL_DPS2         (100.0f)    // Maximum acceleration in degrees per second squared
+#define DEFAULT_DEADBAND_DEG           (2.0f)      // Stop window in degrees
 
 #define MAX_JOINT_ANGLE_DEG            (180.0f)
 

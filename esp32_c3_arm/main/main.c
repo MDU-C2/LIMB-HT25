@@ -135,12 +135,12 @@ static void process_incoming_can_orientation(void)
 void app_main(void)
 {
     // Initialize Non-Volatile Storage (NVS)
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase()); // Erase the NVS flash
-        err = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(err);
+    //esp_err_t err = nvs_flash_init();
+    //if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    //    ESP_ERROR_CHECK(nvs_flash_erase()); // Erase the NVS flash
+    //    err = nvs_flash_init();
+    //}
+    //ESP_ERROR_CHECK(err);
 
     // Create queues and mutex
     s_motion_cmd_queue = xQueueCreate(1, sizeof(arm_motion_command_t));
@@ -156,15 +156,17 @@ void app_main(void)
 
     // Initialize motion control
     motion_control_config_t motion_cfg = {
-        .step_gpio = STEPPER_STEP_GPIO, // Step GPIO for the motion control
-        .dir_gpio = STEPPER_DIR_GPIO, // Direction GPIO for the motion control
-        .enable_gpio = STEPPER_ENABLE_GPIO, // Enable GPIO for the motion control
-        .timer_resolution_hz = MOTION_TIMER_RESOLUTION_HZ, // Resolution for the motion control
-        .timer_base_period_us = 50, // Base period for the motion control
-        .pulse_width_us = 10, // Pulse width for the motion control
-        .steps_per_revolution = DEFAULT_STEPS_PER_REV, // Steps per revolution for the motion control
-        .microstepping = DEFAULT_MICROSTEPPING, // Microstepping for the motion control
-        .gear_ratio = DEFAULT_GEAR_RATIO, // Gear ratio for the motion control
+        .step_gpio = STEPPER_STEP_GPIO,
+        .dir_gpio = STEPPER_DIR_GPIO,
+        .enable_gpio = STEPPER_ENABLE_GPIO,
+        .steps_per_revolution = DEFAULT_STEPS_PER_REV,
+        .microstepping = DEFAULT_MICROSTEPPING,
+        .gear_ratio = DEFAULT_GEAR_RATIO,
+        .max_velocity_dps = DEFAULT_MAX_VELOCITY_DPS,
+        .min_velocity_dps = DEFAULT_MIN_VELOCITY_DPS,
+        .max_accel_dps2 = DEFAULT_MAX_ACCEL_DPS2,
+        .deadband_deg = DEFAULT_DEADBAND_DEG,
+        .control_period_ms = MOTION_CONTROL_PERIOD_MS,
     };
     ESP_ERROR_CHECK(motion_control_init(&motion_cfg));
 
@@ -176,7 +178,7 @@ void app_main(void)
         .clk_speed_hz = IMU_I2C_FREQ_HZ, // Clock speed for the IMU
         .i2c_addr = LSM6DSO32_I2C_ADDR, // I2C address for the IMU
     };
-    ESP_ERROR_CHECK(imu_driver_init(&imu_cfg));
+    //ESP_ERROR_CHECK(imu_driver_init(&imu_cfg));
 
     // Initialize CAN interface
     can_interface_config_t can_cfg = {
@@ -185,43 +187,59 @@ void app_main(void)
         .imu_queue = s_can_imu_queue, // IMU queue for the CAN interface
         .status_mutex = s_can_tx_mutex, // Status mutex for the CAN interface
     };
-    ESP_ERROR_CHECK(can_interface_init(&can_cfg)); // Initialize the CAN interface
-    ESP_ERROR_CHECK(can_interface_start(CAN_BAUD_RATE_DEFAULT)); // Start the CAN interface
+    //ESP_ERROR_CHECK(can_interface_init(&can_cfg)); // Initialize the CAN interface
+    //ESP_ERROR_CHECK(can_interface_start(CAN_BAUD_RATE_DEFAULT)); // Start the CAN interface
 
     ESP_LOGI(TAG, "System initialized");
 
     // Create tasks
     // CAN RX task
-    BaseType_t task_ok = xTaskCreate(can_rx_task_entry, "can_rx", CAN_RX_TASK_STACK, NULL, CAN_RX_TASK_PRIO, NULL);
-    if (task_ok != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create CAN RX task");
-        abort();
-    }
+    //BaseType_t task_ok = xTaskCreate(can_rx_task_entry, "can_rx", CAN_RX_TASK_STACK, NULL, CAN_RX_TASK_PRIO, NULL);
+    //if (task_ok != pdPASS) {
+    //    ESP_LOGE(TAG, "Failed to create CAN RX task");
+    //    abort();
+    //}
 
     // IMU task
-    task_ok = xTaskCreate(imu_task_entry, "imu", IMU_TASK_STACK, NULL, IMU_TASK_PRIO, NULL);
-    if (task_ok != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create IMU task");
-        abort();
-    }
+    //task_ok = xTaskCreate(imu_task_entry, "imu", IMU_TASK_STACK, NULL, IMU_TASK_PRIO, NULL);
+    //if (task_ok != pdPASS) {
+    //    ESP_LOGE(TAG, "Failed to create IMU task");
+    //    abort();
+    //}
 
     // Motion task
-    task_ok = xTaskCreate(motion_task_entry, "motion", MOTION_TASK_STACK, NULL, MOTION_TASK_PRIO, NULL);
+    BaseType_t task_ok = xTaskCreate(motion_task_entry, "motion", MOTION_TASK_STACK, NULL, MOTION_TASK_PRIO, NULL);
     if (task_ok != pdPASS) {
         ESP_LOGE(TAG, "Failed to create motion task");
         abort();
     }
 
     // CAN TX task
-    task_ok = xTaskCreate(can_tx_task_entry, "can_tx", CAN_TX_TASK_STACK, NULL, CAN_TX_TASK_PRIO, NULL);
-    if (task_ok != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create CAN TX task");
-        abort();
-    }
+    //task_ok = xTaskCreate(can_tx_task_entry, "can_tx", CAN_TX_TASK_STACK, NULL, CAN_TX_TASK_PRIO, NULL);
+    //if (task_ok != pdPASS) {
+    //    ESP_LOGE(TAG, "Failed to create CAN TX task");
+    //    abort();
+    //}
 
     // Process incoming CAN orientation
     while (true) {
-        process_incoming_can_orientation(); // Process the incoming CAN orientation
-        vTaskDelay(pdMS_TO_TICKS(100)); // 100ms delay
+        // Test the motion control - send a command to move to 45 degrees
+        arm_motion_command_t motion_cmd = {
+            .target_angle_deg = 45.0f,
+            .max_velocity_dps = 10.0f,
+            .max_accel_dps2 = 100.0f,
+            .has_command = true,
+        };
+        ESP_LOGI(TAG, "Sending motion command: target=%.2f deg, max_vel=%.2f dps, max_accel=%.2f dps2",
+                 motion_cmd.target_angle_deg, motion_cmd.max_velocity_dps, motion_cmd.max_accel_dps2);
+        
+        if (xQueueSend(s_motion_cmd_queue, &motion_cmd, 0) != pdTRUE) {
+            ESP_LOGW(TAG, "Motion command queue full");
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // 1000ms delay
+        
+        //process_incoming_can_orientation(); // Process the incoming CAN orientation
+        //vTaskDelay(pdMS_TO_TICKS(100)); // 100ms delay
     }
 }
