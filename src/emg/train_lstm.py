@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,9 +9,9 @@ import argparse
 import logging
 from datetime import datetime
 
-from .datasets import EMGSequenceDataset, load_standardize_splits
-from .models import get_simple_lstm
-from .training import train_epoch, eval_model
+from datasets import EMGSequenceDataset, load_standardize_splits
+from models import get_simple_lstm
+from training import train_epoch, eval_model
 from .utils import save_model, save_checkpoint, load_checkpoint
 
 # Configure logging
