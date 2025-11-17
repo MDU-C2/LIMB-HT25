@@ -112,8 +112,7 @@ static void emg_task(void *pvParameters)
                 }
 
                 //  --- DEBUG LOG ---
-                ESP_LOGI(TAG, "Window gotten: %d bytes (for %d samples) and last value is %d", 
-                         sizeof(g_emg_buffer.emg_ch0_window), EMG_WINDOW_SIZE, g_emg_buffer.emg_ch0_window[0]);
+                // ESP_LOGI(TAG, "last value: %d", g_emg_buffer.emg_ch0_window[EMG_WINDOW_SIZE-1]);
                 
 
             } else {

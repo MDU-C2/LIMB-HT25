@@ -180,7 +180,7 @@ static void imu_task(void *pvParameters)
                     //          current_imu_data.pitch * RAD_TO_DEG, 
                     //          current_imu_data.roll * RAD_TO_DEG);
                     // --- Fin del DEBUG LOG ---
-                    ESP_LOGI(TAG, " Accel Z: %.3f", current_imu_data.accel.z);
+                    // ESP_LOGI(TAG, " Accel Z: %.3f", current_imu_data.accel.z);
                 }
             } else {
                 ESP_LOGE(TAG, "CRITICAL: Mutex unavailable for IMU buffer write!");
