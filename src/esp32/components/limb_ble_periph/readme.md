@@ -1,5 +1,12 @@
 A component for setting up the Bluetooth LE peripheral used in the LIMB project.
 
+> [!IMPORTANT]
+> This component requires that the Bluetooth component is enabled using NimBLE as the host.
+> Use `idf.py menuconfig` to enable `Component config > Bluetooth > Bluetooth > Host > Nimble - BLE only`.
+>
+> It is also recommended to increase the tick rate in FreeRTOS to 1 kHz via
+> `Component config > FreeRTOS > Kernel > configTICK_RATE_HZ`.
+
 To use, first start a FreeRTOS task using the provided `BleTask` function in `limb_ble_periph.h`.
 Then, you can get access to the tx buffer used for the different sensors using the
 `get_emg_buf`, `get_imu_buf`, and `get_piezo_buf` functions in `sensors_service.h`.
