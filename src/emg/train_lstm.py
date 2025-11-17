@@ -5,14 +5,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import os
-import argparse
+import re
 import logging
 from datetime import datetime
 
 from datasets import EMGSequenceDataset, load_standardize_splits
 from models import get_simple_lstm
 from training import train_epoch, eval_model
-from .utils import save_model, save_checkpoint, load_checkpoint
+from utils import save_model, save_checkpoint, load_checkpoint
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +35,37 @@ def set_seed(seed=42):
     logger.info(f"Random seed set to {seed}")
 
 
+def extract_dataset_info(dataset_path):
+    """
+    Extract dataset name and channel information from dataset path.
+    
+    Args:
+        dataset_path: Path to the dataset file
+        
+    Returns:
+        Tuple of (dataset_name, channel_info) where:
+        - dataset_name: Base name of the dataset (without extension)
+        - channel_info: Channel number if found (e.g., "ch1"), or "all" if not specified
+    """
+    
+    # Get the filename without path and extension
+    filename = os.path.basename(dataset_path)
+    dataset_name = os.path.splitext(filename)[0]
+    
+    # Try to extract channel number from filename (e.g., emg_sequences_ch1.npz)
+    channel_match = re.search(r'_ch(\d+)', dataset_name, re.IGNORECASE)
+    if channel_match:
+        channel_num = channel_match.group(1)
+        channel_info = f"ch{channel_num}"
+        # Also extract base dataset name without channel suffix
+        base_name = re.sub(r'_ch\d+', '', dataset_name, flags=re.IGNORECASE)
+    else:
+        channel_info = "all"
+        base_name = dataset_name
+    
+    return base_name, channel_info
+
+
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Train EMG LSTM model")
@@ -44,7 +75,8 @@ def parse_args():
         '--dataset',
         type=str,
         default=None,
-        help='Path to NPZ dataset file (default: auto-detect in EMG_signal_processing/)'
+        help='Path to NPZ dataset file. Can be absolute or relative. '
+             'If not specified, uses ../../EMG_signal_processing/emg_sequences_dataset.npz'
     )
     
     # Model arguments
@@ -174,16 +206,35 @@ def main():
     
     # Determine dataset path
     if args.dataset is None:
+        # Default path: ../../EMG_signal_processing/emg_sequences_dataset.npz relative to this file
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        npz_path = os.path.join(current_dir, 'EMG_signal_processing', 'emg_sequences_dataset.npz')
+        default_path = os.path.join(current_dir, '..', '..', 'EMG_signal_processing', 'emg_sequences_dataset.npz')
+        npz_path = os.path.abspath(default_path)
+        logger.info(f"No dataset specified, using default: {npz_path}")
     else:
-        npz_path = args.dataset
+        # User-specified path - resolve relative to current working directory or use absolute
+        if os.path.isabs(args.dataset):
+            npz_path = args.dataset
+        else:
+            # Try relative to current working directory first
+            if os.path.exists(args.dataset):
+                npz_path = os.path.abspath(args.dataset)
+            else:
+                # Try relative to this script's directory
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                npz_path = os.path.abspath(os.path.join(current_dir, args.dataset))
     
     if not os.path.exists(npz_path):
         logger.error(f"Dataset not found at {npz_path}")
+        logger.error(f"Please specify a valid dataset path using --dataset")
         raise FileNotFoundError(f"Dataset not found at {npz_path}")
     
     logger.info(f"Loading dataset from {npz_path}")
+    
+    # Extract dataset and channel info for naming
+    dataset_base, channel_info = extract_dataset_info(npz_path)
+    model_name_prefix = f"{dataset_base}_{channel_info}"
+    logger.info(f"Dataset: {dataset_base}, Channel: {channel_info}")
     
     # Device setup
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -293,8 +344,9 @@ def main():
             best_epoch = epoch
             early_stopping_counter = 0
             
-            # Save best model
-            save_model(model, scaler, config, args.output_dir, 'best_model.pt')
+            # Save best model with dataset and channel info in filename
+            best_model_filename = f"best_model_{model_name_prefix}.pt"
+            save_model(model, scaler, config, args.output_dir, best_model_filename)
         else:
             early_stopping_counter += 1
         
@@ -302,7 +354,8 @@ def main():
         if not args.save_best_only or is_best:
             save_checkpoint(
                 model, optimizer, epoch, val_acc, best_val_acc,
-                scaler, config, args.output_dir, is_best=is_best
+                scaler, config, args.output_dir, is_best=is_best,
+                name_prefix=model_name_prefix
             )
         
         # Early stopping check
@@ -317,7 +370,8 @@ def main():
     logger.info(f"Training completed. Best validation accuracy: {best_val_acc:.4f} at epoch {best_epoch}")
     
     # Load best model for final evaluation
-    best_model_path = os.path.join(args.output_dir, 'best_model.pt')
+    best_model_filename = f"best_model_{model_name_prefix}.pt"
+    best_model_path = os.path.join(args.output_dir, best_model_filename)
     if os.path.exists(best_model_path):
         logger.info("Loading best model for final evaluation...")
         checkpoint = torch.load(best_model_path, map_location=device)

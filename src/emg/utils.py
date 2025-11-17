@@ -18,13 +18,15 @@ def save_model(model, scaler, config, save_dir, filename='best_model.pt'):
         scaler: The fitted StandardScaler
         config: Dictionary containing training configuration
         save_dir: Directory to save the model
-        filename: Name of the model file
+        filename: Name of the model file (should include dataset/channel info)
     """
     os.makedirs(save_dir, exist_ok=True)
     
     model_path = os.path.join(save_dir, filename)
-    scaler_path = os.path.join(save_dir, 'scaler.pkl')
-    config_path = os.path.join(save_dir, 'config.json')
+    # Extract prefix from model filename for consistent naming
+    base_name = os.path.splitext(filename)[0]  # Remove .pt extension
+    scaler_path = os.path.join(save_dir, f'{base_name}_scaler.pkl')
+    config_path = os.path.join(save_dir, f'{base_name}_config.json')
     
     # Save model state dict
     torch.save({
@@ -84,7 +86,7 @@ def load_scaler(scaler_path):
 
 
 def save_checkpoint(model, optimizer, epoch, val_acc, best_val_acc, 
-                   scaler, config, save_dir, is_best=False):
+                   scaler, config, save_dir, is_best=False, name_prefix=''):
     """
     Save a training checkpoint.
     
@@ -98,6 +100,7 @@ def save_checkpoint(model, optimizer, epoch, val_acc, best_val_acc,
         config: Training configuration
         save_dir: Directory to save checkpoints
         is_best: Whether this is the best model so far
+        name_prefix: Optional prefix for checkpoint filenames (e.g., "dataset_ch1_")
     """
     os.makedirs(save_dir, exist_ok=True)
     
@@ -115,18 +118,21 @@ def save_checkpoint(model, optimizer, epoch, val_acc, best_val_acc,
         }
     }
     
+    # Build filenames with prefix if provided
+    prefix = f"{name_prefix}_" if name_prefix else ""
+    
     # Save latest checkpoint
-    latest_path = os.path.join(save_dir, 'checkpoint_latest.pt')
+    latest_path = os.path.join(save_dir, f'{prefix}checkpoint_latest.pt')
     torch.save(checkpoint, latest_path)
     
     # Save best model if this is the best
     if is_best:
-        best_path = os.path.join(save_dir, 'checkpoint_best.pt')
+        best_path = os.path.join(save_dir, f'{prefix}checkpoint_best.pt')
         torch.save(checkpoint, best_path)
         logger.info(f"New best model saved! Val acc: {val_acc:.4f}")
         
         # Also save the scaler with the best model
-        scaler_path = os.path.join(save_dir, 'scaler.pkl')
+        scaler_path = os.path.join(save_dir, f'{prefix}scaler.pkl')
         with open(scaler_path, 'wb') as f:
             pickle.dump(scaler, f)
 
