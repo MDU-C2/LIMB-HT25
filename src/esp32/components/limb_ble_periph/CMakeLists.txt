@@ -3,8 +3,9 @@ idf_component_register(
   "limb_ble_periph.c"
   "src/sensors_service.c"
   "src/gap.c"
-  PRIV_REQUIRES
+  REQUIRES
   bt
+  PRIV_REQUIRES
   nvs_flash
   esp_driver_gpio
   INCLUDE_DIRS
