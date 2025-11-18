@@ -2,84 +2,44 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_adc/adc_oneshot.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
+#include "potentiometer.h"
 
-static const char *TAG = "POTENTIOMETER";
-
-#define ADC1_CHAN0          ADC_CHANNEL_0  // GPIO0
-#define ADC_ATTEN           ADC_ATTEN_DB_12
-#define ADC_BITWIDTH        ADC_BITWIDTH_DEFAULT
-
-static adc_oneshot_unit_handle_t adc1_handle;
-static adc_cali_handle_t adc1_cali_handle = NULL;
-
-static bool adc_calibration_init(adc_unit_t unit, adc_channel_t channel, adc_atten_t atten, adc_cali_handle_t *out_handle)
-{
-    adc_cali_handle_t handle = NULL;
-    esp_err_t ret = ESP_FAIL;
-    bool calibrated = false;
-
-#if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
-    if (!calibrated) {
-        adc_cali_curve_fitting_config_t cali_config = {
-            .unit_id = unit,
-            .chan = channel,
-            .atten = atten,
-            .bitwidth = ADC_BITWIDTH_DEFAULT,
-        };
-        ret = adc_cali_create_scheme_curve_fitting(&cali_config, &handle);
-        if (ret == ESP_OK) {
-            calibrated = true;
-        }
-    }
-#endif
-
-    *out_handle = handle;
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Calibration Success");
-    } else {
-        ESP_LOGW(TAG, "No calibration available, using raw values");
-    }
-    return calibrated;
-}
+static const char *TAG = "POTENTIOMETER_TEST";
 
 void app_main(void)
 {
-    // Configure ADC1
-    adc_oneshot_unit_init_cfg_t init_config1 = {
-        .unit_id = ADC_UNIT_1,
-    };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
+    // Initialize potentiometer with default configuration (GPIO0)
+    ESP_ERROR_CHECK(potentiometer_init(NULL));
+    
+    ESP_LOGI(TAG, "Potentiometer test started");
 
-    // Configure ADC channel
-    adc_oneshot_chan_cfg_t config = {
-        .bitwidth = ADC_BITWIDTH,
-        .atten = ADC_ATTEN,
-    };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC1_CHAN0, &config));
-
-    // Initialize calibration (optional, but recommended)
-    adc_calibration_init(ADC_UNIT_1, ADC1_CHAN0, ADC_ATTEN, &adc1_cali_handle);
-
-    ESP_LOGI(TAG, "Potentiometer ADC initialized on GPIO0");
-
-    // Main loop - read ADC value every 500ms
+    // Main loop - read ADC values every 500ms
     while (1) {
-        int adc_raw;
-        int voltage = 0;
+        int raw_value;
+        int voltage_mv;
+        uint16_t normalized;
 
         // Read raw ADC value
-        ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC1_CHAN0, &adc_raw));
-
-        // Convert to voltage if calibration is available
-        if (adc1_cali_handle) {
-            ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc1_cali_handle, adc_raw, &voltage));
-            ESP_LOGI(TAG, "ADC Raw: %d, Voltage: %d mV", adc_raw, voltage);
+        esp_err_t ret = potentiometer_read_raw(&raw_value);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "ADC Raw: %d", raw_value);
         } else {
-            ESP_LOGI(TAG, "ADC Raw: %d", adc_raw);
+            ESP_LOGE(TAG, "Failed to read raw value: %s", esp_err_to_name(ret));
         }
+
+        // Read voltage (if calibration is available)
+        ret = potentiometer_read_voltage(&voltage_mv);
+        if (ret == ESP_OK && voltage_mv > 0) {
+            ESP_LOGI(TAG, "Voltage: %d mV", voltage_mv);
+        }
+
+        // Read normalized value (0-1000)
+        ret = potentiometer_read_normalized(&normalized);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "Normalized: %d/1000", normalized);
+        }
+
+        ESP_LOGI(TAG, "---");
 
         vTaskDelay(pdMS_TO_TICKS(500));
     }

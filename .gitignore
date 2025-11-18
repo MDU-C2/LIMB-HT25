@@ -419,3 +419,6 @@ result-*
 # OAK D files
 oak-examples/
 oak-template/
+# EMG data files
+emg_sequences_ch*.npz
+**/emg/checkpoints/
