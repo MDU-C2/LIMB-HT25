@@ -9,8 +9,8 @@ static servo_config_t servos[NUM_SERVOS] = {
     // Thumb servo - smaller range of motion
     {
         .gpio_pin = THUMB_SERVO_GPIO,
-        .min_angle = 0,
-        .max_angle = 90,
+        .min_angle = 150,
+        .max_angle = SERVO_MAX_DEGREE,
         .min_pulse_us = 1000,
         .max_pulse_us = 2000,
         .current_angle = 0,
@@ -22,8 +22,8 @@ static servo_config_t servos[NUM_SERVOS] = {
     // Index finger - full range
     {
         .gpio_pin = INDEX_SERVO_GPIO,
-        .min_angle = SERVO_MIN_DEGREE,
-        .max_angle = 70,
+        .min_angle = 120,
+        .max_angle = SERVO_MAX_DEGREE,
         .min_pulse_us = 1000,
         .max_pulse_us = 2000,
         .current_angle = 0,
@@ -35,7 +35,7 @@ static servo_config_t servos[NUM_SERVOS] = {
     // Middle finger - full range
     {
         .gpio_pin = MID_SERVO_GPIO,
-        .min_angle = 0,
+        .min_angle = 110,
         .max_angle = SERVO_MAX_DEGREE,
         .min_pulse_us = 1000,
         .max_pulse_us = 2000,
@@ -49,7 +49,7 @@ static servo_config_t servos[NUM_SERVOS] = {
     {
         .gpio_pin = RING_SERVO_GPIO,
         .min_angle = SERVO_MIN_DEGREE,
-        .max_angle = SERVO_MAX_DEGREE,
+        .max_angle = 70,
         .min_pulse_us = 1000,
         .max_pulse_us = 2000,
         .current_angle = 0,
@@ -73,37 +73,31 @@ static servo_config_t servos[NUM_SERVOS] = {
     }
 };
 
-
-
 mcpwm_timer_handle_t timer = NULL;
 mcpwm_oper_handle_t operators[3] = {NULL};
 mcpwm_cmpr_handle_t comparator[NUM_SERVOS] = {NULL};
 mcpwm_gen_handle_t generator[NUM_SERVOS] = {NULL};
 
 
-static uint32_t servo_angle_to_us(int channel, int logical_angle)
+static uint32_t servo_angle_to_us(int channel, int angle)
 {
     if (channel < 0 || channel >= NUM_SERVOS) return 1500;
     
     servo_config_t *servo = &servos[channel];
     
-    // Clamp logical angle to servo's range
-    if (logical_angle < servo->min_angle) logical_angle = servo->min_angle;
-    if (logical_angle > servo->max_angle) logical_angle = servo->max_angle;
-    
     // direction correction
-    int actual_angle;
     if (servo->direction == SERVO_DIR_REVERSE) {
         // Reverse direction: flip the angle
-        actual_angle = servo->max_angle - (logical_angle - servo->min_angle);
+        if (angle < servo->min_angle) angle = servo->max_angle;
+        if (angle > servo->max_angle) angle = servo->min_angle;
     } else {
-        // Normal direction: use angle as-is
-        actual_angle = logical_angle;
+        if (angle < servo->min_angle) angle = servo->min_angle;
+        if (angle > servo->max_angle) angle = servo->max_angle;
     }
     
     // Convert to pulse width
     return servo->min_pulse_us + 
-           (actual_angle - servo->min_angle) * (servo->max_pulse_us - servo->min_pulse_us) / 
+           (angle - servo->min_angle) * (servo->max_pulse_us - servo->min_pulse_us) / 
            (servo->max_angle - servo->min_angle);
 }
 
@@ -193,50 +187,7 @@ esp_err_t servo_init(void)
 }
 
 
-void servo_set_direction(int channel, servo_direction_t direction)
-{
-    if (channel < 0 || channel >= NUM_SERVOS) {
-        ESP_LOGW(TAG, "Invalid servo channel: %d", channel);
-        return;
-    }
-    
-    servos[channel].direction = direction;
-    ESP_LOGI(TAG, "%s servo direction set to %s", 
-             servos[channel].name, 
-             direction == SERVO_DIR_NORMAL ? "NORMAL" : "REVERSE");
-}
 
-// Servo angle limit 
-esp_err_t servo_set_limits(int channel, int min_angle, int max_angle)
-{
-    if (channel < 0 || channel >= NUM_SERVOS) {
-        ESP_LOGW(TAG, "Invalid servo channel: %d", channel);
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    servos[channel].min_angle = min_angle;
-    servos[channel].max_angle = max_angle;
-    
-    ESP_LOGI(TAG, "%s servo limits updated: %d° to %d°", 
-             servos[channel].name, min_angle, max_angle);
-    return ESP_OK;
-}
-
-// Servo pulse width limit
-esp_err_t servo_set_pulse_range(int channel, uint32_t min_us, uint32_t max_us)
-{
-    if (channel < 0 || channel >= NUM_SERVOS) {
-        ESP_LOGW(TAG, "Invalid servo channel: %d", channel);
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    servos[channel].min_pulse_us = min_us;
-    servos[channel].max_pulse_us = max_us;
-    
-    ESP_LOGI(TAG, "%s servo pulse range updated: %lu - %lu μs", 
-             servos[channel].name, min_us, max_us);
-    return ESP_OK;
-}
 
 //Set servo position in degrees
 void servo_write_deg_channel(int channel, int deg)

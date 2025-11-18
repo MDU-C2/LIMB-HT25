@@ -49,6 +49,7 @@ typedef struct {
     int operator_index;            // Which operator this servo uses
 } servo_config_t;
 
+
 // Function declarations
 esp_err_t servo_init(void);
 esp_err_t servo_set_limits(int channel, int min_angle, int max_angle);
