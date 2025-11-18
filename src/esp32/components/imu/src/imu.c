@@ -128,7 +128,7 @@ esp_err_t imu_init(const imu_config_t *config)
     }
 
     // Copy configuration
-    memcpy(&s_imu_config, config, sizeof(imu_config_t));
+    s_imu_config = *config;
 
     // Initialize I2C
     esp_err_t ret = i2c_master_init();
@@ -213,28 +213,13 @@ esp_err_t imu_read_data(imu_data_t *data)
     }
 
     // Convert gyroscope data (16-bit, ±250 dps range by default)
-    int16_t gyro_x = (int16_t)((raw_data[1] << 8) | raw_data[0]);
-    int16_t gyro_y = (int16_t)((raw_data[3] << 8) | raw_data[2]);
-    int16_t gyro_z = (int16_t)((raw_data[5] << 8) | raw_data[4]);
+    data->gyro.x = (int16_t)((raw_data[1] << 8) | raw_data[0]);
+    data->gyro.y = (int16_t)((raw_data[3] << 8) | raw_data[2]);
+    data->gyro.z = (int16_t)((raw_data[5] << 8) | raw_data[4]);
 
-    // Convert to rad/s based on configured range
-    // Default: 250 dps = 250 * π/180 rad/s
-    float gyro_scale = (float)s_imu_config.gyro_range * 3.14159f / 180.0f / 32768.0f;
-    data->gyro.x = (float)gyro_x * gyro_scale;
-    data->gyro.y = (float)gyro_y * gyro_scale;
-    data->gyro.z = (float)gyro_z * gyro_scale;
-
-    // Convert accelerometer data (16-bit, ±4g range by default)
-    int16_t accel_x = (int16_t)((raw_data[7] << 8) | raw_data[6]);
-    int16_t accel_y = (int16_t)((raw_data[9] << 8) | raw_data[8]);
-    int16_t accel_z = (int16_t)((raw_data[11] << 8) | raw_data[10]);
-
-    // Convert to m/s² based on configured range
-    // Default: 4g = 4 * 9.81 m/s²
-    float accel_scale = (float)s_imu_config.accel_range * 9.81f / 32768.0f;
-    data->accel.x = (float)accel_x * accel_scale;
-    data->accel.y = (float)accel_y * accel_scale;
-    data->accel.z = (float)accel_z * accel_scale;
+    data->accel.x = (int16_t)((raw_data[7] << 8) | raw_data[6]);
+    data->accel.y = (int16_t)((raw_data[9] << 8) | raw_data[8]);
+    data->accel.z = (int16_t)((raw_data[11] << 8) | raw_data[10]);
 
     return ESP_OK;
 }

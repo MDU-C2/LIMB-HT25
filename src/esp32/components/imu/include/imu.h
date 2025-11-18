@@ -85,4 +85,3 @@ esp_err_t imu_read_data(imu_data_t *data);
  * @return true if sensor is detected, false otherwise
  */
 bool imu_is_present(void);
-
