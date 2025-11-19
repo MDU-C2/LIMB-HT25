@@ -13,9 +13,9 @@ extern "C" {
  * @brief IMU data structure
  */
 typedef struct {
-    float x;
-    float y;
-    float z;
+    int16_t x;
+    int16_t y;
+    int16_t z;
 } imu_vector_t;
 
 /**
