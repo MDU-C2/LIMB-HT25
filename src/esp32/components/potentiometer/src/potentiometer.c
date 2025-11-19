@@ -56,11 +56,10 @@ esp_err_t potentiometer_init(const potentiometer_config_t *config)
 
     // Use default config if none provided
     if (config == NULL) {
-        potentiometer_config_t default_config = POTENTIOMETER_CONFIG_DEFAULT();
-        memcpy(&s_config, &default_config, sizeof(potentiometer_config_t));
+        s_config = POTENTIOMETER_CONFIG_DEFAULT();
         ESP_LOGI(TAG, "Using default configuration");
     } else {
-        memcpy(&s_config, config, sizeof(potentiometer_config_t));
+        s_config = *config;
     }
 
     // Initialize ADC unit
