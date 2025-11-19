@@ -6,10 +6,6 @@
 #include "esp_adc/adc_oneshot.h"
 #include "hal/adc_types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * @brief Potentiometer configuration structure
  */

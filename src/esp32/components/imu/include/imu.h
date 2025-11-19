@@ -5,10 +5,6 @@
 #include "esp_err.h"
 #include "driver/i2c.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * @brief IMU data structure
  */
