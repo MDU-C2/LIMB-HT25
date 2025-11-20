@@ -56,7 +56,8 @@ esp_err_t potentiometer_init(const potentiometer_config_t *config)
 
     // Use default config if none provided
     if (config == NULL) {
-        s_config = POTENTIOMETER_CONFIG_DEFAULT();
+        potentiometer_config_t default_config = POTENTIOMETER_CONFIG_DEFAULT();
+        s_config = default_config;
         ESP_LOGI(TAG, "Using default configuration");
     } else {
         s_config = *config;

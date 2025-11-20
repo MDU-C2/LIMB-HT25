@@ -9,7 +9,7 @@ static const char *TAG = "adc_mgr";
 
 static adc_oneshot_unit_handle_t    s_unit = NULL;
 static bool                         s_inited = false;
-static bool                         s_channels_used[SOC_ADC_MAX_CHANNELS];
+static bool                         s_channels_used[SOC_ADC_MAX_CHANNEL_NUM];
 
 esp_err_t adc_mgr_init(void)
 {
@@ -58,7 +58,7 @@ adc_mgr_handle_t adc_mgr_register_channel(adc_channel_t channel, const adc_onesh
         if (err != ESP_OK) return -1;
     }
 
-    if (channel < 0 || channel >= SOC_ADC_MAX_CHANNELS) {
+    if (channel < 0 || channel >= SOC_ADC_MAX_CHANNEL_NUM) {
         return -1;
     }
 
@@ -67,7 +67,7 @@ adc_mgr_handle_t adc_mgr_register_channel(adc_channel_t channel, const adc_onesh
         local_cfg = *cfg;
     } else {
         local_cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
-        local_cfg.atten = ADC_ATTEN_DB_11;
+        local_cfg.atten = ADC_ATTEN_DB_12;
     }
 
     // Check if this channel is already registered (only one sensor per channel)
@@ -93,7 +93,7 @@ esp_err_t adc_mgr_read(adc_mgr_handle_t handle, int *out_raw)
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (handle < 0 || handle >= SOC_ADC_MAX_CHANNELS || !s_channels_used[handle]) {
+    if (handle < 0 || handle >= SOC_ADC_MAX_CHANNEL_NUM || !s_channels_used[handle]) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -105,7 +105,7 @@ esp_err_t adc_mgr_get_channel(adc_mgr_handle_t handle, adc_channel_t *out_channe
 {
     if (!out_channel) return ESP_ERR_INVALID_ARG;
     if (!s_inited) return ESP_ERR_INVALID_STATE;
-    if (handle < 0 || handle >= SOC_ADC_MAX_CHANNELS || !s_channels_used[handle]) return ESP_ERR_INVALID_STATE;
+    if (handle < 0 || handle >= SOC_ADC_MAX_CHANNEL_NUM || !s_channels_used[handle]) return ESP_ERR_INVALID_STATE;
 
     // Handle is the channel number
     *out_channel = (adc_channel_t)handle;
