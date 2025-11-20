@@ -12,7 +12,6 @@
 typedef struct {
     uint8_t gpio_pin;           // GPIO pin number (e.g., GPIO0)
     adc_channel_t adc_channel;  // ADC channel (e.g., ADC_CHANNEL_0)
-    adc_unit_t adc_unit;        // ADC unit (ADC_UNIT_1 or ADC_UNIT_2)
     adc_atten_t adc_atten;      // ADC attenuation (ADC_ATTEN_DB_0 to ADC_ATTEN_DB_12)
     adc_bitwidth_t adc_bitwidth; // ADC bit width (ADC_BITWIDTH_DEFAULT, etc.)
 } potentiometer_config_t;
@@ -23,7 +22,6 @@ typedef struct {
 #define POTENTIOMETER_CONFIG_DEFAULT() { \
     .gpio_pin = 0, \
     .adc_channel = ADC_CHANNEL_0, \
-    .adc_unit = ADC_UNIT_1, \
     .adc_atten = ADC_ATTEN_DB_12, \
     .adc_bitwidth = ADC_BITWIDTH_DEFAULT, \
 }

@@ -1,8 +1,8 @@
 #include "potentiometer.h"
+#include "adc_manager.h"
 
 #include <string.h>
 #include "esp_log.h"
-#include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 
@@ -10,14 +10,14 @@ static const char *TAG = "POTENTIOMETER";
 
 // Static state
 static potentiometer_config_t s_config;
-static adc_oneshot_unit_handle_t s_adc_handle = NULL;
+static adc_mgr_handle_t s_adc_handle = -1;
 static adc_cali_handle_t s_cali_handle = NULL;
 static bool s_initialized = false;
 
 /**
- * @brief Initialize ADC calibration
+ * @brief Initialize ADC calibration (always uses ADC_UNIT_1)
  */
-static bool adc_calibration_init(adc_unit_t unit, adc_channel_t channel, adc_atten_t atten, adc_cali_handle_t *out_handle)
+static bool adc_calibration_init(adc_channel_t channel, adc_atten_t atten, adc_cali_handle_t *out_handle)
 {
     adc_cali_handle_t handle = NULL;
     esp_err_t ret = ESP_FAIL;
@@ -26,7 +26,7 @@ static bool adc_calibration_init(adc_unit_t unit, adc_channel_t channel, adc_att
 #if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
     if (!calibrated) {
         adc_cali_curve_fitting_config_t cali_config = {
-            .unit_id = unit,
+            .unit_id = ADC_UNIT_1,
             .chan = channel,
             .atten = atten,
             .bitwidth = ADC_BITWIDTH_DEFAULT,
@@ -62,32 +62,21 @@ esp_err_t potentiometer_init(const potentiometer_config_t *config)
         s_config = *config;
     }
 
-    // Initialize ADC unit
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = s_config.adc_unit,
-    };
-    esp_err_t ret = adc_oneshot_new_unit(&init_config, &s_adc_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize ADC unit: %s", esp_err_to_name(ret));
-        return ret;
-    }
-
-    // Configure ADC channel
+    // Register channel with ADC manager
     adc_oneshot_chan_cfg_t chan_config = {
         .bitwidth = s_config.adc_bitwidth,
         .atten = s_config.adc_atten,
     };
-    ret = adc_oneshot_config_channel(s_adc_handle, s_config.adc_channel, &chan_config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure ADC channel: %s", esp_err_to_name(ret));
-        adc_oneshot_del_unit(s_adc_handle);
-        s_adc_handle = NULL;
-        return ret;
+    
+    s_adc_handle = adc_mgr_register_channel(s_config.adc_channel, &chan_config);
+    if (s_adc_handle < 0) {
+        ESP_LOGE(TAG, "Failed to register ADC channel with ADC manager");
+        return ESP_FAIL;
     }
 
     // Initialize calibration (optional, but recommended)
-    adc_calibration_init(s_config.adc_unit, 
-                        s_config.adc_channel, 
+    // Always uses ADC_UNIT_1
+    adc_calibration_init(s_config.adc_channel, 
                         s_config.adc_atten, 
                         &s_cali_handle);
 
@@ -100,7 +89,7 @@ esp_err_t potentiometer_init(const potentiometer_config_t *config)
 
 esp_err_t potentiometer_read_raw(int *raw_value)
 {
-    if (!s_initialized || s_adc_handle == NULL) {
+    if (!s_initialized || s_adc_handle < 0) {
         ESP_LOGE(TAG, "Potentiometer not initialized");
         return ESP_ERR_INVALID_STATE;
     }
@@ -109,7 +98,7 @@ esp_err_t potentiometer_read_raw(int *raw_value)
         return ESP_ERR_INVALID_ARG;
     }
 
-    return adc_oneshot_read(s_adc_handle, s_config.adc_channel, raw_value);
+    return adc_mgr_read(s_adc_handle, raw_value);
 }
 
 esp_err_t potentiometer_read_voltage(int *voltage_mv)
@@ -211,11 +200,9 @@ esp_err_t potentiometer_deinit(void)
         s_cali_handle = NULL;
     }
 
-    // Delete ADC unit
-    if (s_adc_handle != NULL) {
-        adc_oneshot_del_unit(s_adc_handle);
-        s_adc_handle = NULL;
-    }
+    // Note: We don't unregister from ADC manager here because other sensors
+    // might be using the same channel. The ADC manager handles cleanup.
+    s_adc_handle = -1;
 
     s_initialized = false;
     ESP_LOGI(TAG, "Potentiometer deinitialized");

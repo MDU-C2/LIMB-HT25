@@ -2,7 +2,7 @@ idf_component_register(
   SRCS
   "src/potentiometer.c"
   REQUIRES
-  driver
+  adc_manager
   esp_adc
   INCLUDE_DIRS
   "include")
