@@ -16,6 +16,15 @@ cmake_minimum_required(VERSION 3.16)
 set(EXTRA_COMPONENT_DIRS "../../esp32/components")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+# NOTE: If you add our components directory as shown above, you also need to
+# enable a minimum build so that you only build the components you actually
+# use. The limb_ble_periph component requires that NimBLE bluetooth is enabled
+# to even compile, so if you don't have a minimal build the limb_ble_periph
+# component will fail to build unless you've enabled the NimBLE bluetooth
+# component in your app.
+idf_build_set_property(MINIMAL_BUILD ON)
+
 project(esp_project_name)
 ```
 
