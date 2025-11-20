@@ -8,11 +8,11 @@
 // =================================
 //#define BUTTON_Next_GPIO  1    // GPIO for button to move to next position (active low)
 //#define BUTTON_Prev_GPIO  0    // GPIO for button to move to previous position (
-#define THUMB_SERVO_GPIO   21           // PWM pin to HS422 signal (orange)
-#define INDEX_SERVO_GPIO  22           // PWM pin to HS422 signal (orange)
-#define MID_SERVO_GPIO    23           // PWM pin to HS422 signal (orange)
-#define RING_SERVO_GPIO   12           // PWM pin to HS422 signal (orange)
-#define PINKY_SERVO_GPIO 15           // PWM pin to HS422 signal (orange)
+#define THUMB_SERVO_GPIO   21           
+#define INDEX_SERVO_GPIO  22           
+#define MID_SERVO_GPIO    9           
+#define RING_SERVO_GPIO   12           
+#define PINKY_SERVO_GPIO 15           
 
 // Please consult the datasheet of your servo before changing the following parameters
 #define SERVO_MIN_PULSEWIDTH_US 500  // Minimum pulse width in microsecond
@@ -36,7 +36,7 @@ typedef struct {
     int gpio_pin;                   // GPIO pin for this servo
     int min_angle;                  // Minimum angle in degrees
     int max_angle;                  // Maximum angle in degrees
-    uint32_t min_pulse_us;         // Minimum pulse width in microseconds
+    uint32_t min_pulse_us;         // 
     uint32_t max_pulse_us;         // Maximum pulse width in microseconds
     int current_angle;             // Current servo position
     float current_force;           // Current force applied, measured by FSR
@@ -60,6 +60,4 @@ void servo_write_all_deg(int deg);
 void servo_enable_channel(int channel, bool enable);
 int servo_get_current_angle(int channel);
 void servo_print_info(int channel);
-void servo_set_direction(int channel, servo_direction_t direction);
-void servo_write_finger_position(int channel, int finger_position); // 0-100% closed
 void servo_main(void);

@@ -11,8 +11,8 @@ static servo_config_t servos[NUM_SERVOS] = {
         .gpio_pin = THUMB_SERVO_GPIO,
         .min_angle = 150,
         .max_angle = SERVO_MAX_DEGREE,
-        .min_pulse_us = 1000,
-        .max_pulse_us = 2000,
+        .min_pulse_us = 600,
+        .max_pulse_us = 1000,
         .current_angle = 0,
         .current_force = 0.0f,
         .direction = SERVO_DIR_REVERSE,
@@ -24,8 +24,8 @@ static servo_config_t servos[NUM_SERVOS] = {
         .gpio_pin = INDEX_SERVO_GPIO,
         .min_angle = 120,
         .max_angle = SERVO_MAX_DEGREE,
-        .min_pulse_us = 1000,
-        .max_pulse_us = 2000,
+        .min_pulse_us = 500,
+        .max_pulse_us = 1000,
         .current_angle = 0,
         .current_force = 0.0f,
         .direction = SERVO_DIR_REVERSE,
@@ -37,11 +37,11 @@ static servo_config_t servos[NUM_SERVOS] = {
         .gpio_pin = MID_SERVO_GPIO,
         .min_angle = 110,
         .max_angle = SERVO_MAX_DEGREE,
-        .min_pulse_us = 1000,
-        .max_pulse_us = 2000,
+        .min_pulse_us = 500,
+        .max_pulse_us = 1000,
         .current_angle = 0,
         .current_force = 0.0f,
-        .direction = SERVO_DIR_REVERSE,
+        .direction = SERVO_DIR_NORMAL,
         .name = "Middle",
         .operator_index = 1
     },
@@ -50,8 +50,8 @@ static servo_config_t servos[NUM_SERVOS] = {
         .gpio_pin = RING_SERVO_GPIO,
         .min_angle = SERVO_MIN_DEGREE,
         .max_angle = 70,
-        .min_pulse_us = 1000,
-        .max_pulse_us = 2000,
+        .min_pulse_us = 500,
+        .max_pulse_us = 1000,
         .current_angle = 0,
         .current_force = 0.0f,
         .direction = SERVO_DIR_NORMAL,
@@ -63,8 +63,8 @@ static servo_config_t servos[NUM_SERVOS] = {
         .gpio_pin = PINKY_SERVO_GPIO,
         .min_angle = SERVO_MIN_DEGREE,
         .max_angle = 54,
-        .min_pulse_us = 1000,
-        .max_pulse_us = 2000,
+        .min_pulse_us = 500,
+        .max_pulse_us = 1000,
         .current_angle = 0,
         .current_force = 0.0f,
         .direction = SERVO_DIR_NORMAL,
@@ -85,15 +85,8 @@ static uint32_t servo_angle_to_us(int channel, int angle)
     
     servo_config_t *servo = &servos[channel];
     
-    // direction correction
-    if (servo->direction == SERVO_DIR_REVERSE) {
-        // Reverse direction: flip the angle
-        if (angle < servo->min_angle) angle = servo->max_angle;
-        if (angle > servo->max_angle) angle = servo->min_angle;
-    } else {
-        if (angle < servo->min_angle) angle = servo->min_angle;
-        if (angle > servo->max_angle) angle = servo->max_angle;
-    }
+    if (angle < servo->min_angle) angle = servo->min_angle;
+    if (angle > servo->max_angle) angle = servo->max_angle;
     
     // Convert to pulse width
     return servo->min_pulse_us + 
@@ -101,30 +94,35 @@ static uint32_t servo_angle_to_us(int channel, int angle)
            (servo->max_angle - servo->min_angle);
 }
 
-
-void servo_write_finger_position(int channel, int finger_percent)
+// Set servo position in microseconds
+void servo_write_us_channel(int channel, uint32_t pulse_us)
 {
     if (channel < 0 || channel >= NUM_SERVOS) {
         ESP_LOGW(TAG, "Invalid servo channel: %d", channel);
         return;
     }
     
-    // Clamp percentage
-    if (finger_percent < 0) finger_percent = 0;
-    if (finger_percent > 100) finger_percent = 100;
-    
     servo_config_t *servo = &servos[channel];
-    
-    // Convert percentage to logical angle
-    int logical_angle = servo->min_angle + 
-                       (finger_percent * (servo->max_angle - servo->min_angle)) / 100;
-    
-    // Use existing function (handles direction automatically)
-    servo_write_deg_channel(channel, logical_angle);
-    
-    ESP_LOGI(TAG, "%s finger set to %d%% closed (logical angle: %d°)", 
-             servo->name, finger_percent, logical_angle);
+    /*if(servo->direction == SERVO_DIR_REVERSE) {
+        // Invert pulse for reverse direction
+        pulse_us = servo->max_pulse_us - pulse_us;
+    }*/
+
+    // Clamp to servo's pulse range
+    if (pulse_us < servo->min_pulse_us) pulse_us = servo->min_pulse_us;
+    if (pulse_us > servo->max_pulse_us) pulse_us = servo->max_pulse_us;
+
+    // Update angle
+    servo->current_angle = servo->min_angle + 
+                           (pulse_us - servo->min_pulse_us) * 
+                           (servo->max_angle - servo->min_angle) / 
+                           (servo->max_pulse_us - servo->min_pulse_us);
+
+    ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, pulse_us));
+    ESP_LOGD(TAG, "%s servo set to %lu μs", servo->name, pulse_us);
 }
+
+
 
 esp_err_t servo_init(void)
 {
@@ -168,8 +166,13 @@ esp_err_t servo_init(void)
         ESP_ERROR_CHECK(mcpwm_new_generator(operators[servo->operator_index], &generator_config, &servo->generator));
 
         // Set initial position to middle of servo's range
-        uint32_t initial_us = servo_angle_to_us(i, 0);
-        ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, initial_us));
+        /*uint32_t initial_us;
+        if(servo->direction == SERVO_DIR_NORMAL) {
+            initial_us = servo->min_pulse_us;
+        } else {
+            initial_us = servo->max_pulse_us;
+        }
+        ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, initial_us));*/
         servo->current_angle = 0;
 
         // Configure PWM actions
@@ -177,6 +180,7 @@ esp_err_t servo_init(void)
                         MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH)));
         ESP_ERROR_CHECK(mcpwm_generator_set_action_on_compare_event(servo->generator,
                         MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, servo->comparator, MCPWM_GEN_ACTION_LOW)));
+        //vTaskDelay(1000);
     }
     ESP_LOGI(TAG, "Enable and start timer");
     ESP_ERROR_CHECK(mcpwm_timer_enable(timer));
@@ -210,8 +214,7 @@ void servo_write_deg_channel(int channel, int deg)
     ESP_LOGI(TAG, "%s servo set to %d° (%lu μs)", servo->name, servo->current_angle, pulse_us);
 }
 
-// Set servo position in microseconds
-void servo_write_us_channel(int channel, uint32_t pulse_us)
+void micro_increment(int channel, int microseconds)
 {
     if (channel < 0 || channel >= NUM_SERVOS) {
         ESP_LOGW(TAG, "Invalid servo channel: %d", channel);
@@ -220,13 +223,21 @@ void servo_write_us_channel(int channel, uint32_t pulse_us)
     
     servo_config_t *servo = &servos[channel];
 
-    // Clamp to servo's pulse range
-    if (pulse_us < servo->min_pulse_us) pulse_us = servo->min_pulse_us;
-    if (pulse_us > servo->max_pulse_us) pulse_us = servo->max_pulse_us;
+    int new_pulse = 0;
+    if(servo->direction == SERVO_DIR_NORMAL) {
+        new_pulse = (int32_t)servo_angle_to_us(channel, servo->current_angle) + microseconds;
+    } else {
+        new_pulse = (int32_t)servo_angle_to_us(channel, servo->current_angle) - microseconds;
+    }
 
-    ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, pulse_us));
-    ESP_LOGD(TAG, "%s servo set to %lu μs", servo->name, pulse_us);
+    // Clamp to servo's pulse range
+    if (new_pulse < (int32_t)servo->min_pulse_us) new_pulse = servo->min_pulse_us;
+    if (new_pulse > (int32_t)servo->max_pulse_us) new_pulse = servo->max_pulse_us;
+
+    ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(servo->comparator, (uint32_t)microseconds));
+    ESP_LOGD(TAG, "%s servo incremented by %d μs to %lu μs", servo->name, microseconds, (uint32_t)microseconds);
 }
+
 
 
 // Set all servos to same angle (respecting individual limits)
@@ -268,7 +279,7 @@ void close_all_fingers(void)
 {
     ESP_LOGI(TAG, "Closing all fingers");
     for (int i = 0; i < NUM_SERVOS; i++) {
-        servo_write_finger_position(i, 100);  // 100% closed
+        servo_write_deg_channel(i, 100);  // 100% closed
     }
 }
 
@@ -276,15 +287,10 @@ void open_all_fingers(void)
 {
     ESP_LOGI(TAG, "Opening all fingers");
     for (int i = 0; i < NUM_SERVOS; i++) {
-        servo_write_finger_position(i, 0);    // 0% closed (fully open)
+        servo_write_deg_channel(i, 0);    // 0% closed (fully open)
     }
 }
 
-void set_finger_curl(int channel, int curl_percent)
-{
-    ESP_LOGI(TAG, "Setting finger on channel %d to %d%% curl", channel, curl_percent);
-    servo_write_finger_position(channel, curl_percent);
-}
 
 void servo_main(void)
 {
@@ -294,29 +300,13 @@ void servo_main(void)
     ESP_ERROR_CHECK(servo_init());
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    // Print servo info
-    for (int i = 0; i < NUM_SERVOS; i++) {
-        servo_print_info(i);
-    }
+    int channel = 0; 
 
-    while (1) {
-        // Test percentage-based control
-        /*for(int curl = 0; curl <= 100; curl += 10) {
-            set_finger_curl(0, curl); // Thumb
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }*/
-        servo_print_info(0); // Thumb
+    while (1)
+    {
+        servo_write_us_channel(channel, 2000);  // Set to neutral position
+        servo_print_info(3);
         vTaskDelay(pdMS_TO_TICKS(500));
-        servo_print_info(1); // Index
-        vTaskDelay(pdMS_TO_TICKS(500));
-        servo_print_info(2); // Middle
-        vTaskDelay(pdMS_TO_TICKS(500));
-        servo_print_info(3); // Ring
-        vTaskDelay(pdMS_TO_TICKS(500));
-        servo_print_info(4); // Pinky
-
-        vTaskDelay(pdMS_TO_TICKS(2000));
-        
-        
     }
+    
 }
