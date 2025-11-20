@@ -19,7 +19,7 @@ typedef struct {
 /**
  * @brief Default potentiometer configuration for GPIO0
  */
-#define POTENTIOMETER_CONFIG_DEFAULT() { \
+#define POTENTIOMETER_CONFIG_DEFAULT() (potentiometer_config_t) { \
     .gpio_pin = 0, \
     .adc_channel = ADC_CHANNEL_0, \
     .adc_atten = ADC_ATTEN_DB_12, \

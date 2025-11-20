@@ -40,7 +40,7 @@ typedef struct {
 /**
  * @brief Default IMU configuration
  */
-#define IMU_CONFIG_DEFAULT() { \
+#define IMU_CONFIG_DEFAULT() (imu_config_t) { \
     .i2c_port = I2C_NUM_0, \
     .sda_pin = 4, \
     .scl_pin = 5, \
