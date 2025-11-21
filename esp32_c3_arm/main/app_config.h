@@ -30,13 +30,13 @@
 // -------------------- Stepper / Motion --------------------
 #define STEPPER_STEP_GPIO              (GPIO_NUM_6)
 #define STEPPER_DIR_GPIO               (GPIO_NUM_7)
-#define STEPPER_ENABLE_GPIO            (GPIO_NUM_10)
+#define STEPPER_ENABLE_GPIO            (GPIO_NUM_8)
 
 #define MOTION_CONTROL_PERIOD_MS       (10)       // Control loop period
 
 #define DEFAULT_MICROSTEPPING          (16)
 #define DEFAULT_STEPS_PER_REV          (200)      // full-step steps per revolution
-#define DEFAULT_GEAR_RATIO             (50.0f)    // gear ratio (motor revs per joint rev)
+#define DEFAULT_GEAR_RATIO             (5.0f)    // gear ratio (motor revs per joint rev)
 
 // Motion profile parameters
 #define DEFAULT_MAX_VELOCITY_DPS      (30.0f)     // Maximum velocity in degrees per second
@@ -70,4 +70,14 @@
 
 // -------------------- Safety Parameters --------------------
 #define EMERGENCY_STOP_TIMEOUT_MS      (500)
+
+// ---------- ADC (pot) ----------
+#define POT_ADC_CHANNEL   ADC1_CHANNEL_2
+#define ALPHA             0.10f
+#define AVG_SAMPLES       8
+// Measured raw limits for your pot mapping (edit if re-calibrated)
+#define RAW_MIN_CAL       1044
+#define RAW_MAX_CAL       2681
+#define DEG_MIN_CAL       0.0f
+#define DEG_MAX_CAL       90.0f
 

@@ -42,6 +42,14 @@ float motion_control_get_error_deg(void);
 
 void motion_control_get_status(arm_status_t *status);
 
+static float map_pot_to_deg(int raw);
+
+static int read_adc_avg(int n);
+
+static inline float clampf(float x, float lo, float hi);
+
+static float clamp_angle(float angle_deg);
+
 /**
  * @brief Set position feedback from external source (e.g., ADC, encoder)
  * @param angle_deg Current angle in degrees from feedback sensor
