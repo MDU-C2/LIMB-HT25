@@ -29,20 +29,15 @@ void app_main()
     while(1) {
         //start_calibration_mode();
         
-        ESP_LOGI(TAG, "Moving servos to minimum positions");
-        servo_write_deg_channel(0, 0);      // Thumb to min
-        servo_write_deg_channel(1, 0);      // Index to min
-        servo_write_deg_channel(2, 0);      // Middle to min
-        servo_write_deg_channel(3, 0);    // Ring to max
-        servo_write_deg_channel(4, 0);    // Pinky to max
+        make_fist_gesture();
         vTaskDelay(pdMS_TO_TICKS(2000));
-        
-        ESP_LOGI(TAG, "Moving servos to maximum positions");
-        servo_write_deg_channel(0, 180);    // Thumb to max
-        servo_write_deg_channel(1, 180);    // Index to max
-        servo_write_deg_channel(2, 180);    // Middle to max
-        servo_write_deg_channel(3, 180);      // Ring to min
-        servo_write_deg_channel(4, 180);      // Pinky to min
+        open_hand_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        count_to_five_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        make_peace_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        rock_gesture();
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }

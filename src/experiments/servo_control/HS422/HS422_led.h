@@ -74,6 +74,8 @@ void make_fist_gesture(void);
 void open_hand_gesture(void);
 void make_peace_gesture(void);
 void count_to_five_gesture(void);
+void rock_gesture(void);
+void flip_off_gesture(void);
 
 // Rotary encoder functions
 esp_err_t rotary_encoder_init(void);

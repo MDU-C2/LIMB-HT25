@@ -45,7 +45,7 @@ static servo_config_t servos[NUM_SERVOS] = {
         .min_angle = 0,
         .min_pulse_us = 1000,
         .max_pulse_us = 2000,
-        .direction = SERVO_DIR_NORMAL,
+        .direction = SERVO_DIR_REVERSE,
         .name = "Ring"
     },
     // Pinky finger
@@ -56,7 +56,7 @@ static servo_config_t servos[NUM_SERVOS] = {
         .min_angle = 0,
         .min_pulse_us = 1000,
         .max_pulse_us = 2000,
-        .direction = SERVO_DIR_NORMAL,
+        .direction = SERVO_DIR_REVERSE,
         .name = "Pinky"
     }
 };
@@ -159,7 +159,7 @@ void make_fist_gesture(void)
 {
     ESP_LOGI(TAG, "Executing 'Make Fist' gesture");
     for (int i = 0; i < NUM_SERVOS; i++) {
-        if(servos[i].direction == SERVO_DIR_NORMAL) {
+        if(servos[i].direction == SERVO_DIR_REVERSE) {
             servo_write_deg_channel(i, servos[i].max_angle);
         } else {
             servo_write_deg_channel(i, servos[i].min_angle);
@@ -172,7 +172,7 @@ void open_hand_gesture(void)
 {
     ESP_LOGI(TAG, "Executing 'Open Hand' gesture");
     for (int i = 0; i < NUM_SERVOS; i++) {
-        if(servos[i].direction == SERVO_DIR_NORMAL) {
+        if(servos[i].direction == SERVO_DIR_REVERSE) {
             servo_write_deg_channel(i, servos[i].min_angle);
         } else {
             servo_write_deg_channel(i, servos[i].max_angle);
@@ -186,13 +186,13 @@ void make_peace_gesture(void)
     ESP_LOGI(TAG, "Executing 'Peace' gesture");
     for (int i = 0; i < NUM_SERVOS; i++) {
         if (i == 1 || i == 2) {  // Index and Middle fingers
-            if(servos[i].direction == SERVO_DIR_NORMAL) {
+            if(servos[i].direction == SERVO_DIR_REVERSE) {
                 servo_write_deg_channel(i, servos[i].min_angle);
             } else {
                 servo_write_deg_channel(i, servos[i].max_angle);
             }
         } else {  // Other fingers
-            if(servos[i].direction == SERVO_DIR_NORMAL) {
+            if(servos[i].direction == SERVO_DIR_REVERSE) {
                 servo_write_deg_channel(i, servos[i].max_angle);
             } else {
                 servo_write_deg_channel(i, servos[i].min_angle);
@@ -210,7 +210,7 @@ void count_to_five_gesture(void)
     
     // Open fingers one by one
     for (int i = 0; i < 5; i++) {
-        if(servos[i].direction == SERVO_DIR_NORMAL) {
+        if(servos[i].direction == SERVO_DIR_REVERSE) {
             servo_write_deg_channel(i, servos[i].min_angle);
         } else {
             servo_write_deg_channel(i, servos[i].max_angle);
@@ -221,8 +221,47 @@ void count_to_five_gesture(void)
     vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
 }
 
+void rock_gesture(void)
+{
+    ESP_LOGI(TAG, "Executing 'Rock' gesture");
+    for (int i = 0; i < NUM_SERVOS; i++) {
+        if (i == 0 || i == 1 || i == 4) {  // Thumb, Index, Pinky fingers
+            if(servos[i].direction == SERVO_DIR_NORMAL) {
+                servo_write_deg_channel(i, servos[i].max_angle);
+            } else {
+                servo_write_deg_channel(i, servos[i].min_angle);
+            }
+        } else {  // Index and Middle fingers
+            if(servos[i].direction == SERVO_DIR_NORMAL) {
+                servo_write_deg_channel(i, servos[i].min_angle);
+            } else {
+                servo_write_deg_channel(i, servos[i].max_angle);
+            }
+        }
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
+}
 
-
+void flip_off_gesture(void)
+{
+    ESP_LOGI(TAG, "Executing 'Flip Off' gesture");
+    for (int i = 0; i < NUM_SERVOS; i++) {
+        if (i == 2) {  // Middle finger
+            if(servos[i].direction == SERVO_DIR_REVERSE) {
+                servo_write_deg_channel(i, servos[i].min_angle);
+            } else {
+                servo_write_deg_channel(i, servos[i].max_angle);
+            }
+        } else {  // Other fingers
+            if(servos[i].direction == SERVO_DIR_REVERSE) {
+                servo_write_deg_channel(i, servos[i].max_angle);
+            } else {
+                servo_write_deg_channel(i, servos[i].min_angle);
+            }
+        }
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
+}
 
 // ============================================================================
 // ROTARY ENCODER IMPLEMENTATION
