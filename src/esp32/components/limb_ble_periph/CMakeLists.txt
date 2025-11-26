@@ -1,0 +1,12 @@
+idf_component_register(
+  SRCS
+  "src/limb_ble_periph.c"
+  "src/sensors_service.c"
+  "src/gap.c"
+  REQUIRES
+  bt
+  PRIV_REQUIRES
+  nvs_flash
+  esp_driver_gpio
+  INCLUDE_DIRS
+  "include")

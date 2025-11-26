@@ -8,6 +8,12 @@ __pycache__/
 # C extensions
 *.so
 
+
+# Locals
+PMW3360
+PMW3360DM-T2QU
+IMU_and_Motor_Com
+
 # Distribution / packaging
 .Python
 build/
@@ -413,3 +419,6 @@ result-*
 # OAK D files
 oak-examples/
 oak-template/
+# EMG data files
+emg_sequences_ch*.npz
+**/emg/checkpoints/

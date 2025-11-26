@@ -1,0 +1,230 @@
+{
+  "project_info": {
+    "project_name": "LIMB - Leveraging Intelligent Mechatronics for Bionics",
+    "session_id": "S001",
+    "date": "2025-XX-XX",
+    "operator": "initials_or_name",
+    "notes": ""
+  },
+  "participant": {
+    "participant_id": "P001",
+    "dominant_hand": "right",
+    "age": null,
+    "sex": "",
+    "height_cm": null,
+    "weight_kg": null,
+    "medical_notes": ""
+  },
+  "task_protocol": {
+    "description": "Rest, grip, release",
+    "trials": 10,
+    "trial_duration_s": 15,
+    "rest_between_trials_s": 30,
+    "effort_level_percent_MVC": 60,
+    "mvc_protocol": "3 x 5s max grip with 60s rest; take best RMS",
+    "cueing_method": "auditory_beep",
+    "randomization": "balanced_block",
+    "video_recording": false
+  },
+  "hardware_setup": {
+    "emg_system_model": "brand_model",
+    "electrode_type": "surface_AgAgCl",
+    "reference_ground_location": "bony_area_elbow_or_wrist",
+    "amplifier_gain": 1000,
+    "adc_resolution_bits": 16,
+    "isolation": "battery_powered_or_medical_grade",
+    "cable_management": "secured_to_reduce_motion_artifacts",
+    "imu_devices": [
+      "imu_on_forearm",
+      "imu_on_hand"
+    ],
+    "vision_system": "OAK-D fixed camera",
+    "synchronization_hardware": "sync_pulse_or_shared_clock"
+  },
+  "skin_prep": {
+    "hair_removed": true,
+    "abrasion_method": "gentle",
+    "cleaning": "70_percent_isopropyl",
+    "impedance_check_kOhm": 5
+  },
+  "channels": {
+    "num_channels": 8,
+    "channel_map": [
+      {
+        "ch": 1,
+        "muscle": "Flexor digitorum superficialis",
+        "side": "dominant",
+        "placement_notes": "midline, fiber-aligned"
+      },
+      {
+        "ch": 2,
+        "muscle": "Flexor carpi radialis",
+        "side": "dominant",
+        "placement_notes": ""
+      },
+      {
+        "ch": 3,
+        "muscle": "Extensor digitorum",
+        "side": "dominant",
+        "placement_notes": ""
+      },
+      {
+        "ch": 4,
+        "muscle": "Extensor carpi ulnaris",
+        "side": "dominant",
+        "placement_notes": ""
+      },
+      {
+        "ch": 5,
+        "muscle": "Thenar eminence",
+        "side": "dominant",
+        "placement_notes": ""
+      },
+      {
+        "ch": 6,
+        "muscle": "Hypothenar eminence",
+        "side": "dominant",
+        "placement_notes": ""
+      },
+      {
+        "ch": 7,
+        "muscle": "Brachioradialis",
+        "side": "dominant",
+        "placement_notes": ""
+      },
+      {
+        "ch": 8,
+        "muscle": "Pronator teres",
+        "side": "dominant",
+        "placement_notes": ""
+      }
+    ],
+    "interelectrode_distance_mm": 20
+  },
+  "acquisition_settings": {
+    "sampling_rate_hz": 2000,
+    "bandpass_filter_hz": [
+      20,
+      450
+    ],
+    "notch_filter_hz": 50,
+    "hardware_filtering": true,
+    "units": "volts",
+    "pretrigger_seconds": 0.5,
+    "posttrigger_seconds": 0.5,
+    "recording_format": "binary_f32",
+    "clock_source": "internal_or_external",
+    "timebase": "unix_epoch_ms"
+  },
+  "synchronization": {
+    "method": "hardware_sync_pulse",
+    "sync_signal_channel": "aux1",
+    "imu_alignment": "timestamp_alignment",
+    "vision_alignment": "frame_timestamp_alignment",
+    "latency_characterization_ms": 5
+  },
+  "preprocessing": {
+    "dc_offset_removal": "mean_subtraction_per_channel",
+    "rectification": "full_wave",
+    "envelope_extraction": {
+      "method": "rms",
+      "window_ms": 50,
+      "overlap_percent": 50
+    },
+    "lowpass_envelope_cutoff_hz": 10,
+    "artifact_rejection": {
+      "saturation_threshold_volts": 0.0045,
+      "motion_artifact_strategy": "high_variance_window_flagging"
+    },
+    "normalization": {
+      "method": "mvc",
+      "reference_value": "best_MVC_RMS",
+      "per_session": true
+    }
+  },
+  "segmentation_and_labels": {
+    "window_ms": 200,
+    "stride_ms": 50,
+    "label_set": [
+      "rest",
+      "grip",
+      "move"
+    ],
+    "label_source": "synchronized_task_markers",
+    "class_balance_strategy": "undersample_majority_or_weighted_loss",
+    "holdout_strategy": "leave_one_trial_out",
+    "timestamp_alignment_tolerance_ms": 10
+  },
+  "feature_engineering": {
+    "use_raw_timeseries": true,
+    "time_domain": [
+      "RMS",
+      "MAV",
+      "ZC",
+      "SSC",
+      "WL"
+    ],
+    "frequency_domain": [
+      "mean_freq",
+      "median_freq",
+      "total_power"
+    ],
+    "time_frequency": {
+      "use_stft": false,
+      "stft_window_ms": 128,
+      "stft_hop_ms": 32,
+      "n_fft": 256
+    }
+  },
+  "lstm_input_format": {
+    "sequence_length_ms": 400,
+    "sampling_rate_hz": 2000,
+    "downsample_to_hz": 1000,
+    "num_channels": 8,
+    "shape": "(samples, time_steps, channels)",
+    "scaling": "zscore_per_channel",
+    "padding": "none_or_zero_pad",
+    "export_format": "npz_or_hdf5"
+  },
+  "quality_control": {
+    "per_channel_snr_db": null,
+    "dropped_samples": 0,
+    "impedance_alert_threshold_kOhm": 10,
+    "trial_exclusion_criteria": "SNR<10dB or >5% saturation",
+    "plots_to_save": [
+      "raw_trace",
+      "power_spectrum",
+      "envelope"
+    ],
+    "qc_operator_notes": ""
+  },
+  "dataset_structure": {
+    "directory_layout": {
+      "root": "/data/emg_project",
+      "raw": "raw/P001/S001/",
+      "processed": "processed/P001/S001/",
+      "labels": "labels/P001/S001/",
+      "sync": "sync/P001/S001/"
+    },
+    "file_naming": {
+      "raw_emg": "emg_P001_S001_trial{trial:02d}.bin",
+      "processed_emg": "emg_proc_P001_S001_trial{trial:02d}.npz",
+      "labels": "labels_P001_S001_trial{trial:02d}.csv",
+      "sync": "sync_P001_S001.json",
+      "metadata": "meta_P001_S001.json"
+    }
+  },
+  "metadata_logging": {
+    "environment": {
+      "room_temp_c": 22,
+      "humidity_percent": 40
+    },
+    "operator_comments": "",
+    "anomalies_observed": []
+  },
+  "versioning": {
+    "spec_version": "1.0.0",
+    "pipeline_git_commit": "hash_here",
+    "data_release_tag": "v1.0"
+  }
+}
