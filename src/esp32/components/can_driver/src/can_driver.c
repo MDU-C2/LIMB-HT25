@@ -62,10 +62,11 @@ esp_err_t can_init(int tx_pin, int rx_pin, int baudrate) {
 }
 
 esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len) {
-    twai_message_t message;
-    message.identifier = id;
-    message.data_length_code = len;
-    message.flags = 0;  // Standard frame, data frame
+    twai_message_t message = {
+        .identifier = id,
+        .data_length_code = len,
+        .flags = 0,  // Standard frame, data frame
+    };
     
     for (int i = 0; i < len && i < 8; i++) {
         message.data[i] = data[i];
