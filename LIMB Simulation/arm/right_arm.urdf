@@ -1,0 +1,583 @@
+<?xml version="1.0" ?>
+<robot name="right_arm_final" xmlns:xacro="http://wiki.ros.org/xacro">
+  
+  <material name="grey">
+    <color rgba="0.6 0.6 0.6 1.0"/>
+  </material>
+  <material name="blue">
+    <color rgba="0.2 0.4 0.9 1.0"/>
+  </material>
+  <material name="SkinColor">
+    <color rgba="0.8 0.6 0.4 1"/>
+  </material>
+
+  <link name="base_link"/>
+  
+  <link name="arm_base_rotated"/>
+
+  <joint name="world_to_arm_base" type="fixed">
+    <parent link="base_link"/>
+    <child link="arm_base_rotated"/>
+    <origin xyz="0 0 0" rpy="0 0 1.5708"/> 
+  </joint>
+
+  <link name="right_shoulder_rotz">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+       <geometry><sphere radius="0.02"/></geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+  
+  <link name="right_shoulder_rotx">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+       <geometry><sphere radius="0.02"/></geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+
+  <joint name="jRightShoulder_rotz" type="revolute">
+    <parent link="arm_base_rotated"/>
+    <child link="right_shoulder_rotz"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="200" velocity="100.0"/> 
+  </joint>
+  
+  <joint name="jRightShoulder_rotx" type="revolute">
+    <parent link="right_shoulder_rotz"/>
+    <child link="right_shoulder_rotx"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-3.14" upper="3.14" effort="200" velocity="100.0"/>
+  </joint>
+
+  <joint name="jRightShoulder_roty" type="revolute">
+    <parent link="right_shoulder_rotx"/>
+    <child link="right_upper_arm"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="200" velocity="100.0"/>
+  </joint>
+  
+  <link name="right_upper_arm">
+    <inertial>
+      <origin xyz="0.116 0 0" rpy="0 -1.5708 0"/>
+      <mass value="1.5"/> 
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.02"/>
+    </inertial>
+    <visual>
+       <origin rpy="0 -1.5708 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/r_shoulder_base.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+      <origin rpy="0 -1.5708 0" xyz="0.055 0.065 0"/>
+      <geometry><mesh filename="arm/r_shoulder.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+       <origin rpy="0 -1.5708 0" xyz="0.116 0 0"/>
+      <geometry><mesh filename="arm/bicep.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+      <origin rpy="0 -1.5708 0" xyz="0.116 0 0"/>
+      <geometry><mesh filename="arm/bicepcover.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin rpy="0 -1.5708 0" xyz="0.116 0 0"/>
+      <geometry><mesh filename="arm/r_shoulder.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <link name="right_elbow_roty">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 -1.5708 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.02"/>
+    </inertial>
+      <visual>
+      <origin rpy="0 -1.5708 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/r_forearm.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin rpy="0 -1.5708 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/r_forearm.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="jRightElbow_roty" type="revolute">
+    <parent link="right_upper_arm"/>
+    <child link="right_elbow_roty"/>
+    <origin xyz="0.305 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="200" velocity="100.0"/>
+  </joint>
+  
+  <joint name="jRightElbow_rotz" type="revolute">
+    <parent link="right_elbow_roty"/>
+    <child link="right_forearm"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="200" velocity="100.0"/>
+  </joint>
+  
+  <link name="right_forearm">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+       <geometry><sphere radius="0.02"/></geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+
+  <link name="right_wrist_rotx">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 -1.5708 0"/>
+      <mass value="0.4"/>
+      <inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.002"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 -1.5708 0" xyz="0 0 0"/>
+       <geometry><mesh filename="arm/r_hand.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin rpy="0 -1.5708 0" xyz="0 0 0"/>
+       <geometry><mesh filename="arm/r_hand.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="jRightWrist_rotx" type="revolute">
+    <parent link="right_forearm"/>
+    <child link="right_wrist_rotx"/>
+    <origin xyz="0.310 0.0085 -0.005" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-3.14" upper="3.14" effort="200" velocity="100.0"/>
+  </joint>
+  
+  <joint name="jRightWrist_rotz" type="revolute">
+    <parent link="right_wrist_rotx"/>
+    <child link="right_hand"/>
+    <origin xyz="0 0 -0.006" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="200" velocity="100.0"/>
+  </joint>
+  
+  <link name="right_hand">
+    <inertial>
+      <origin xyz="0 0 -0.006" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+       <geometry><sphere radius="0.02"/></geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+
+  <joint name="joint_hand_cover" type="fixed">
+    <parent link="right_hand"/>
+    <child link="hand_cover_link"/>
+    <origin rpy="-1.57 -1.57 1.57" xyz="0.1 0.017 0.0165"/> 
+  </joint>
+
+  <link name="hand_cover_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/r_cover_hand.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="SkinColor"/>
+    </visual>
+  </link>
+
+
+  <joint name="thumb_joint_1" type="revolute">
+    <parent link="right_hand"/>
+    <child link="thumb_link_1"/>
+    <origin rpy="0 0 0" xyz="0.03 0.03 0.01"/>
+    <axis xyz="0 0 1"/> 
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="-0.5" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="thumb_link_1">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="arm/fullhand2/r_thumb5_1.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <geometry><mesh filename="arm/fullhand2/r_thumb5_1.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="thumb_joint_2" type="revolute">
+    <parent link="thumb_link_1"/>
+    <child link="thumb_link_2"/>
+    <origin rpy="-2.27 0 0.7" xyz="0.005 0.025 -0.01"/>
+    <axis xyz="0 0 1"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="-0.5" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="thumb_link_2">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/thumb5_2.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/thumb5_2.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="thumb_joint_3" type="revolute">
+    <parent link="thumb_link_2"/>
+    <child link="thumb_link_3"/>
+    <origin rpy="0 0 0" xyz="0.04 0 0"/>
+    <axis xyz="0 0 1"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="-0.5" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="thumb_link_3">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/thumb5_3.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/r_cover_thumb.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="SkinColor"/>
+    </visual>
+    <collision> <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/thumb5_3.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+
+  <joint name="index_joint_1" type="revolute">
+    <parent link="right_hand"/>
+    <child link="index_link_1"/>
+    <origin rpy="0 -1.57 0" xyz="0.105 0.033 0.013"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="index_link_1">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="arm/fullhand2/index3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <geometry><mesh filename="arm/fullhand2/index3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="index_joint_2" type="revolute">
+    <parent link="index_link_1"/>
+    <child link="index_link_2"/>
+    <origin rpy="0 1.57 0" xyz="0 0 -0.03"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="index_link_2">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/index3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/index3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="index_joint_3" type="fixed">
+    <parent link="index_link_2"/>
+    <child link="index_link_3"/>
+    <origin rpy="0 0 0" xyz="0.032 0 0"/> 
+    </joint>
+
+  <link name="index_link_3">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/index3_3.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/r_cover_index.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="SkinColor"/>
+    </visual>
+    <collision> <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/index3_3.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+
+  <joint name="middle_joint_1" type="revolute">
+    <parent link="right_hand"/>
+    <child link="middle_link_1"/>
+    <origin rpy="0 -1.57 0" xyz="0.11 0.0095 0.012"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="middle_link_1">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="arm/fullhand2/middle3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <geometry><mesh filename="arm/fullhand2/middle3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="middle_joint_2" type="revolute">
+    <parent link="middle_link_1"/>
+    <child link="middle_link_2"/>
+    <origin rpy="0 1.57 0" xyz="0 0 -0.03"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="middle_link_2">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.0001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/middle3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/middle3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="middle_joint_3" type="fixed">
+    <parent link="middle_link_2"/>
+    <child link="middle_link_3"/>
+    <origin rpy="0 0 0" xyz="0.03 0 0"/> 
+  </joint>
+
+  <link name="middle_link_3">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.0001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/middle3_3.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+      <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/r_cover_middle.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="SkinColor"/>
+    </visual>
+    <collision> <origin rpy="0 -1.57 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/middle3_3.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+
+  <link name="ring_BLOCK_anchor">
+    <inertial>
+      <mass value="0.1"/><inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="ring_anchor_joint" type="fixed">
+    <parent link="right_hand"/>
+    <child link="ring_BLOCK_anchor"/>
+    <origin rpy="0 -1.57 0.7" xyz="0.08 -0.0014 0.01"/> 
+  </joint>
+
+  <joint name="ring_joint_1" type="revolute">
+    <parent link="ring_BLOCK_anchor"/> 
+    <child link="ring_link_1"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+  
+  <link name="ring_link_1">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="arm/fullhand2/r_ring3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <geometry><mesh filename="arm/fullhand2/r_ring3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="ring_joint_2" type="revolute">
+    <parent link="ring_link_1"/>
+    <child link="ring_link_2"/>
+    <origin rpy="-0.75 0 0" xyz="0.0 -0.035 -0.017"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="ring_link_2">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/ring3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/ring3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="ring_joint_3" type="revolute">
+    <parent link="ring_link_2"/>
+    <child link="ring_link_3"/>
+    <origin rpy="0 0 0" xyz="0 0 -0.04"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="ring_link_3">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/ring3_4.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/r_cover_ring.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="SkinColor"/>
+    </visual>
+    <collision> <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/ring3_4.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+
+  <link name="pinky_BLOCK_anchor">
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="pinky_anchor_joint" type="fixed">
+    <parent link="right_hand"/>
+    <child link="pinky_BLOCK_anchor"/>
+    <origin rpy="0 -1.57 0.7" xyz="0.05 -0.02 0.01"/>
+  </joint>
+
+  <joint name="pinky_joint_1" type="revolute">
+    <parent link="pinky_BLOCK_anchor"/> 
+    <child link="pinky_link_1"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="pinky_link_1">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="arm/fullhand2/r_pinky3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <geometry><mesh filename="arm/fullhand2/r_pinky3_1.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="pinky_joint_2" type="revolute">
+    <parent link="pinky_link_1"/>
+    <child link="pinky_link_2"/>
+    <origin rpy="-0.7 0 0" xyz="0.003 -0.04 -0.02"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+
+  <link name="pinky_link_2">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/pinky3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <collision> <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/pinky3_2.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="pinky_joint_3" type="revolute">
+    <parent link="pinky_link_2"/>
+    <child link="pinky_link_3"/>
+    <origin rpy="0 0 0" xyz="0 0 -0.04"/> 
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.5" friction="0.5"/> <limit effort="1" lower="0.0" upper="1.5" velocity="2"/>
+  </joint>
+  
+  <link name="pinky_link_3">
+    <inertial>
+        <mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/pinky3_4.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="grey"/>
+    </visual>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/r_cover_pinky.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="SkinColor"/>
+    </visual>
+    <collision> <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry><mesh filename="arm/fullhand2/pinky3_4.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+  </link>
+
+</robot>
