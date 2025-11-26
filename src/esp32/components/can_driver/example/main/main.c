@@ -66,7 +66,6 @@ void app_main(void) {
             // Log the message
             ESP_LOGI(TAG, "📨 [0x%03lX] %s: %s (DLC=%d)", 
                      rx_id, get_node_name(rx_id), msg_rx, rx_len);
-            }
         }
 
         // Statistical report every 10 seconds
