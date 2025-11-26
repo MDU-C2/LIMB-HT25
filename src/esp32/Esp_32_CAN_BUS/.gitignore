@@ -1,0 +1,92 @@
+# ESP-IDF Build System
+build/
+sdkconfig
+sdkconfig.old
+sdkconfig.defaults.*
+
+# Dependencies
+dependencies.lock
+managed_components/
+
+# IDE and Editor
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python (ESP-IDF tools)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+var/
+wheels/
+*.egg
+MANIFEST
+
+# C/C++ Compiled Objects
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.map
+*.lst
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Flash Download Tools
+flash_project_args
+
+# Logs and Temporary Files
+*.log
+*.tmp
+*.temp
+logs/
+
+# OS Specific
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+._*
+.Spotlight-V100
+.Trashes
+
+# Backup Files
+*.bak
+*.backup
+*~
+
+# Dev Containers (VS Code / Docker)
+.devcontainer/
+
+# Custom Application Files (uncomment if needed)
+# *.csv
+# *.txt
+# data/
+
+# Keep example files but ignore the compiled main.c if you switch between nodes
+# Uncomment the line below if you want to prevent accidental commits of main.c
+# main/main.c

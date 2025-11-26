@@ -1,0 +1,108 @@
+// ESP32 #1 - MASTER NODE (Master Controller)
+// Priority: HIGH (ID base: 0x010)
+// Function: Coordinates the system, sends commands to other nodes
+
+#include <stdio.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "can_driver.h"
+#include "esp_log.h"
+
+#define TAG "MASTER"
+
+// MASTER message IDs
+#define ID_MASTER_CMD       0x010  // General commands
+#define ID_MASTER_FAN       0x011  // Fan control
+#define ID_MASTER_LED       0x012  // LED control
+
+// Expected IDs from other nodes
+#define ID_SENSOR_TEMP      0x020
+#define ID_SENSOR_HUM       0x021
+#define ID_ACTUATOR_STATUS  0x030
+#define ID_MONITOR_STATUS   0x040
+
+void app_main(void) {
+    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "   ESP32 #1 - MASTER NODE STARTED");
+    ESP_LOGI(TAG, "   Priority: HIGH (ID: 0x010)");
+    ESP_LOGI(TAG, "========================================");
+
+    // Variables to receive data
+    uint8_t msg_rx[8];
+    uint32_t rx_id;
+    uint8_t rx_len = sizeof(msg_rx);
+    
+    // System state variables
+    int temperature = 0;
+    int humidity = 0;
+    bool fan_state = false;
+    uint8_t cycle = 0;
+
+    // Send start command
+    vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for all nodes to initialize
+    ESP_LOGI(TAG, ">> Sending START command to all nodes");
+    can_send(ID_MASTER_CMD, (uint8_t*)"START", 5);
+
+    while (1) {
+        cycle++;
+        ESP_LOGI(TAG, "\n=== CYCLE #%d ===", cycle);
+
+        // Listen for messages from other nodes for 2 seconds
+        uint32_t start_time = xTaskGetTickCount();
+        while ((xTaskGetTickCount() - start_time) < pdMS_TO_TICKS(2000)) {
+            if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
+                msg_rx[rx_len] = '\0'; // Null terminator
+                
+                switch (rx_id) {
+                    case ID_SENSOR_TEMP:
+                        temperature = atoi((char*)&msg_rx[2]); // "T:25" -> 25
+                        ESP_LOGI(TAG, "SENSOR: Temperature = %d°C", temperature);
+                        
+                        // Control logic: if temp > 30, turn on fan
+                        if (temperature > 30 && !fan_state) {
+                            ESP_LOGI(TAG, "High temperature! Turning on fan");
+                            can_send(ID_MASTER_FAN, (uint8_t*)"FAN_ON", 6);
+                            fan_state = true;
+                        } else if (temperature <= 25 && fan_state) {
+                            ESP_LOGI(TAG, "Normal temperature. Turning off fan");
+                            can_send(ID_MASTER_FAN, (uint8_t*)"FAN_OFF", 7);
+                            fan_state = false;
+                        }
+                        break;
+                    
+                    case ID_SENSOR_HUM:
+                        humidity = atoi((char*)&msg_rx[2]); // "H:60" -> 60
+                        ESP_LOGI(TAG, "SENSOR: Humidity = %d%%", humidity);
+                        break;
+                    
+                    case ID_ACTUATOR_STATUS:
+                        ESP_LOGI(TAG, "ACTUATOR: %s", msg_rx);
+                        break;
+                    
+                    case ID_MONITOR_STATUS:
+                        ESP_LOGI(TAG, "MONITOR: %s", msg_rx);
+                        break;
+                    
+                    default:
+                        ESP_LOGI(TAG, "Message from unknown ID: 0x%03lX", rx_id);
+                        break;
+                }
+            }
+        }
+
+        // Send periodic status request
+        if (cycle % 5 == 0) {
+            ESP_LOGI(TAG, ">> Requesting status from ACTUATOR");
+            can_send(ID_MASTER_CMD, (uint8_t*)"STATUS?", 7);
+        }
+
+        // Show summary
+        ESP_LOGI(TAG, "--- System Status ---");
+        ESP_LOGI(TAG, "  Temp: %d°C | Humidity: %d%% | Fan: %s", 
+                 temperature, humidity, fan_state ? "ON" : "OFF");
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
