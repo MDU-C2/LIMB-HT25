@@ -83,9 +83,12 @@ esp_err_t can_receive(uint32_t *id, uint8_t *data, uint8_t *len, int timeout_ms)
         *id = message.identifier;
         *len = message.data_length_code;
         
-        for (int i = 0; i < message.data_length_code && i < 8; i++) {
-            data[i] = message.data[i];
-        }
+        // Since we don't support CAN FD, we know the maximum size of the
+        // message data is 8 bytes, meaning we can do a direct copy by
+        // treating the data buffer as an 8-byte integer. 
+        // NOTE: We assume that the user has provided a buffer that's at least
+        // 8 bytes.
+        *(uint64_t*)data = *(uint64_t*)message.data;
     }
     
     return ret;
