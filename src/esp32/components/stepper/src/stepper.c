@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_check.h"
@@ -207,7 +208,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg)
         // Register channel with ADC manager
         adc_oneshot_chan_cfg_t chan_config = {
             .bitwidth = ADC_BITWIDTH_DEFAULT,
-            .atten = ADC_ATTEN_DB_11,
+            .atten = ADC_ATTEN_DB_12,
         };
         
         s_context.adc_handle = adc_mgr_register_channel(cfg->pot_adc_channel, &chan_config);

@@ -4,8 +4,9 @@ idf_component_register(
   REQUIRES
   adc_manager
   esp_adc
-  driver
   freertos
+  esp_driver_gpio
+  esp_driver_ledc
   INCLUDE_DIRS
   "include")
 

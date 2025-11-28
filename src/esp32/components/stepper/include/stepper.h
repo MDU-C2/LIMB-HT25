@@ -29,7 +29,7 @@ typedef struct {
     float max_accel_dps2;         // Maximum acceleration (degrees/sec²)
     
     // Position feedback
-    adc_channel_t pot_adc_channel; // ADC channel for potentiometer (ADC1_CHANNEL_MAX if not used)
+    adc_channel_t pot_adc_channel; // ADC channel for potentiometer (use -1 or value >= SOC_ADC_MAX_CHANNEL_NUM if not used)
 } stepper_control_config_t;
 
 // Initialize stepper motor controller
