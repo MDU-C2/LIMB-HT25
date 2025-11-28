@@ -5,9 +5,8 @@ idf_component_register(
         "."
     REQUIRES
         can_driver
-        imu
-        stepper
         driver
+        esp_driver_gpio
         freertos
 )
 

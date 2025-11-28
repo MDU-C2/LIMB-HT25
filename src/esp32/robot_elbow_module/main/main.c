@@ -1,7 +1,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-// #include "can_driver.h"  // Commented out - no CAN hardware
+#include "can_driver.h"
 #include "imu.h"
 #include "stepper.h"
 
@@ -23,7 +23,6 @@ static const char *TAG = "robot_elbow_module";
 #define STEPPER_ENABLE_PIN GPIO_NUM_8
 
 // CAN RX task commented out - no CAN hardware
-/*
 void can_rx_task(void *pvParameter) {
     uint8_t msg_rx[CAN_MSG_SIZE]; 
     uint8_t rx_len = CAN_MSG_SIZE;
@@ -42,7 +41,7 @@ void can_rx_task(void *pvParameter) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
-*/
+
 
 void imu_task(void *pvParameter) {
     imu_data_t imu_data; // (imu_vector_t) accel and (imu_vector_t) gyro      
@@ -66,7 +65,7 @@ void stepper_task(void *pvParameter) {
         float dt = 0.01f; // 10ms in seconds
         stepper_update(dt);
         
-        // Log status periodically instead of sending over CAN
+        // Send status over CAN and log
         static uint32_t status_counter = 0;
         if (++status_counter >= 10) { // Every 100ms
             status_counter = 0;
@@ -74,6 +73,15 @@ void stepper_task(void *pvParameter) {
             float target_angle = stepper_get_target_angle_deg();
             float velocity = stepper_get_current_velocity_dps();
             bool moving = stepper_is_moving();
+            
+            // Send status over CAN
+            uint8_t can_data[CAN_MSG_SIZE] = {0};
+            int16_t angle_int = (int16_t)(current_angle * 10); // Send as 0.1 degree resolution
+            can_data[0] = (uint8_t)(angle_int & 0xFF);
+            can_data[1] = (uint8_t)((angle_int >> 8) & 0xFF);
+            can_send(CAN_ID_ELBOW_STATUS, can_data, CAN_MSG_SIZE);
+            
+            // Also log locally
             ESP_LOGI(TAG, "Stepper - Current: %.2f°, Target: %.2f°, Velocity: %.2f°/s, Moving: %s",
                      current_angle, target_angle, velocity, moving ? "Yes" : "No");
         }
@@ -118,7 +126,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "Robot elbow module starting...");
     
     // Initialize hardware
-    // can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);  // Commented out - no CAN hardware
+    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
+    ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
     
     imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
     imu_cfg.sda_pin = 10;  // Custom SDA pin
@@ -145,10 +154,10 @@ void app_main(void) {
     }
     
     // Create FreeRTOS tasks
-    // xTaskCreate(can_rx_task, "can_rx", 4096, NULL, 5, NULL);  // Commented out - no CAN hardware
+    xTaskCreate(can_rx_task, "can_rx", 4096, NULL, 5, NULL);  // Commented out - no CAN hardware
     xTaskCreate(imu_task, "imu_task", 4096, NULL, 5, NULL);
     xTaskCreate(stepper_task, "stepper_task", 4096, NULL, 5, NULL);
-    xTaskCreate(stepper_test_task, "stepper_test", 4096, NULL, 4, NULL);  // Lower priority than stepper_task
+    //xTaskCreate(stepper_test_task, "stepper_test", 4096, NULL, 4, NULL);  // Lower priority than stepper_task
     
     ESP_LOGI(TAG, "Tasks created, system running");
 }
