@@ -59,4 +59,5 @@ class InputLayer(Process):
     def stop(self):
         """Stop the process"""
         self.running.clear() # Clear the event to signal the process to stop
+       
 
