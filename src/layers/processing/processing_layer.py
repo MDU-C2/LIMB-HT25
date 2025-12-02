@@ -1,10 +1,12 @@
 from multiprocessing import Process, Event
 import time
+from shared.queues import DataQueue
 
 class ProcessingLayer(Process):
     """Processing layer: ML inference, signal processing."""
 
-    def __init__(self, input_queue, output_queue):
+    def __init__(self, input_queue: DataQueue, output_queue: DataQueue):
+        super().__init__(name="ProcessingLayer")
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.running = Event()

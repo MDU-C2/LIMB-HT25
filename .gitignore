@@ -419,6 +419,12 @@ result-*
 # OAK D files
 oak-examples/
 oak-template/
+
+# DepthAI files
+.depthai_cached_models/
+
 # EMG data files
 emg_sequences_ch*.npz
 **/emg/checkpoints/
+
+

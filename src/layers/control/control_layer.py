@@ -1,5 +1,6 @@
 from multiprocessing import Process, Event
 import time
+from shared.queues import DataQueue
 
 # Questions:
 # 1. Is it a good idea to have the control rate of the system?
@@ -8,8 +9,8 @@ import time
 class ControlLayer(Process):
     """Control layer: decision making, control signals."""
 
-    def __init__(self, input_queue, can_interface, control_rate):
-
+    def __init__(self, input_queue: DataQueue, can_interface, control_rate):
+        super().__init__(name="ControlLayer")
         self.input_queue = input_queue
         self.can_interface = can_interface
         self.control_rate = control_rate

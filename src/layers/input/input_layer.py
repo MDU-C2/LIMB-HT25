@@ -3,6 +3,7 @@ from multiprocessing import Process, Event
 from XXXXX import CanInterface
 from window_buffer import WindowBuffer
 from packet_builder import PacketBuilder
+from shared.queues import DataQueue
 import time
 
 # The difference between threading and multiprocessing:
@@ -11,14 +12,15 @@ import time
 class InputLayer(Process):
     """Input layer process: reads CAN and builds packets"""
 
-    def __init__(self, can_interface: CanInterface, output_queue, window_size: int = 100, sample_rate: float = 100.0):
+    def __init__(self, can_interface: CanInterface, output_queue: DataQueue, window_size: int = 100, sample_rate: float = 100.0):
 
+        super().__init__(name="InputLayer")
         self.running = Event() # Event to signal the process to stop
         self.can_interface = can_interface
         self.window_buffer = WindowBuffer(window_size)
         self.packet_builder = PacketBuilder()
-        self.sample_rate = sample_rate
-        self.output_queue = output_queue # How to implement this queue? Use existing from library or make own class?
+        self.sample_rate = sample_rate # Do we need this?
+        self.output_queue = output_queue
 
     def run(self):
         """Main process loop"""
