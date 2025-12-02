@@ -64,13 +64,7 @@ static inline float clampf(float x, float lo, float hi)
 
 static float clamp_angle(float angle_deg)
 {
-    if (angle_deg > MAX_JOINT_ANGLE_DEG) {
-        return MAX_JOINT_ANGLE_DEG;
-    }
-    if (angle_deg < -MAX_JOINT_ANGLE_DEG) {
-        return -MAX_JOINT_ANGLE_DEG;
-    }
-    return angle_deg;
+    return clampf(angle_deg, -MAX_JOINT_ANGLE_DEG, MAX_JOINT_ANGLE_DEG);
 }
 
 // Get potentiometer value (raw)
