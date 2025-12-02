@@ -61,7 +61,7 @@ static int clampi(int x, int lo, int hi) {
     return x < lo ? lo : (x > hi ? hi : x);
 }
 
-static inline float clampf(float x, float lo, float hi)
+static float clampf(float x, float lo, float hi)
 {
     return x < lo ? lo : (x > hi ? hi : x);
 }
