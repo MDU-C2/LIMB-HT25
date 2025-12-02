@@ -12,6 +12,7 @@
 #include "driver/ledc.h"
 #include "adc_manager.h"
 #include "hal/adc_types.h"
+#include "sys/param.h"
 
 static const char *TAG = "stepper";
 
@@ -118,8 +119,7 @@ static void apply_motor_velocity(float velocity_sps)
         }
         
         // Clamp frequency
-        uint32_t freq_hz = (uint32_t)velocity_sps;
-        if (freq_hz < MIN_FREQ_HZ) freq_hz = MIN_FREQ_HZ;
+        uint32_t freq_hz = MAX((uint32_t)velocity_sps, MIN_FREQ_HZ);
         
         // Update frequency and duty
         ledc_set_freq(LEDC_LOW_SPEED_MODE, s_context.ledc_timer, freq_hz);
@@ -152,7 +152,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg)
     s_context.max_velocity_sps = cfg->max_velocity_dps * s_context.steps_per_degree;
     s_context.min_velocity_sps = cfg->min_velocity_dps * s_context.steps_per_degree;
     s_context.max_accel_sps2 = cfg->max_accel_dps2 * s_context.steps_per_degree;
-    if (s_context.min_velocity_sps > 1.0f) {s_context.min_velocity_sps = 1.0f;}
+    s_context.min_velocity_sps = MIN(s_context.min_velocity_sps, 1.0f);
 
     // Configure GPIOS for STEP, DIR and ENABLE
     uint64_t pin_mask = (1ULL << cfg->step_gpio);
@@ -173,8 +173,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg)
     if (cfg->enable_gpio != GPIO_NUM_NC) {gpio_set_level(cfg->enable_gpio, 0);} // active low on DRV8825
 
     // Configure LEDC timer
-    uint32_t init_freq_hz = (uint32_t)s_context.min_velocity_sps;
-    if (init_freq_hz < 50) {init_freq_hz = 50;}
+    uint32_t init_freq_hz = MAX((uint32_t)s_context.min_velocity_sps, 50);
 
     ledc_timer_config_t timer_cfg = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
@@ -305,8 +304,9 @@ void stepper_update(float dt_seconds)
     current_velocity_sps += clampf(velocity_delta, -accel_limit, accel_limit);
 
     // Clamp to minimum velocity if moving
-    if (current_velocity_sps > 0.0f && current_velocity_sps < s_context.min_velocity_sps) {
-        current_velocity_sps = s_context.min_velocity_sps;
+    bool is_moving = current_velocity_sps > 0.0f;
+    if (is_moving) {
+        current_velocity_sps = MAX(current_velocity_sps, s_context.min_velocity_sps);
     }
 
     // Apply motor velocity (handles enable/disable, frequency, duty)
@@ -314,7 +314,7 @@ void stepper_update(float dt_seconds)
 
     // Update shared state
     portENTER_CRITICAL(&s_context.spinlock);
-    s_context.is_moving = (current_velocity_sps > 0.0f);
+    s_context.is_moving = is_moving;
     s_context.current_veloctiy_dps = current_velocity_sps / s_context.steps_per_degree;
     portEXIT_CRITICAL(&s_context.spinlock);
 
