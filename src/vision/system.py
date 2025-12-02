@@ -16,232 +16,6 @@ import time
 import threading
 import json
 
-class SpatialVisualizer(dai.node.HostNode):
-    
-    def __init__(self, camera_matrix=None, dist_coeffs=None, tag_size=0.1):
-        dai.node.HostNode.__init__(self)
-        self.sendProcessingToPipeline(True)
-        
-        
-        # Camera parameters for 3D axes drawing
-        #self.camera_matrix = camera_matrix
-        #self.dist_coeffs = dist_coeffs
-        #self.tag_size = tag_size  # Tag size in meters
-
-    # CHECK!
-    def build(self, rgb: dai.Node.Output, depth: dai.Node.Output, cup_detections: dai.Node.Output, apriltags: dai.Node.Output, apriltag_passthrough: dai.Node.Output):
-        self.link_args(rgb, depth, cup_detections, apriltags, apriltag_passthrough)
-
-    # CHECK!
-    def process(self, rgb_preview, depth_preview, cup_detections, apriltags, apriltag_passthrough_preview):
-        # Load camera intrinsics if not already loaded
-        #if self.camera_matrix is None:
-        #    self._load_camera_intrinsics_from_device()
-        
-        depth_frame = depth_preview.getCvFrame()
-        rgb_frame = rgb_preview.getCvFrame()
-        apriltags_frame = apriltag_passthrough_preview.getCvFrame()
-
-        depth_frame_color = self.process_depth_frame(depth_frame)
-
-        cups = [d for d in cup_detections.detections if d.labelName == "cup"]
-        tags = apriltags.aprilTags
-
-        self.display_results(rgb_frame, depth_frame_color, apriltags_frame, cups, tags)
-
-    # CHECK!
-    def process_depth_frame(self, depth_frame):
-        depth_downscaled = depth_frame[::4]
-        if np.all(depth_downscaled == 0):
-            min_depth = 0
-        else:
-            min_depth = np.percentile(depth_downscaled[depth_downscaled != 0], 1)
-
-        max_depth = np.percentile(depth_downscaled, 99)
-        depth_frame_color = np.interp(depth_frame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
-        return cv2.applyColorMap(depth_frame_color, cv2.COLORMAP_HOT)
-
-    # CHECK!
-    def display_results(self, rgb_frame, depth_frame_color, apriltags_frame, cup_detections, tag_detections):
-        height, width, _ = rgb_frame.shape
-        
-        # Draw cup detections
-        for cup in cup_detections:
-            self.draw_bounding_box(depth_frame_color, cup)
-            self.draw_detections(rgb_frame, cup, width, height)
-
-        # Draw AprilTag detections
-        num_tags = len(tag_detections)
-        #if num_tags > 0:
-        #    print(f"Detected {num_tags} AprilTag(s)")
-        
-        for tag in tag_detections:
-            self.draw_apriltags(apriltags_frame, tag)
-
-        # Display tag count on frame
-        cv2.putText(apriltags_frame, f"Tags: {num_tags}", (10, 30), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-        cv2.imshow("Depth", depth_frame_color)
-        cv2.imshow("RGB", rgb_frame)
-        cv2.imshow("AprilTags", apriltags_frame)
-
-        if cv2.waitKey(1) == ord('q'):
-            self.stopPipeline()
-
-    # CHECK!
-    def draw_bounding_box(self, depth_frame_color, detection):
-        roi_data = detection.boundingBoxMapping
-        roi = roi_data.roi
-        roi = roi.denormalize(depth_frame_color.shape[1], depth_frame_color.shape[0])
-        top_left = roi.topLeft()
-        bottom_right = roi.bottomRight()
-        cv2.rectangle(depth_frame_color, (int(top_left.x), int(top_left.y)), (int(bottom_right.x), int(bottom_right.y)), (255, 255, 255), 1)
-
-    # CHECK!
-    def draw_detections(self, frame, detection, frame_width, frame_height):
-        x1 = int(detection.xmin * frame_width)
-        x2 = int(detection.xmax * frame_width)
-        y1 = int(detection.ymin * frame_height)
-        y2 = int(detection.ymax * frame_height)
-        label = detection.labelName
-        color = (255, 255, 255)
-        cv2.putText(frame, str(label), (x1+10,y1+20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-        cv2.putText(frame, "{:.2f}".format(detection.confidence*100), (x1+10,y1+35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-        cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm", (x1+10,y1+50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-        cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1+10,y1+65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-        cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1+10,y1+80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-        cv2.rectangle(frame, (x1,y1), (x2,y2), color, 1)
-
-    # CHECK!
-    def draw_apriltags(self, frame, tag):
-        """Draw AprilTag corners, ID, and 3D axes on frame"""
-        # Draw corners
-        corners = [(int(tag.topLeft.x), int(tag.topLeft.y)), 
-                (int(tag.topRight.x), int(tag.topRight.y)), 
-                (int(tag.bottomRight.x), int(tag.bottomRight.y)), 
-                (int(tag.bottomLeft.x), int(tag.bottomLeft.y))]
-
-        # Draw quadrilateral
-        for i in range(4):
-            cv2.line(frame, corners[i], corners[(i+1)%4], (0, 255, 0), 2)
-
-        # Draw tag ID
-        center_x = int((tag.topLeft.x + tag.bottomRight.x)/2)
-        center_y = int((tag.topLeft.y + tag.bottomRight.y)/2)
-        cv2.putText(frame, f"ID: {tag.id}", (center_x, center_y), 
-                    cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
-        
-        
-        # Draw 3D coordinate axes
-        #self.draw_3d_axes(frame, tag, corners)
-        
-    
-    def _load_camera_intrinsics_from_device(self):
-        """Load camera intrinsics from the connected device."""
-        try:
-            # Get the device from the pipeline
-            device = dai.Device()
-            calib = device.readCalibration()
-            
-            # Get intrinsics for RGB camera (CAM_A) at 640x400 resolution
-            intrinsics = calib.getCameraIntrinsics(dai.CameraBoardSocket.CAM_A, 640, 400)
-            
-            # Build camera matrix
-            self.camera_matrix = np.array([
-                [intrinsics[0][0], 0, intrinsics[0][2]],
-                [0, intrinsics[1][1], intrinsics[1][2]],
-                [0, 0, 1]
-            ], dtype=np.float32)
-            
-            # Get distortion coefficients
-            self.dist_coeffs = np.array(
-                calib.getDistortionCoefficients(dai.CameraBoardSocket.CAM_A), 
-                dtype=np.float32
-            )
-            
-            print(f"SpatialVisualizer: Camera intrinsics loaded - fx={self.camera_matrix[0,0]:.1f}, fy={self.camera_matrix[1,1]:.1f}")
-            
-        except Exception as e:
-            print(f"SpatialVisualizer: Error loading camera intrinsics: {e}")
-            # Set default values if loading fails
-            self.camera_matrix = np.array([
-                [500, 0, 320],
-                [0, 500, 200],
-                [0, 0, 1]
-            ], dtype=np.float32)
-            self.dist_coeffs = np.zeros(5, dtype=np.float32)
-    
-
-    
-    def draw_3d_axes(self, frame, tag, corners, length=0.05):
-        """
-        Draw 3D coordinate axes on an AprilTag.
-        
-        Args:
-            frame: Image to draw on
-            tag: AprilTag detection from DepthAI
-            length: Length of axes in meters (default 5cm)
-        """
-        
-        try:
-            # Extract corners as numpy array
-            corners = np.array(corners, dtype=np.float32)
-            
-            # Define 3D tag corners in tag coordinate frame
-            half_size = 10 / 2.0 # 10 cm
-            object_points = np.array([
-                [-half_size,  half_size, 0],  # Top-left
-                [ half_size,  half_size, 0],  # Top-right
-                [ half_size, -half_size, 0],  # Bottom-right
-                [-half_size, -half_size, 0],  # Bottom-left
-            ], dtype=np.float32)
-
-            # Solve PnP to get pose
-            success, rvec, tvec = cv2.solvePnP(
-                object_points,
-                corners,
-                self.camera_matrix,
-                self.dist_coeffs,
-                flags=cv2.SOLVEPNP_IPPE_SQUARE
-            )
-            
-            if not success:
-                print("No success in solvePnP")
-                return
-            
-            # Define axis endpoints in tag frame
-            axis_points = np.array([
-                [0, 0, 0],           # Origin
-                [length, 0, 0],      # X-axis (red)
-                [0, length, 0],      # Y-axis (green)
-                [0, 0, length]       # Z-axis (blue)
-            ], dtype=np.float32)
-            
-            # Project to image plane
-            img_points, _ = cv2.projectPoints(
-                axis_points, rvec, tvec, self.camera_matrix, self.dist_coeffs
-            )
-            img_points = img_points.reshape(-1, 2).astype(int)
-            
-            # Draw axes with thicker lines
-            origin = tuple(img_points[0])
-            cv2.line(frame, origin, tuple(img_points[1]), (0, 0, 255), 3)    # X: red
-            cv2.line(frame, origin, tuple(img_points[2]), (0, 255, 0), 3)    # Y: green
-            cv2.line(frame, origin, tuple(img_points[3]), (255, 0, 0), 3)    # Z: blue
-            
-            # Add axis labels
-            cv2.putText(frame, "X", tuple(img_points[1]), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            cv2.putText(frame, "Y", tuple(img_points[2]), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            cv2.putText(frame, "Z", tuple(img_points[3]), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-            
-        except Exception as e:
-            # Silently skip if axes drawing fails
-            pass
-    
 
 class VisionSystem:
     """
@@ -263,6 +37,7 @@ class VisionSystem:
         apriltag_max_hamming: int = 1,
         tag_size: float = 0.05,  # Tag size in meters
         enable_visualization: bool = True,
+        full_frame_tracking: bool = False,
     ):
         """
         Initialize the vision system.
@@ -285,6 +60,7 @@ class VisionSystem:
         self.apriltag_max_hamming = apriltag_max_hamming
         self.tag_size = tag_size
         self.enable_visualization = enable_visualization
+        self.full_frame_tracking = full_frame_tracking
         
         # Pipeline components
         self.pipeline: Optional[dai.Pipeline] = None
@@ -321,11 +97,12 @@ class VisionSystem:
         self.dist_coeffs: Optional[np.ndarray] = None
         
         print(f"VisionSystem initialized (tag_size={tag_size}m, visualization={'ON' if enable_visualization else 'OFF'})")
+    
     def _create_and_build_pipeline(self):
         """
         Create and configure the DepthAI pipeline (non-blocking mode).
         """
-        model_desc = dai.NNModelDescription("yolov6-nano")
+        
         #model_desc = dai.NNModelDescription("mobilenet-ssd")
         FPS = 30
         self.device = dai.Device()
@@ -339,19 +116,44 @@ class VisionSystem:
         
         # 2. Create stereo depth node
         stereo = self.pipeline.create(dai.node.StereoDepth)
-        stereo.setExtendedDisparity(True)
-        platform = self.pipeline.getDefaultDevice().getPlatform()
-        if platform == dai.Platform.RVC2:
-            stereo.setOutputSize(480, 320)
+        #stereo.setExtendedDisparity(True)
+        left_output = mono_left.requestOutput((640, 400))
+        right_output = mono_right.requestOutput((640, 400))
+        left_output.link(stereo.left)
+        right_output.link(stereo.right)
+
+        #platform = self.pipeline.getDefaultDevice().getPlatform()
+        #if platform == dai.Platform.RVC2:
+        #    stereo.setOutputSize(480, 320)
 
         # 3. Create spatial detection network for cup detection
-        spatial_detection_network = self.pipeline.create(dai.node.SpatialDetectionNetwork).build(
-            cam_rgb, stereo, model_desc, fps=FPS
-        )
+        #model_desc_v6 = dai.NNModelDescription("yolov6-nano")
+        model_desc_v10 = dai.NNModelDescription("yolov6-nano")
+        spatial_detection_network = self.pipeline.create(dai.node.SpatialDetectionNetwork).build(cam_rgb, stereo, model_desc_v10, fps=FPS)
+        spatial_detection_network.setConfidenceThreshold(0.6)
         spatial_detection_network.input.setBlocking(False)
         spatial_detection_network.setBoundingBoxScaleFactor(0.5)
         spatial_detection_network.setDepthLowerThreshold(100)
         spatial_detection_network.setDepthUpperThreshold(5000)
+
+        object_tracker = self.pipeline.create(dai.node.ObjectTracker)
+        object_tracker.setDetectionLabelsToTrack([41])  # Track cups (label 41 in COCO)
+        object_tracker.setTrackerType(dai.TrackerType.SHORT_TERM_IMAGELESS)
+        object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+
+        #preview = object_tracker.passthroughTrackerFrame.createOutputQueue()
+        #tracklets = object_tracker.out.createOutputQueue()
+
+        if self.full_frame_tracking:
+            cam_rgb.requestFullResolutionOutput().link(object_tracker.inputTrackerFrame)
+            object_tracker.inputTrackerFrame.setBlocking(False)
+            object_tracker.inputTrackerFrame.setMaxSize(1)
+        else:
+            spatial_detection_network.passthrough.link(object_tracker.inputTrackerFrame)
+
+        # Link detection frame and detections to object tracker
+        spatial_detection_network.passthrough.link(object_tracker.inputDetectionFrame)
+        spatial_detection_network.out.link(object_tracker.inputDetections)
 
         # 4. Create AprilTag detection node
         apriltag_node = self.pipeline.create(dai.node.AprilTag)
@@ -368,14 +170,14 @@ class VisionSystem:
         #    print(f"Warning: Could not set AprilTag config: {e}")
         
         # 5. Link cameras
-        mono_left.requestOutput((480, 320)).link(stereo.left)
-        mono_right.requestOutput((480, 320)).link(stereo.right)
+        #mono_left.requestOutput((640, 400)).link(stereo.left)
+        #mono_right.requestOutput((640, 400)).link(stereo.right)
         
         # Preprocessing for AprilTag: resize and convert to GRAY8
         manip = self.pipeline.create(dai.node.ImageManip)
-        manip.initialConfig.setOutputSize(480, 320)
+        manip.initialConfig.setOutputSize(640, 400)
         manip.initialConfig.setFrameType(dai.ImgFrame.Type.GRAY8)
-        cam_rgb.requestOutput((480, 320)).link(manip.inputImage)
+        cam_rgb.requestOutput((640, 400)).link(manip.inputImage)
         manip.out.link(apriltag_node.inputImage)
 
         # 6. Create output queues (non-blocking access for sensor fusion)
@@ -385,20 +187,11 @@ class VisionSystem:
         self.preview_queue = spatial_detection_network.passthrough.createOutputQueue()
         self.depth_queue = spatial_detection_network.passthroughDepth.createOutputQueue()
         
-        # 7. Create SpatialVisualizer for real-time display (if enabled)
+        # 7. Create queues for object tracker visualization (if enabled)
         if self.enable_visualization:
             print(f"Visualizer enabled: {self.enable_visualization}")
-            # Create visualizer (camera params will be set after device connection)
-            self.visualizer = self.pipeline.create(SpatialVisualizer)
-            
-            # Link data streams to visualizer
-            self.visualizer.build(
-                rgb=spatial_detection_network.passthrough,
-                depth=spatial_detection_network.passthroughDepth,
-                cup_detections=spatial_detection_network.out,
-                apriltags=apriltag_node.out,
-                apriltag_passthrough=apriltag_node.passthroughInputImage
-            )
+            self.tracker_frame_queue = object_tracker.passthroughTrackerFrame.createOutputQueue(maxSize=4, blocking=False)
+            self.tracklets_queue = object_tracker.out.createOutputQueue(maxSize=4, blocking=False)
 
         # 8. Load camera intrinsics
         self._load_camera_intrinsics("camera_calibration.json")
@@ -443,14 +236,19 @@ class VisionSystem:
     
     def run_pipeline(self):
         """
-        Run the pipeline.
+        Run the pipeline with visualization loop.
         """
         try:
             self._create_and_build_pipeline()
-            self.pipeline.run()
+            self.pipeline.start()
             self._running = True
             
             print("Pipeline running successfully")
+            
+            # Run visualization loop if enabled
+            if self.enable_visualization:
+                visualize_tracker(self.pipeline, self.tracker_frame_queue, self.tracklets_queue)
+            
             return True
         except Exception as e:
             print(f"Error running pipeline: {e}")

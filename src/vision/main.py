@@ -24,7 +24,7 @@ def main():
         enable_visualization=True  # Enable SpatialVisualizer
     )
     
-    print("Starting pipeline with SpatialVisualizer...")
+    #print("Starting pipeline with SpatialVisualizer...")
     
     # Create pipeline and start it directly with run() for SpatialVisualizer
     try:
