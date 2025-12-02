@@ -61,7 +61,7 @@ class PacketBuilder:
             packet_age_ms=0.0,
             human_data=human_data,
             sensor_snapshots=sensor_snapshots,
-            motor_state=motor_state
+            motor_state=motor_state,
             metadata={
                 "sample_rate": sample_rate,
                 "window_size": window_buffer.window_size,
@@ -99,15 +99,15 @@ class PacketBuilder:
                     joint_positions=np.array(state.get("joint_positions", [])),
                     joint_velocities=np.array(state.get("joint_velocities", [])),
                     gripper_state=state.get("gripper_state", {}),
-                    timestamp=state.get("timestamp", time.time())
+                    timestamp=state.get("timestamp", time.time()))
             else:
             # Default empty state
-            return MotorState(
-                joint_positions=np.array([]),
-                joint_velocities=np.array([]),
-                gripper_state={},
-                timestamp=time.time()
-            )
+                return MotorState(
+                    joint_positions=np.array([]),
+                    joint_velocities=np.array([]),
+                    gripper_state={},
+                    timestamp=time.time()
+                )
         except Exception as e:
             print(f"Warning: Failed to get motor state: {e}")
             return None
