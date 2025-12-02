@@ -26,11 +26,14 @@ static const char *TAG = "STEPPER_TEST";
 #define UPDATE_PERIOD_MS   10          // Control loop update period (10ms = 100Hz)
 #define STATUS_PERIOD_MS   500          // Status print period (500ms)
 
+stepper_control_handle_t s_stepper_handle;
+
 /**
  * @brief Control loop task - updates stepper control periodically
  */
 static void stepper_control_task(void *pvParameters)
 {
+    stepper_control_handle_t *stepper_handle = pvParameters;
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(UPDATE_PERIOD_MS);
     float dt = UPDATE_PERIOD_MS / 1000.0f; // Convert to seconds
@@ -39,7 +42,7 @@ static void stepper_control_task(void *pvParameters)
 
     while (1) {
         // Update stepper control loop
-        stepper_update(dt);
+        stepper_update(*stepper_handle, dt);
 
         // Wait for next period
         vTaskDelayUntil(&last_wake_time, period);
@@ -51,6 +54,7 @@ static void stepper_control_task(void *pvParameters)
  */
 static void status_task(void *pvParameters)
 {
+    stepper_control_handle_t *stepper_handle = pvParameters;
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(STATUS_PERIOD_MS);
 
@@ -58,11 +62,11 @@ static void status_task(void *pvParameters)
 
     while (1) {
         // Get current status
-        float current_angle = stepper_get_current_angle_deg();
-        float target_angle = stepper_get_target_angle_deg();
-        float velocity = stepper_get_current_velocity_dps();
-        bool is_moving = stepper_is_moving();
-        bool has_feedback = stepper_has_position_feedback();
+        float current_angle = stepper_get_current_angle_deg(*stepper_handle);
+        float target_angle = stepper_get_target_angle_deg(*stepper_handle);
+        float velocity = stepper_get_current_velocity_dps(*stepper_handle);
+        bool is_moving = stepper_is_moving(*stepper_handle);
+        bool has_feedback = stepper_has_position_feedback(*stepper_handle);
 
         // Print status
         ESP_LOGI(TAG, "Status: current=%.2f°, target=%.2f°, vel=%.2f°/s, moving=%d, feedback=%d",
@@ -78,58 +82,60 @@ static void status_task(void *pvParameters)
  */
 static void test_sequence_task(void *pvParameters)
 {
+    stepper_control_handle_t *stepper_handle = pvParameters;
+
     // Wait a bit for initialization
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     ESP_LOGI(TAG, "=== Starting Stepper Test Sequence ===");
 
     // Test 1: Check if position feedback is available
-    bool has_feedback = stepper_has_position_feedback();
+    bool has_feedback = stepper_has_position_feedback(*stepper_handle);
     ESP_LOGI(TAG, "Test 1: Position feedback available: %s", has_feedback ? "YES" : "NO");
     if (has_feedback) {
-        float initial_angle = stepper_get_current_angle_deg();
+        float initial_angle = stepper_get_current_angle_deg(*stepper_handle);
         ESP_LOGI(TAG, "  Initial angle: %.2f°", initial_angle);
     }
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // Test 2: Move to positive angle
     ESP_LOGI(TAG, "Test 2: Moving to +45°");
-    stepper_set_target_angle_deg(45.0f);
+    stepper_set_target_angle_deg(*stepper_handle, 45.0f);
     vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for movement
 
     // Test 3: Move to negative angle
     ESP_LOGI(TAG, "Test 3: Moving to -45°");
-    stepper_set_target_angle_deg(-45.0f);
+    stepper_set_target_angle_deg(*stepper_handle, -45.0f);
     vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for movement
 
     // Test 4: Move to zero
     ESP_LOGI(TAG, "Test 4: Moving to 0°");
-    stepper_set_target_angle_deg(0.0f);
+    stepper_set_target_angle_deg(*stepper_handle, 0.0f);
     vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for movement
 
     // Test 5: Test emergency stop
     ESP_LOGI(TAG, "Test 5: Testing emergency stop");
-    stepper_set_target_angle_deg(30.0f);
+    stepper_set_target_angle_deg(*stepper_handle, 30.0f);
     vTaskDelay(pdMS_TO_TICKS(1000)); // Start moving
     ESP_LOGI(TAG, "  Activating E-stop...");
-    stepper_set_estop(true);
+    stepper_set_estop(*stepper_handle, true);
     vTaskDelay(pdMS_TO_TICKS(2000));
     ESP_LOGI(TAG, "  Releasing E-stop...");
-    stepper_set_estop(false);
+    stepper_set_estop(*stepper_handle, false);
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // Test 6: Continuous movement test
     ESP_LOGI(TAG, "Test 6: Continuous movement test (sine wave pattern)");
     for (int i = 0; i < 20; i++) {
         float angle = 60.0f * sinf(i * 0.314f); // ±60° sine wave
-        stepper_set_target_angle_deg(angle);
+        stepper_set_target_angle_deg(*stepper_handle, angle);
         ESP_LOGI(TAG, "  Target: %.2f°", angle);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
     // Test 7: Return to center
     ESP_LOGI(TAG, "Test 7: Returning to center (0°)");
-    stepper_set_target_angle_deg(0.0f);
+    stepper_set_target_angle_deg(*stepper_handle, 0.0f);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     ESP_LOGI(TAG, "=== Test Sequence Complete ===");
@@ -160,7 +166,7 @@ void app_main(void)
     };
 
     // Initialize stepper
-    esp_err_t ret = stepper_init(&config);
+    esp_err_t ret = stepper_init(&config, &s_stepper_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize stepper: %s", esp_err_to_name(ret));
         return;
@@ -179,13 +185,13 @@ void app_main(void)
     ESP_LOGI(TAG, "  ADC channel: %d", POT_ADC_CHANNEL);
 
     // Create control task (high priority, runs at 100Hz)
-    xTaskCreate(stepper_control_task, "stepper_ctrl", 4096, NULL, 5, NULL);
+    xTaskCreate(stepper_control_task, "stepper_ctrl", 4096, &s_stepper_handle, 5, NULL);
 
     // Create status monitoring task (low priority)
-    xTaskCreate(status_task, "status", 2048, NULL, 1, NULL);
+    xTaskCreate(status_task, "status", 2048, &s_stepper_handle, 1, NULL);
 
     // Create test sequence task (medium priority)
-    //xTaskCreate(test_sequence_task, "test_seq", 4096, NULL, 3, NULL);
+    xTaskCreate(test_sequence_task, "test_seq", 4096, &s_stepper_handle, 3, NULL);
 
     ESP_LOGI(TAG, "All tasks created. Test sequence will start in 1 second...");
 }

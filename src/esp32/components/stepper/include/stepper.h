@@ -3,6 +3,7 @@
 #include "esp_err.h"
 #include "driver/gpio.h"
 #include "hal/adc_types.h"
+#include "hal/ledc_types.h"
 
 // Calibration constants for potentiometer mapping
 // These should be calibrated for each joint
@@ -30,36 +31,42 @@ typedef struct {
     
     // Position feedback
     adc_channel_t pot_adc_channel; // ADC channel for potentiometer (use -1 or value >= SOC_ADC_MAX_CHANNEL_NUM if not used)
+
+    // The caller has to provide the PWM channel to use (since other
+    // components might use some of the channels).
+    ledc_channel_t pwm_channel;
 } stepper_control_config_t;
 
+typedef ledc_channel_t stepper_control_handle_t;
+
 // Initialize stepper motor controller
-esp_err_t stepper_init(const stepper_control_config_t *cfg);
+esp_err_t stepper_init(const stepper_control_config_t *cfg, stepper_control_handle_t *out_handle);
 
 // Deinitialize stepper motor controller
-esp_err_t stepper_deinit(void);
+esp_err_t stepper_deinit(stepper_control_handle_t handle);
 
 // Update stepper control loop (call periodically, e.g., every 10ms)
 // dt_seconds: time delta since last update
-void stepper_update(float dt_seconds);
+void stepper_update(stepper_control_handle_t handle, float dt_seconds);
 
 // Set target angle (degrees)
-void stepper_set_target_angle_deg(float angle_deg);
+void stepper_set_target_angle_deg(stepper_control_handle_t handle, float angle_deg);
 
 // Set emergency stop state
-void stepper_set_estop(bool active);
+void stepper_set_estop(stepper_control_handle_t handle, bool active);
 
 // Get current angle from feedback (degrees)
-float stepper_get_current_angle_deg(void);
+float stepper_get_current_angle_deg(stepper_control_handle_t handle);
 
 // Get target angle (degrees)
-float stepper_get_target_angle_deg(void);
+float stepper_get_target_angle_deg(stepper_control_handle_t handle);
 
 // Get current velocity (degrees per second)
-float stepper_get_current_velocity_dps(void);
+float stepper_get_current_velocity_dps(stepper_control_handle_t handle);
 
 // Check if motor is moving
-bool stepper_is_moving(void);
+bool stepper_is_moving(stepper_control_handle_t handle);
 
 // Check if position feedback is enabled
-bool stepper_has_position_feedback(void);
+bool stepper_has_position_feedback(stepper_control_handle_t handle);
 

@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -12,6 +13,8 @@
 #include "driver/ledc.h"
 #include "adc_manager.h"
 #include "hal/adc_types.h"
+#include "hal/ledc_types.h"
+#include "soc/soc_caps.h"
 #include "sys/param.h"
 
 static const char *TAG = "stepper";
@@ -51,9 +54,15 @@ typedef struct {
     
     // ADC manager handle
     adc_mgr_handle_t adc_handle;
+
+    bool is_initialized;
 } motion_control_context_t;
 
-static motion_control_context_t s_context = {0};
+#define LIMB_ARR_LEN(arr) (sizeof(arr) / sizeof(*(arr)))
+
+// We only support at most as many steppers as there are LEDC channels, since
+// they require exclusive access anyway.
+static motion_control_context_t s_contexts[SOC_LEDC_CHANNEL_NUM] = {0};
 
 // Helper functions
 
@@ -73,9 +82,9 @@ static float clamp_angle(float angle_deg)
 
 // Get potentiometer value (raw)
 // Could keep track of success count and return 0 if no successful reads and divide by success count
-static int read_adc_avg(int n) 
+static int read_adc_avg(stepper_control_handle_t handle, int n)
 {
-    motion_control_context_t *ctx = &s_context;
+    motion_control_context_t *ctx = &s_contexts[handle];
 
     int acc = 0;
     int raw = 0;
@@ -97,9 +106,9 @@ static float map_pot_to_deg(int raw)
     return DEG_MIN_CAL + (span_deg * (raw - RAW_MIN_CAL) / span_raw);
 }
 
-static void stop_motor(void) 
+static void stop_motor(stepper_control_handle_t handle) 
 {
-    motion_control_context_t *ctx = &s_context;
+    motion_control_context_t *ctx = &s_contexts[handle];
 
     ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel, 0);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel);
@@ -113,9 +122,9 @@ static void stop_motor(void)
 }
 
 
-static void apply_motor_velocity(float velocity_sps) 
+static void apply_motor_velocity(stepper_control_handle_t handle, float velocity_sps) 
 {
-    motion_control_context_t *ctx = &s_context;
+    motion_control_context_t *ctx = &s_contexts[handle];
 
     if (velocity_sps > 0.0f) {
         // Enable motor
@@ -131,19 +140,21 @@ static void apply_motor_velocity(float velocity_sps)
         ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel, ctx->duty_50_percent);
         ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel);
     } else {
-        stop_motor();
+        stop_motor(handle);
     }
 }
 
 // Initialization
 
-esp_err_t stepper_init(const stepper_control_config_t *cfg)
+esp_err_t stepper_init(const stepper_control_config_t *cfg, stepper_control_handle_t* out_handle)
 {
 
     // Validate config
     if (!cfg) return ESP_ERR_INVALID_ARG;
 
     motion_control_context_t ctx = {0};
+
+    stepper_control_handle_t handle = cfg->pwm_channel;
 
     // Reset and store config
     ctx.cfg = *cfg;
@@ -192,7 +203,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg)
 
     // Configure LEDC channel for STEP output
     ctx.ledc_timer = LEDC_TIMER_0;
-    ctx.ledc_channel = LEDC_CHANNEL_0;
+    ctx.ledc_channel = cfg->pwm_channel;
     ctx.duty_50_percent = (1 << (13 - 1)); // 50% duty for 13 bit resolution
     
     ledc_channel_config_t channel_cfg = {
@@ -220,7 +231,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg)
         }
         
         // Read initial ADC value (averaged for stability)
-        int raw_adc = read_adc_avg(10);
+        int raw_adc = read_adc_avg(handle, 10);
         float initial_angle = map_pot_to_deg(raw_adc);
         ctx.current_angle_deg = clamp_angle(initial_angle);
         ctx.target_angle_deg = ctx.current_angle_deg;
@@ -241,8 +252,11 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg)
     ctx.is_moving = false;
     ctx.current_veloctiy_dps = 0.0f;
 
-    motion_control_context_t *out_ctx = &s_context;
-    *out_ctx = ctx;
+    ctx.is_initialized = true;
+
+    s_contexts[handle] = ctx;
+
+    *out_handle = handle;
     
     ESP_LOGI(TAG, "Stepper initialized: steps/deg=%.3f, max_vel=%.2f sps, max_accel=%.2f sps²", 
              ctx.steps_per_degree, ctx.max_velocity_sps, ctx.max_accel_sps2);
@@ -250,28 +264,28 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg)
     return ESP_OK;
 }
 
-esp_err_t stepper_deinit(void) 
+esp_err_t stepper_deinit(stepper_control_handle_t handle) 
 {
-    motion_control_context_t *ctx = &s_context;
+    motion_control_context_t *ctx = &s_contexts[handle];
 
     // Stop the motor
-    stop_motor();
+    stop_motor(handle);
+
+    // TODO(johan): Do we need to actually reset ledc/gpio as well?
     
-    // Note: ADC manager handles channel cleanup automatically on deinit
-    // We just mark our handle as invalid
-    ctx->adc_handle = -1;
-    
+    *ctx = (motion_control_context_t){0};
+
     return ESP_OK;
 }
 
-void stepper_update(float dt_seconds) 
+void stepper_update(stepper_control_handle_t handle, float dt_seconds) 
 {
-    motion_control_context_t *ctx = &s_context;
+    motion_control_context_t *ctx = &s_contexts[handle];
 
     if (dt_seconds <= 0.0f) return;
 
     // Read & filter pot
-    int raw = read_adc_avg(AVG_SAMPLES);
+    int raw = read_adc_avg(handle, AVG_SAMPLES);
     ctx->filt = ctx->filt + ALPHA * ((float)raw - ctx->filt);
     float angle_deg = map_pot_to_deg((int)(ctx->filt + 0.5f));
     angle_deg = clamp_angle(angle_deg);
@@ -286,7 +300,7 @@ void stepper_update(float dt_seconds)
     portEXIT_CRITICAL(&ctx->spinlock);
 
     if (estop) {
-        stop_motor();
+        stop_motor(handle);
         return;
     }
     
@@ -297,7 +311,7 @@ void stepper_update(float dt_seconds)
 
     // Stop in deadband
     if (distance_deg < DEADBAND_DEG) {
-        stop_motor();
+        stop_motor(handle);
         return;
     }
 
@@ -323,7 +337,7 @@ void stepper_update(float dt_seconds)
     }
 
     // Apply motor velocity (handles enable/disable, frequency, duty)
-    apply_motor_velocity(current_velocity_sps);
+    apply_motor_velocity(handle, current_velocity_sps);
 
     // Update shared state
     portENTER_CRITICAL(&ctx->spinlock);
@@ -343,9 +357,9 @@ void stepper_update(float dt_seconds)
 
 // ------ Setters ------
 
-void stepper_set_target_angle_deg(float angle_deg)
+void stepper_set_target_angle_deg(stepper_control_handle_t handle, float angle_deg)
 {
-    motion_control_context_t *ctx = &s_context;
+    motion_control_context_t *ctx = &s_contexts[handle];
 
     angle_deg = clamp_angle(angle_deg);
     portENTER_CRITICAL(&ctx->spinlock);
@@ -353,23 +367,23 @@ void stepper_set_target_angle_deg(float angle_deg)
     portEXIT_CRITICAL(&ctx->spinlock);
 }
 
-void stepper_set_estop(bool active)
+void stepper_set_estop(stepper_control_handle_t handle, bool active)
 {
-    motion_control_context_t *ctx = &s_context;
+    motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
     ctx->estop_active = active;
     portEXIT_CRITICAL(&ctx->spinlock);
     if (active) {
-        stop_motor();
+        stop_motor(handle);
     }
 }
 
 // ------ Getters ------
 
-float stepper_get_current_angle_deg(void)
+float stepper_get_current_angle_deg(stepper_control_handle_t handle)
 {
-    const motion_control_context_t *ctx = &s_context;
+    const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
     float angle = ctx->current_angle_deg;
@@ -377,9 +391,9 @@ float stepper_get_current_angle_deg(void)
     return angle;
 }
 
-float stepper_get_target_angle_deg(void)
+float stepper_get_target_angle_deg(stepper_control_handle_t handle)
 {
-    const motion_control_context_t *ctx = &s_context;
+    const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
     float angle = ctx->target_angle_deg;
@@ -387,9 +401,9 @@ float stepper_get_target_angle_deg(void)
     return angle;
 }
 
-float stepper_get_current_velocity_dps(void)
+float stepper_get_current_velocity_dps(stepper_control_handle_t handle)
 {
-    const motion_control_context_t *ctx = &s_context;
+    const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
     float velocity = ctx->current_veloctiy_dps;
@@ -397,9 +411,9 @@ float stepper_get_current_velocity_dps(void)
     return velocity;
 }
 
-bool stepper_is_moving(void)
+bool stepper_is_moving(stepper_control_handle_t handle)
 {
-    const motion_control_context_t *ctx = &s_context;
+    const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
     bool moving = ctx->is_moving;
@@ -407,9 +421,9 @@ bool stepper_is_moving(void)
     return moving;
 }
 
-bool stepper_has_position_feedback(void)
+bool stepper_has_position_feedback(stepper_control_handle_t handle)
 {
-    const motion_control_context_t *ctx = &s_context;
+    const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
     bool has_feedback = ctx->use_position_feedback;
