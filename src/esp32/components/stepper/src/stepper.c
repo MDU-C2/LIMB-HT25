@@ -57,6 +57,10 @@ static motion_control_context_t s_context = {0};
 
 // Helper functions
 
+static int clampi(int x, int lo, int hi) {
+    return x < lo ? lo : (x > hi ? hi : x);
+}
+
 static inline float clampf(float x, float lo, float hi)
 {
     return x < lo ? lo : (x > hi ? hi : x);
@@ -84,8 +88,7 @@ static int read_adc_avg(int n)
 // Map pot raw -> degrees (calibrated)
 static float map_pot_to_deg(int raw)
 {
-    if (raw < RAW_MIN_CAL) raw = RAW_MIN_CAL;
-    if (raw > RAW_MAX_CAL) raw = RAW_MAX_CAL;
+    raw = clampi(raw, RAW_MIN_CAL, RAW_MAX_CAL);
 
     const float span_raw = (float)(RAW_MAX_CAL - RAW_MIN_CAL);
     const float span_deg = (float)(DEG_MAX_CAL - DEG_MIN_CAL);
