@@ -32,12 +32,12 @@ typedef struct {
     uint32_t duty_50_percent;
 
     // Motion state
-    volatile bool estop_active;
-    volatile bool is_moving;
-    volatile float current_veloctiy_dps;
-    volatile float target_angle_deg;
-    volatile float current_angle_deg;
-    volatile bool use_position_feedback;
+    bool estop_active;
+    bool is_moving;
+    float current_veloctiy_dps;
+    float target_angle_deg;
+    float current_angle_deg;
+    bool use_position_feedback;
 
     // Calculated parameters
     float steps_per_degree;
