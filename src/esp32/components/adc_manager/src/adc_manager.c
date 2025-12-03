@@ -153,7 +153,7 @@ esp_err_t adc_mgr_init(const AdcMgrConfig adc_mgr_config) {
   for (int i = 0; i < adc_mgr_config.channel_configs_len; ++i) {
     channel_configs[i] = (adc_digi_pattern_config_t){
         .channel = adc_mgr_config.channel_configs[i].channel,
-        .atten = ADC_ATTEN_DB_0,
+        .atten = ADC_ATTEN_DB_12,
         .bit_width = SOC_ADC_DIGI_MAX_BITWIDTH,
         // ADC1 is the only one supported.
         .unit = ADC_UNIT_1,
