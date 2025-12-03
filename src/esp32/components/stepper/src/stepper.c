@@ -84,14 +84,18 @@ static int average(const uint16_t *values, int n)
     return acc / n;
 }
 
+// Performs a linear interpolation of x from the range [x0, x1] onto [y0, y1].
+static float lerp_from_range(float x, float x0, float x1, float y0, float y1) {
+    float x_range = x1 - x0;
+    float y_range = y1 - y0;
+    return y0 + ((x - x0) * y_range / x_range);
+}
+
 // Map pot raw -> degrees (calibrated)
 static float map_pot_to_deg(int raw)
 {
     raw = clampi(raw, RAW_MIN_CAL, RAW_MAX_CAL);
-
-    const float span_raw = (float)(RAW_MAX_CAL - RAW_MIN_CAL);
-    const float span_deg = (float)(DEG_MAX_CAL - DEG_MIN_CAL);
-    return DEG_MIN_CAL + (span_deg * (raw - RAW_MIN_CAL) / span_raw);
+    return lerp_from_range((float)raw, RAW_MIN_CAL, RAW_MAX_CAL, DEG_MIN_CAL, DEG_MAX_CAL);
 }
 
 static void stop_motor(stepper_control_handle_t handle) 
