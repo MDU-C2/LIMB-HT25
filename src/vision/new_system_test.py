@@ -52,6 +52,7 @@ class KalmanFilter:
 
 
 class KalmanFilterNode(dai.node.HostNode):
+    
     def __init__(self):
         self._kalman_filters = {}
         super().__init__()
@@ -146,7 +147,7 @@ class KalmanFilterNode(dai.node.HostNode):
                     outline_color=PRIMARY_COLOR,
                 )
                 annotation_helper.draw_text(
-                    text=f"X: {int(vec_space[0])} mm, Y: {int(vec_space[1])} mm, Z: {int(vec_space[2])} mm",
+                    text=f"X: {int(vec_space[0].item())} mm, Y: {int(vec_space[1].item())} mm, Z: {int(vec_space[2].item())} mm",
                     position=(
                         x1 / img_frame.getWidth() + 0.02,
                         y1 / img_frame.getHeight() + 0.05,
@@ -223,11 +224,14 @@ _, args = initialize_argparser()
 
 def main():
 
+    CUP_LABEL = 41
+
     _, args = initialize_argparser()
 
     visualizer = dai.RemoteConnection(httpPort=8558)
     device = dai.Device(dai.DeviceInfo(args.device)) if args.device else dai.Device()
-    platform = device.getPlatform().name
+    platform_obj = device.getPlatform()
+    platform = platform_obj.name
     print(f"Platform: {platform}")
 
     if args.fps_limit is None:
@@ -237,10 +241,13 @@ def main():
         print("Creating pipeline...")
 
         # Detection  model
-        model_desc = dai.NNModelDescription("yolov6-nano") # model_desc = dai.NNModelDescription.fromYamlFile(f"file_name_{platform}.yaml")
+        # Get model from zoo with platform specification for correct compilation
+        model_desc = dai.NNModelDescription("luxonis/yolov6-nano:r2-coco-512x288")
+        #model_desc = dai.NNModelDescription("luxonis/yolov10-nano:coco-512x288")
+        model_desc.platform = platform  # platform is a string (e.g., "RVC2")
         #nn_archive = dai.NNArchive(dai.getModelFromZoo(model_desc))
         #labels = nn_archive.getConfig().model.heads[0].metadata.classes
-        #cup_label = labels.index("cup")
+        #cup_label = labels.index("cup") if "cup" in labels else 41
 
         # Camera input
         cam = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
@@ -256,19 +263,22 @@ def main():
         stereo.setLeftRightCheck(True)
         stereo.setRectification(True)
 
+        # Build network with archive for RVC2, or model_desc for other platforms
+        
+
         nn = pipeline.create(dai.node.SpatialDetectionNetwork).build(
             cam, stereo, model_desc, fps=args.fps_limit
         )
+        nn_archive = dai.NNArchive(dai.getModelFromZoo(model_desc))
+        nn.setNNArchive(nn_archive, numShaves=4)
+        
         nn.setBoundingBoxScaleFactor(0.7)
         nn.setDepthLowerThreshold(100)
         nn.setDepthUpperThreshold(5000)
-        
-        #if platform == "RVC2":
-        #    nn.setNNArchive(nn_archive, numShaves=4)
 
         # Tracking
         object_tracker = pipeline.create(dai.node.ObjectTracker)
-        object_tracker.setDetectionLabelsToTrack([41])
+        object_tracker.setDetectionLabelsToTrack([CUP_LABEL])
         if platform == "RVC2":
             object_tracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
         else:
@@ -289,7 +299,7 @@ def main():
             tracker_out=object_tracker.out,
             baseline=baseline,
             focal_length=focal_length,
-            label_mapping={41: "cup"}
+            label_map={CUP_LABEL: "cup"}
         )
         
         # Visualize
