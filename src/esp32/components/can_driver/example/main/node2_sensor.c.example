@@ -1,0 +1,82 @@
+// ESP32 #2 - SENSOR NODE
+// Priority: MEDIUM-HIGH (ID base: 0x020)
+// Function: Reads sensors and sends data to the bus
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "can_driver.h"
+#include "esp_log.h"
+#include "esp_random.h"
+
+#define TAG "SENSOR"
+
+// SENSOR message IDs
+#define ID_SENSOR_TEMP      0x020  // Temperature data
+#define ID_SENSOR_HUM       0x021  // Humidity data
+
+// IDs this node listens to
+#define ID_MASTER_CMD       0x010
+
+void app_main(void) {
+    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "   ESP32 #2 - SENSOR NODE STARTED");
+    ESP_LOGI(TAG, "   Priority: MEDIUM-HIGH (ID: 0x020)");
+    ESP_LOGI(TAG, "========================================");
+
+    uint8_t msg_rx[8];
+    uint32_t rx_id;
+    uint8_t rx_len = sizeof(msg_rx);
+    bool system_active = false;
+    
+    // Simulate initial sensor values
+    int temperature = 22;
+    int humidity = 50;
+
+    while (1) {
+        // Listen for commands from master
+        if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
+            msg_rx[rx_len] = '\0';
+            
+            if (rx_id == ID_MASTER_CMD) {
+                if (strcmp((char*)msg_rx, "START") == 0) {
+                    ESP_LOGI(TAG, "START command received");
+                    system_active = true;
+                } else if (strcmp((char*)msg_rx, "STOP") == 0) {
+                    ESP_LOGI(TAG, "STOP command received");
+                    system_active = false;
+                }
+            }
+        }
+
+        if (system_active) {
+            // Simulate sensor readings (in reality, you would read real sensors)
+            // Temperature varies between 20-35°C
+            temperature = 20 + (esp_random() % 16);
+            humidity = 40 + (esp_random() % 30);
+            
+            // Send temperature data
+            char temp_msg[8];
+            snprintf(temp_msg, sizeof(temp_msg), "T:%d", temperature);
+            can_send(ID_SENSOR_TEMP, (uint8_t*)temp_msg, strlen(temp_msg));
+            ESP_LOGI(TAG, "Sending temperature: %d°C", temperature);
+            
+            vTaskDelay(pdMS_TO_TICKS(500));
+            
+            // Send humidity data
+            char hum_msg[8];
+            snprintf(hum_msg, sizeof(hum_msg), "H:%d", humidity);
+            can_send(ID_SENSOR_HUM, (uint8_t*)hum_msg, strlen(hum_msg));
+            ESP_LOGI(TAG, "Sending humidity: %d%%", humidity);
+            
+            // Send every 3 seconds
+            vTaskDelay(pdMS_TO_TICKS(2500));
+        } else {
+            ESP_LOGI(TAG, "Waiting for START command...");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+}

@@ -9,6 +9,11 @@
 #define BUTTON_Next_GPIO  19    // GPIO for button to move to next position (active low)
 #define BUTTON_Prev_GPIO  20    // GPIO for button to move to previous position (
 
+// Rotary Encoder GPIO pins
+#define ROTARY_ENCODER_CLK_GPIO  8    // CLK pin (A phase)
+#define ROTARY_ENCODER_DT_GPIO   7    // DT pin (B phase)
+#define ROTARY_ENCODER_SW_GPIO   6    // SW pin (button/switch)
+
 #define THUMB_SERVO_GPIO    0          
 #define INDEX_SERVO_GPIO    1           
 #define MID_SERVO_GPIO      2           
@@ -48,6 +53,13 @@ typedef struct {
     const char* name;              // Human-readable name for debugging
 } servo_config_t;
 
+// Calibration state
+typedef enum {
+    CAL_STATE_SELECT_FINGER,    // Selecting which finger to calibrate
+    CAL_STATE_SET_MIN,          // Setting minimum angle
+    CAL_STATE_SET_MAX,          // Setting maximum angle
+    CAL_STATE_DONE              // Calibration complete
+} calibration_state_t;
 
 // Function declarations
 uint32_t us_to_duty(uint32_t us);
@@ -56,3 +68,17 @@ void servo_write_deg_channel(int channel, int deg);
 void servo_write_all_deg(int deg);
 void close_all_fingers(void);
 void open_all_fingers(void);
+
+// Gesture functions
+void make_fist_gesture(void);
+void open_hand_gesture(void);
+void make_peace_gesture(void);
+void count_to_five_gesture(void);
+void rock_gesture(void);
+void flip_off_gesture(void);
+
+// Rotary encoder functions
+esp_err_t rotary_encoder_init(void);
+void start_calibration_mode(void);
+int get_encoder_value(void);
+bool is_encoder_button_pressed(void);

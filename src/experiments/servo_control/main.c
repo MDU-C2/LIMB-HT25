@@ -5,31 +5,39 @@ static const char *TAG = "MAIN";
 
 void app_main() 
 {
-    ESP_LOGI(TAG, "Starting servo test");
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    ESP_LOGI(TAG, "Starting servo control application");
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    
     // Initialize all servos
+    ESP_LOGI(TAG, "Initializing servos...");
     servo_led_init();
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    // Initialize rotary encoder
+    ESP_LOGI(TAG, "Initializing rotary encoder...");
+    rotary_encoder_init();
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
-    ESP_LOGI(TAG, "Testing individual servos one by one...");
+    // Start calibration mode
+    // Uncomment the line below to enter calibration mode
+    // start_calibration_mode();
     
-    servo_write_deg_channel(0, 0);      // Thumb to min
-    servo_write_deg_channel(1, 0);      // Index to min
-    servo_write_deg_channel(2, 0);      // Middle to min
-    servo_write_deg_channel(3, 180);      // Ring to min
-    servo_write_deg_channel(4, 180);      // Pinky to min
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    ESP_LOGI(TAG, "Starting servo test loop...");
+    ESP_LOGI(TAG, "To enter calibration mode, uncomment start_calibration_mode() in main.c");
+    
+    // Normal operation - test servo movements
     while(1) {
-    
-    
-        servo_write_deg_channel(0, 180);      // Thumb to min
-        servo_write_deg_channel(1, 180);      // Index to min
-        servo_write_deg_channel(2, 180);      // Middle to min
-        servo_write_deg_channel(3, 0);      // Ring to min
-        servo_write_deg_channel(4, 0);      // Pinky to min
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        //start_calibration_mode();
         
-    
+        make_fist_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        open_hand_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        count_to_five_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        make_peace_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        rock_gesture();
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
