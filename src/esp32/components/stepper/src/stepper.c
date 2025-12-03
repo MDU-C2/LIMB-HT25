@@ -1,7 +1,6 @@
 #include "stepper.h"
 
 #include <math.h>
-#include <string.h>
 
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
@@ -11,8 +10,7 @@
 
 #include "driver/gpio.h"
 #include "driver/ledc.h"
-#include "adc_manager.h"
-#include "hal/adc_types.h"
+// #include "adc_manager.h"
 #include "hal/ledc_types.h"
 #include "soc/soc_caps.h"
 #include "sys/param.h"
@@ -21,7 +19,6 @@ static const char *TAG = "stepper";
 
 // Control constants
 #define ALPHA 0.1f              // Low-pass filter coefficient (0.0-1.0)
-#define AVG_SAMPLES 5           // Number of ADC samples to average
 #define DEADBAND_DEG 0.5f       // Deadband in degrees (stop if error < this)
 #define MIN_FREQ_HZ 50          // Minimum LEDC frequency
 
@@ -51,9 +48,6 @@ typedef struct {
 
     // ADC filter state
     float filt;
-    
-    // ADC manager handle
-    adc_mgr_handle_t adc_handle;
 
     bool is_initialized;
 } motion_control_context_t;
@@ -80,18 +74,12 @@ static float clamp_angle(float angle_deg)
     return clampf(angle_deg, -MAX_JOINT_ANGLE_DEG, MAX_JOINT_ANGLE_DEG);
 }
 
-// Get potentiometer value (raw)
-// Could keep track of success count and return 0 if no successful reads and divide by success count
-static int read_adc_avg(stepper_control_handle_t handle, int n)
+// Calculates the average value 
+static int average(const uint16_t *values, int n)
 {
-    motion_control_context_t *ctx = &s_contexts[handle];
-
     int acc = 0;
-    int raw = 0;
     for (int i = 0; i < n; i++) {
-        if (adc_mgr_read(ctx->adc_handle, &raw) == ESP_OK) {
-            acc += raw;
-        }
+        acc += values[i];
     }
     return acc / n;
 }
@@ -146,7 +134,7 @@ static void apply_motor_velocity(stepper_control_handle_t handle, float velocity
 
 // Initialization
 
-esp_err_t stepper_init(const stepper_control_config_t *cfg, stepper_control_handle_t* out_handle)
+esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len, stepper_control_handle_t* out_handle)
 {
 
     // Validate config
@@ -159,7 +147,6 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, stepper_control_hand
     // Reset and store config
     ctx.cfg = *cfg;
     ctx.spinlock = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
-    ctx.adc_handle = -1; // Initialize ADC handle to invalid
 
     // Compute steps per degree and motion limits
     // We define the degrees per second and need to convert that into steps per second
@@ -217,28 +204,16 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, stepper_control_hand
     ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_cfg), TAG, "Failed to configure LEDC channel");
     
     // ADC setup & filtered initial angle
-    if (cfg->pot_adc_channel >= 0 && cfg->pot_adc_channel < SOC_ADC_MAX_CHANNEL_NUM) {
-        // Register channel with ADC manager
-        adc_oneshot_chan_cfg_t chan_config = {
-            .bitwidth = ADC_BITWIDTH_DEFAULT,
-            .atten = ADC_ATTEN_DB_12,
-        };
-        
-        ctx.adc_handle = adc_mgr_register_channel(cfg->pot_adc_channel, &chan_config);
-        if (ctx.adc_handle < 0) {
-            ESP_LOGE(TAG, "Failed to register ADC channel with ADC manager");
-            return ESP_FAIL;
-        }
-        
-        // Read initial ADC value (averaged for stability)
-        int raw_adc = read_adc_avg(handle, 10);
+    if (latest_potentiometer_values_len > 0) {
+        // Use initial ADC value to set intial angle (averaged for stability).
+        int raw_adc = average(latest_potentiometer_values, latest_potentiometer_values_len);
         float initial_angle = map_pot_to_deg(raw_adc);
         ctx.current_angle_deg = clamp_angle(initial_angle);
         ctx.target_angle_deg = ctx.current_angle_deg;
         ctx.use_position_feedback = true;
         ctx.filt = initial_angle; // Initialize filter state
         
-        ESP_LOGI(TAG, "ADC initialized: channel=%d, raw=%d, angle=%.2f deg", 
+        ESP_LOGI(TAG, "Potentiometer initialized: ADC channel=%d, raw=%d, angle=%.2f deg", 
                  cfg->pot_adc_channel, raw_adc, initial_angle);
     } else {
         ctx.use_position_feedback = false;
@@ -278,14 +253,14 @@ esp_err_t stepper_deinit(stepper_control_handle_t handle)
     return ESP_OK;
 }
 
-void stepper_update(stepper_control_handle_t handle, float dt_seconds) 
+void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len) 
 {
     motion_control_context_t *ctx = &s_contexts[handle];
 
     if (dt_seconds <= 0.0f) return;
 
     // Read & filter pot
-    int raw = read_adc_avg(handle, AVG_SAMPLES);
+    int raw = average(latest_potentiometer_values, latest_potentiometer_values_len);
     ctx->filt = ctx->filt + ALPHA * ((float)raw - ctx->filt);
     float angle_deg = map_pot_to_deg((int)(ctx->filt + 0.5f));
     angle_deg = clamp_angle(angle_deg);

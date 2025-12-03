@@ -2,10 +2,13 @@
 #include <math.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/task.h"
+#include "portmacro.h"
 #include "stepper.h"
 #include "driver/gpio.h"
 #include "hal/adc_types.h"
+#include "adc_manager.h"
 
 static const char *TAG = "STEPPER_TEST";
 
@@ -26,7 +29,36 @@ static const char *TAG = "STEPPER_TEST";
 #define UPDATE_PERIOD_MS   10          // Control loop update period (10ms = 100Hz)
 #define STATUS_PERIOD_MS   500          // Status print period (500ms)
 
+#define AVG_SAMPLES 5           // Number of ADC samples to average
+
 stepper_control_handle_t s_stepper_handle;
+
+adc_mgr_handle_t adc_handle;
+
+SemaphoreHandle_t s_latest_potentiometer_mutex;
+uint16_t s_latest_potentiometer_values[1024];
+uint16_t s_latest_potentiometer_values_len;
+
+static void adc_reading_task(void *pvParameters)
+{
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t period = pdMS_TO_TICKS(UPDATE_PERIOD_MS);
+    while (1) {
+        // Get potentiometer samples.
+        xSemaphoreTake(s_latest_potentiometer_mutex, portMAX_DELAY);
+        s_latest_potentiometer_values_len = 0;
+        for (int i = 0; i < AVG_SAMPLES; ++i) {
+            int raw = 0;
+            if (adc_mgr_read(adc_handle, &raw) == ESP_OK) {
+                s_latest_potentiometer_values[s_latest_potentiometer_values_len++] = raw;
+            }
+        }
+        xSemaphoreGive(s_latest_potentiometer_mutex);
+
+        vTaskDelayUntil(&last_wake_time, period);
+    }
+    
+}
 
 /**
  * @brief Control loop task - updates stepper control periodically
@@ -41,8 +73,10 @@ static void stepper_control_task(void *pvParameters)
     ESP_LOGI(TAG, "Control task started (update period: %d ms)", UPDATE_PERIOD_MS);
 
     while (1) {
+        xSemaphoreTake(s_latest_potentiometer_mutex, portMAX_DELAY);
         // Update stepper control loop
-        stepper_update(*stepper_handle, dt);
+        stepper_update(*stepper_handle, dt, s_latest_potentiometer_values, s_latest_potentiometer_values_len);
+        xSemaphoreGive(s_latest_potentiometer_mutex);
 
         // Wait for next period
         vTaskDelayUntil(&last_wake_time, period);
@@ -152,6 +186,34 @@ void app_main(void)
     ESP_LOGI(TAG, "Stepper Motor Test Application");
     ESP_LOGI(TAG, "==============================");
 
+    // Register channel with ADC manager
+    adc_oneshot_chan_cfg_t chan_config = {
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+        .atten = ADC_ATTEN_DB_12,
+    };
+    
+    adc_handle = adc_mgr_register_channel(POT_ADC_CHANNEL, &chan_config);
+    if (adc_handle < 0) {
+        ESP_LOGE(TAG, "Failed to register ADC channel with ADC manager");
+        return;
+    }
+
+    s_latest_potentiometer_mutex = xSemaphoreCreateMutex();
+    if (s_latest_potentiometer_mutex == NULL) {
+        ESP_LOGE(TAG, "Couldn't allocate mutex");
+        return;
+    }
+
+    // Collect initial ADC readings for potentiometer.
+    xSemaphoreTake(s_latest_potentiometer_mutex, portMAX_DELAY);
+    for (int i = 0; i < 10; ++i) {
+        int raw = 0;
+        if (adc_mgr_read(adc_handle, &raw) == ESP_OK) {
+            s_latest_potentiometer_values[s_latest_potentiometer_values_len++] = raw;
+        }
+    }
+    xSemaphoreGive(s_latest_potentiometer_mutex);
+    
     // Configure stepper motor
     stepper_control_config_t config = {
         .step_gpio = STEP_GPIO,
@@ -166,7 +228,7 @@ void app_main(void)
     };
 
     // Initialize stepper
-    esp_err_t ret = stepper_init(&config, &s_stepper_handle);
+    esp_err_t ret = stepper_init(&config, s_latest_potentiometer_values, s_latest_potentiometer_values_len, &s_stepper_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize stepper: %s", esp_err_to_name(ret));
         return;
@@ -192,6 +254,8 @@ void app_main(void)
 
     // Create test sequence task (medium priority)
     xTaskCreate(test_sequence_task, "test_seq", 4096, &s_stepper_handle, 3, NULL);
+
+    xTaskCreate(adc_reading_task, "adc_read", 4096, NULL, 4, NULL);
 
     ESP_LOGI(TAG, "All tasks created. Test sequence will start in 1 second...");
 }

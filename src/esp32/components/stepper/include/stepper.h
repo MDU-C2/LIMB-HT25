@@ -40,14 +40,14 @@ typedef struct {
 typedef ledc_channel_t stepper_control_handle_t;
 
 // Initialize stepper motor controller
-esp_err_t stepper_init(const stepper_control_config_t *cfg, stepper_control_handle_t *out_handle);
+esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len, stepper_control_handle_t *out_handle);
 
 // Deinitialize stepper motor controller
 esp_err_t stepper_deinit(stepper_control_handle_t handle);
 
 // Update stepper control loop (call periodically, e.g., every 10ms)
 // dt_seconds: time delta since last update
-void stepper_update(stepper_control_handle_t handle, float dt_seconds);
+void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len);
 
 // Set target angle (degrees)
 void stepper_set_target_angle_deg(stepper_control_handle_t handle, float angle_deg);
