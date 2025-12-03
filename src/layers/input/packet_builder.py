@@ -142,7 +142,7 @@ class PacketBuilder:
         """
         Get the latest pressure data.
         """
-        #TODO: Implement for each finger (and palm?)
+        #TODO: Implement for each finger, 5 fingers.
         pass
 
     def _get_piezo_data(self) -> float:

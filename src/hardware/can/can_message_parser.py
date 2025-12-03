@@ -12,17 +12,17 @@ class CANMessageParser:
         # Sensor messages (from ESP32 nodes)
         0x100: {"type": "EMG", "format": "<4f"},        # 4 EMG channels (float32)
         0x101: {"type": "IMU", "format": "<6f"},         # IMU: [ax, ay, az, gx, gy, gz]
-        0x102: {"type": "pressure", "format": "<f"},     # pressure (float32)
+        0x102: {"type": "pressure", "format": "<5f"},     # pressure [thumb, index, middle, ring, little]
         0x103: {"type": "piezo", "format": "<f"},        # piezo (float32)
         0x104: {"type": "potentiometer", "format": "<f"}, # potentiometer (float32)
         
         # Actuator messages (to ESP32 nodes)
         0x200: {"type": "gripper_command", "format": "<Bf"},    # [action, force]
-        0x201: {"type": "arm_command", "format": "<6f"},        # [joint1, joint2, joint3, joint4, joint5, joint6]
+        0x201: {"type": "arm_command", "format": "<5f"},        # [joint1, joint2, joint3, joint4, joint5]
         0x202: {"type": "motor_command", "format": "<Bf"},      # Motor control
 
         # Status messages 
-        0x300: {"type": "motor_status", "format": "<6f6f"},    # [positions, velocities]
+        0x300: {"type": "motor_status", "format": "<5f"},    # [positions]
         0x301: {"type": "gripper_status", "format": "<Bf"},    # [state, force]
     }
 
@@ -83,7 +83,10 @@ class CANMessageParser:
             }
         
         elif msg_type == 'pressure':
-            return {'value': parsed[0]} # TODO: Change this to adapt to our implementation of the pressure. We are have 5 for fingers..
+            return {
+                "values": list(parsed),
+                "finger_count": len(parsed)
+            }
         
         elif msg_type == 'piezo':
             return {'value': parsed[0]}
@@ -104,8 +107,7 @@ class CANMessageParser:
         
         elif msg_type == 'motor_status':
             return {
-                'joint_positions': list(parsed[:6]), # TODO: How many joint do we have?
-                'joint_velocities': list(parsed[6:12])
+                'joint_positions': list(parsed)
             }
         
         elif msg_type == 'gripper_status':

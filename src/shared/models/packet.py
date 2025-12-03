@@ -12,9 +12,8 @@ class MotorState:
 
     This is the "feedback" from the robot. It describes where the motors are now (and not where we want them to be).
     """
-    joint_positions: np.ndarray
-    joint_velocities: np.ndarray
-    gripper_state: Dict[str, Any]
+    joint_positions: np.ndarray # Shape: (5,) - 5 joint angles in radians
+    gripper_state: Dict[str, Any] # {"open": bool, "force": float} - Whether the gripper is open and the force applied
     timestamp: float = field(default_factory=time.time)
 
 @dataclass
@@ -36,7 +35,7 @@ class SensorSnapshot:
     These are "point-in-time" readings. The most recent value from each sensor at the moment the packet was created.
     """
     vision: Optional[Dict[str, Any]] = None                 # TODO: Define what vision data looks like
-    pressure: Optional[float] = None                        # Maybe need for each finger, so an array of floats?
+    pressure: Optional[List[float]] = None                  # 5 values: [thumb, index, middle, ring, little]
     piezo: Optional[float] = None                           # TODO: Define what piezo data looks like
     timestamp: float = field(default_factory=time.time)     # When snapshot was taken
 
