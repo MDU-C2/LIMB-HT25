@@ -49,10 +49,10 @@ class PacketBuilder:
     def build(self, window_buffer, sample_rate: float = 100.0) -> DataPacket:
         """Builds a complete packet from window buffer and latest sensor snapshots"""
         
-        window_data = window_buffer.get_window() # Build human data window # TODO: Implement this function in window buffer
+        window_data = window_buffer.get_window() # Build human data window
         human_data = self._build_human_data_window(window_data, sample_rate) # TODO: Implement this function
-        sensor_snapshots = self.get_latest_sensors() # Get latest sensors snapshots # TODO: Implement this function
-        motor_state = self.get_latest_motors()  # Get latest motor state # TODO: Implement this function
+        sensor_snapshots = self._get_latest_sensors() # Get latest sensors snapshots # TODO: Implement this function
+        motor_state = self._get_latest_motors()  # Get latest motor state # TODO: Implement this function
         
         # Build packet
         packet = DataPacket(
@@ -60,8 +60,8 @@ class PacketBuilder:
             timestamp=time.time(),
             packet_age_ms=0.0,
             human_data=human_data,
-            sensor_snapshots=sensor_snapshots,
-            motor_state=motor_state,
+            sensors=sensor_snapshots,
+            motors=motor_state,
             metadata={
                 "sample_rate": sample_rate,
                 "window_size": window_buffer.window_size,

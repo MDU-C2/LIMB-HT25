@@ -53,7 +53,7 @@ class WindowBuffer:
         t_start = timestamps[0] if len(timestamps) > 0 else time.time()
         t_end = timestamps[-1] if len(timestamps) > 0 else time.time()
 
-        # Ensure the correct shapes?
+        # Ensure the correct shapes? Maybe not needed but to be safe perhaps its good...
         # EMG
         if emg_data.ndim == 1:
             emg_data = emg_data.reshape(-1, 1)

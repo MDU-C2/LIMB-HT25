@@ -1,6 +1,6 @@
 
 from multiprocessing import Process, Event
-from XXXXX import CanInterface
+from hardware.can.can_interface import CanInterface
 from window_buffer import WindowBuffer
 from packet_builder import PacketBuilder
 from shared.queues import DataQueue
@@ -12,15 +12,29 @@ import time
 class InputLayer(Process):
     """Input layer process: reads CAN and builds packets"""
 
-    def __init__(self, can_interface: CanInterface, output_queue: DataQueue, window_size: int = 100, sample_rate: float = 100.0):
+    def __init__(self, can_interface: CanInterface, 
+                    output_queue: DataQueue, 
+                    window_size: int = 100, 
+                    sample_rate: float = 100.0,
+                    vision_source = None,
+                    pressure_source = None,
+                    piezo_source = None,
+                    motor_state_source = None):
 
         super().__init__(name="InputLayer")
         self.running = Event() # Event to signal the process to stop
         self.can_interface = can_interface
         self.window_buffer = WindowBuffer(window_size)
-        self.packet_builder = PacketBuilder()
+        self.packet_builder = PacketBuilder(sequence_start=0)
         self.sample_rate = sample_rate # Do we need this?
         self.output_queue = output_queue
+
+        self.packet_builder.set_sensor_sources(
+            vision_source=vision_source, 
+            pressure_source=pressure_source, 
+            piezo_source=piezo_source)
+
+        self.packet_builder.set_motor_state_source(motor_state_source)
 
     def run(self):
         """Main process loop"""
@@ -30,6 +44,9 @@ class InputLayer(Process):
 
         while self.running.is_set():
 
+
+            # TODO: Update to correct attributes, e.g. msg.message_type instead of msg.type
+
             # Read CAN messages (non-blocking)
             can_messages = self.can_interface.read() # Maybe read all? Is it a list or a dict?
             
@@ -38,21 +55,20 @@ class InputLayer(Process):
                 # Update window buffer with new data
                 # To add functions in each branch, to the window buffer?
 
+                # TODO: EMG and IMU and other sensors have different sample rates, do we need to handle this somehow?
+
                 if msg.type == "EMG":
-                    pass
+                    self.window_buffer.add_emg(msg.data, msg.timestamp)
 
                 elif msg.type == "IMU":
-                    pass
+                    self.window_buffer.add_imu(msg.data, msg.timestamp)
 
                 elif msg.type == "piezo":
                     pass
 
-                elif msg.type == "potentiometer": # Do we need this?
-                    pass
-
             # Create packet (only when window buffer is full)
             if self.window_buffer.is_full():
-                packet = self.packet_builder.build() # TODO: Implement this function and Packet stuff
+                packet = self.packet_builder.build(self.window_buffer, self.sample_rate)
                 
                 # Send packet to the next layer via an async queue
                 self.output_queue.put(packet)
