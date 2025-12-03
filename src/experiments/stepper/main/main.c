@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "esp_log.h"
+#include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
@@ -33,11 +34,17 @@ static const char *TAG = "STEPPER_TEST";
 
 stepper_control_handle_t s_stepper_handle;
 
-adc_mgr_handle_t adc_handle;
+adc_channel_t stepper_adc_channel;
 
 SemaphoreHandle_t s_latest_potentiometer_mutex;
-uint16_t s_latest_potentiometer_values[1024];
-uint16_t s_latest_potentiometer_values_len;
+uint16_t s_potentiometer_adc_underlying_buf[1024];
+AdcMgrReadResults s_adc_read_results = {
+    .channel_buffers[POT_ADC_CHANNEL] = (AdcMgrChannelBuffer) {
+        .data = s_potentiometer_adc_underlying_buf,
+        .capacity = 1024,
+    },
+};
+AdcMgrChannelBuffer* s_read_potentiometer_values_buf = &s_adc_read_results.channel_buffers[POT_ADC_CHANNEL];
 
 static void adc_reading_task(void *pvParameters)
 {
@@ -46,13 +53,8 @@ static void adc_reading_task(void *pvParameters)
     while (1) {
         // Get potentiometer samples.
         xSemaphoreTake(s_latest_potentiometer_mutex, portMAX_DELAY);
-        s_latest_potentiometer_values_len = 0;
-        for (int i = 0; i < AVG_SAMPLES; ++i) {
-            int raw = 0;
-            if (adc_mgr_read(adc_handle, &raw) == ESP_OK) {
-                s_latest_potentiometer_values[s_latest_potentiometer_values_len++] = raw;
-            }
-        }
+        s_read_potentiometer_values_buf->length = 0;
+        ESP_ERROR_CHECK(adc_mgr_read(&s_adc_read_results, 0));
         xSemaphoreGive(s_latest_potentiometer_mutex);
 
         vTaskDelayUntil(&last_wake_time, period);
@@ -75,7 +77,7 @@ static void stepper_control_task(void *pvParameters)
     while (1) {
         xSemaphoreTake(s_latest_potentiometer_mutex, portMAX_DELAY);
         // Update stepper control loop
-        stepper_update(*stepper_handle, dt, s_latest_potentiometer_values, s_latest_potentiometer_values_len);
+        stepper_update(*stepper_handle, dt, s_read_potentiometer_values_buf->data, s_read_potentiometer_values_buf->length);
         xSemaphoreGive(s_latest_potentiometer_mutex);
 
         // Wait for next period
@@ -186,17 +188,19 @@ void app_main(void)
     ESP_LOGI(TAG, "Stepper Motor Test Application");
     ESP_LOGI(TAG, "==============================");
 
-    // Register channel with ADC manager
-    adc_oneshot_chan_cfg_t chan_config = {
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-        .atten = ADC_ATTEN_DB_12,
+    AdcMgrChannelConfig adc_channel_configs[] = {
+        (AdcMgrChannelConfig) {
+                .channel = POT_ADC_CHANNEL,
+                .sample_rate = 1000,
+        }
     };
-    
-    adc_handle = adc_mgr_register_channel(POT_ADC_CHANNEL, &chan_config);
-    if (adc_handle < 0) {
-        ESP_LOGE(TAG, "Failed to register ADC channel with ADC manager");
-        return;
-    }
+    AdcMgrConfig adc_mgr_config = {
+        .ms_worth_of_buffer_size = 100,
+        .channel_configs = adc_channel_configs,
+        .channel_configs_len = 1,
+    };
+
+    ESP_ERROR_CHECK(adc_mgr_init(adc_mgr_config));
 
     s_latest_potentiometer_mutex = xSemaphoreCreateMutex();
     if (s_latest_potentiometer_mutex == NULL) {
@@ -206,13 +210,9 @@ void app_main(void)
 
     // Collect initial ADC readings for potentiometer.
     xSemaphoreTake(s_latest_potentiometer_mutex, portMAX_DELAY);
-    for (int i = 0; i < 10; ++i) {
-        int raw = 0;
-        if (adc_mgr_read(adc_handle, &raw) == ESP_OK) {
-            s_latest_potentiometer_values[s_latest_potentiometer_values_len++] = raw;
-        }
-    }
+    ESP_ERROR_CHECK(adc_mgr_read(&s_adc_read_results, 5));
     xSemaphoreGive(s_latest_potentiometer_mutex);
+    ESP_LOGI(TAG, "Read %d initial adc values", s_adc_read_results.channel_buffers[POT_ADC_CHANNEL].length);
     
     // Configure stepper motor
     stepper_control_config_t config = {
@@ -228,7 +228,7 @@ void app_main(void)
     };
 
     // Initialize stepper
-    esp_err_t ret = stepper_init(&config, s_latest_potentiometer_values, s_latest_potentiometer_values_len, &s_stepper_handle);
+    esp_err_t ret = stepper_init(&config, s_read_potentiometer_values_buf->data, s_read_potentiometer_values_buf->length, &s_stepper_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize stepper: %s", esp_err_to_name(ret));
         return;

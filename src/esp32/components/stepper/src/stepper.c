@@ -257,7 +257,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
 {
     motion_control_context_t *ctx = &s_contexts[handle];
 
-    if (dt_seconds <= 0.0f) return;
+    if (dt_seconds <= 0.0f || latest_potentiometer_values_len == 0) return;
 
     // Read & filter pot
     int raw = average(latest_potentiometer_values, latest_potentiometer_values_len);
