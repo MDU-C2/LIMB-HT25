@@ -1,7 +1,7 @@
 
 import time
 import numpy as np
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
 from shared.models.packet import (
@@ -73,7 +73,72 @@ class PacketBuilder:
 
 
     def _build_human_data_window(self, window_data, sample_rate: float) -> HumanDataWindow:
-        pass
+        """
+        Build HumanDataWindow from window buffer data.
+        
+        Extracts EMG and IMU arrays, timestamps, and creates a HumanDataWindow object
+        with proper shapes matching the EMG processing pipeline expectations.
+        """
+        # Extract EMG and IMU arrays
+        emg_data = window_data.get('emg')
+        imu_data = window_data.get('imu')
+        
+        # Ensure they are numpy arrays
+        if not isinstance(emg_data, np.ndarray):
+            emg_data = np.array(emg_data)
+        if not isinstance(imu_data, np.ndarray):
+            imu_data = np.array(imu_data)
+        
+        # Extract timestamps
+        timestamps = window_data.get('timestamps')
+        timestamp_start = window_data.get('timestamp_start')
+        timestamp_end = window_data.get('timestamp_end')
+        
+        # Validate and ensure proper shapes
+        # EMG should be (window_size, num_channels)
+        if emg_data.ndim == 1:
+            # If 1D, reshape to (window_size, 1)
+            emg_data = emg_data.reshape(-1, 1)
+        
+        # IMU should be (window_size, 6) - [ax, ay, az, wx, wy, wz]
+        if imu_data.ndim == 1:
+            # If 1D, tile it (shouldn't happen if window is full)
+            imu_data = np.tile(imu_data, (len(timestamps) if timestamps is not None else 100, 1))
+        elif imu_data.ndim == 2:
+            # Ensure shape is (window_size, 6)
+            if imu_data.shape[1] != 6:
+                if imu_data.shape[1] < 6:
+                    # Pad with zeros
+                    padding = np.zeros((imu_data.shape[0], 6 - imu_data.shape[1]))
+                    imu_data = np.hstack([imu_data, padding])
+                else:
+                    # Truncate to 6 values
+                    imu_data = imu_data[:, :6]
+        
+        # Validate timestamps
+        if timestamps is None or len(timestamps) == 0:
+            # Fallback: calculate from sample rate
+            current_time = time.time()
+            window_duration = emg_data.shape[0] / sample_rate if emg_data.shape[0] > 0 else 0.0
+            timestamp_start = current_time - window_duration
+            timestamp_end = current_time
+        else:
+            # Use provided timestamps
+            if timestamp_start is None:
+                timestamp_start = timestamps[0] if len(timestamps) > 0 else time.time()
+            if timestamp_end is None:
+                timestamp_end = timestamps[-1] if len(timestamps) > 0 else time.time()
+        
+        # Create HumanDataWindow object
+        human_data_window = HumanDataWindow(
+            emg=emg_data,
+            imu=imu_data,
+            timestamp_start=timestamp_start,
+            timestamp_end=timestamp_end,
+            sample_rate=sample_rate
+        )
+        
+        return human_data_window
 
     # Decide how self.moto_state_source looks like and then can remove some code
     def _get_latest_motors(self) -> MotorState:
@@ -90,21 +155,19 @@ class PacketBuilder:
             elif callable(self.motor_state_sources):
                 state = self.motor_state_sources()
             else:
-                state = self.motor_state_source
+                state = self.motor_state_sources
 
             if isinstance(state, MotorState):
                 return state
             elif isinstance(state, dict):
                 return MotorState(
                     joint_positions=np.array(state.get("joint_positions", [])),
-                    joint_velocities=np.array(state.get("joint_velocities", [])),
                     gripper_state=state.get("gripper_state", {}),
                     timestamp=state.get("timestamp", time.time()))
             else:
             # Default empty state
                 return MotorState(
                     joint_positions=np.array([]),
-                    joint_velocities=np.array([]),
                     gripper_state={},
                     timestamp=time.time()
                 )
@@ -138,7 +201,7 @@ class PacketBuilder:
         Get the latest vision data (cup detections and AprilTag detections).
         """
         pass
-    def _get_pressure_data(self) -> float:
+    def _get_pressure_data(self) -> Optional[List[float]]:
         """
         Get the latest pressure data.
         """

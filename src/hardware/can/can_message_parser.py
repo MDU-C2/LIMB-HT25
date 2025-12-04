@@ -10,7 +10,7 @@ class CANMessageParser:
     # TODO: Change these to the actual IDs that we are using
     CAN_IDS = {
         # Sensor messages (from ESP32 nodes)
-        0x100: {"type": "EMG", "format": "<4f"},        # 4 EMG channels (float32)
+        0x100: {"type": "EMG", "format": "<2f"},        # 2 EMG channels (#TODO: float32? int16?)
         0x101: {"type": "IMU", "format": "<6f"},         # IMU: [ax, ay, az, gx, gy, gz]
         0x102: {"type": "pressure", "format": "<5f"},     # pressure [thumb, index, middle, ring, little]
         0x103: {"type": "piezo", "format": "<f"},        # piezo (float32)
@@ -78,8 +78,7 @@ class CANMessageParser:
         
         elif msg_type == 'IMU':
             return {
-                'linear_acceleration': list(parsed[:3]),  # [ax, ay, az]
-                'angular_velocity': list(parsed[3:6]),     # [wx, wy, wz]
+                'data': list(parsed) # [ax, ay, az, wx, wy, wz]
             }
         
         elif msg_type == 'pressure':

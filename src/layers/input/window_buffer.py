@@ -22,13 +22,13 @@ class WindowBuffer:
         if len(self.emg_buffer) > self.window_size:
             self.emg_buffer.pop(0) # Remove the oldest
 
-    def add_imu(self, samples, timestamp):
+    def add_imu(self, data, timestamp):
         """Add a new IMU sample to the buffer."""
         if timestamp is None:
             timestamp = time.time()
 
         self.imu_buffer.append({
-            "data": samples.copy(), # Make a copy to avoid modifying the original data (needed?)
+            "data": data.copy(), # Make a copy to avoid modifying the original data (needed?)
             "timestamp": timestamp
         })
 

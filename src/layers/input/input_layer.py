@@ -1,6 +1,6 @@
 
 from multiprocessing import Process, Event
-from hardware.can.can_interface import CanInterface
+from hardware.can.can_interface import CANInterface
 from window_buffer import WindowBuffer
 from packet_builder import PacketBuilder
 from shared.queues import DataQueue
@@ -12,7 +12,7 @@ import time
 class InputLayer(Process):
     """Input layer process: reads CAN and builds packets"""
 
-    def __init__(self, can_interface: CanInterface, 
+    def __init__(self, can_interface: CANInterface, 
                     output_queue: DataQueue, 
                     window_size: int = 100, 
                     sample_rate: float = 100.0,
@@ -57,14 +57,14 @@ class InputLayer(Process):
 
                 # TODO: EMG and IMU and other sensors have different sample rates, do we need to handle this somehow?
 
-                if msg.type == "EMG":
-                    self.window_buffer.add_emg(msg.data, msg.timestamp)
+                if msg.message_type == "EMG":
+                    self.window_buffer.add_emg(msg.data["channels"], msg.timestamp)
 
-                elif msg.type == "IMU":
-                    self.window_buffer.add_imu(msg.data, msg.timestamp)
+                elif msg.message_type == "IMU":
+                    self.window_buffer.add_imu(msg.data["data"], msg.timestamp)
 
-                elif msg.type == "piezo":
-                    pass
+                elif msg.message_type == "piezo":
+                    pass # TODO: Implement this
 
             # Create packet (only when window buffer is full)
             if self.window_buffer.is_full():
@@ -77,5 +77,7 @@ class InputLayer(Process):
     def stop(self):
         """Stop the process"""
         self.running.clear() # Clear the event to signal the process to stop
-       
+        self.can_interface.stop() # Stop the CAN interface
+        self.window_buffer.clear() # Clear the window buffer
+        
 
