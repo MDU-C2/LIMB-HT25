@@ -9,7 +9,7 @@ Make sure the CAN interface is set up before running:
   3. Interface should be UP
 
 For loopback testing (send and receive on same interface):
-  sudo ip link set can0 up type can bitrate 500000 loopback on
+  sudo ip link set can0 up type can bitrate 1000000 loopback on
 
 THIS IS AI GENERATED CODE
 """
@@ -37,7 +37,7 @@ def test_interface_start_stop():
     """Test starting and stopping the CAN interface."""
     print_section("Test 1: Start/Stop Interface")
     
-    can_interface = SocketCANInterface(interface="can0", bitrate=500000)
+    can_interface = SocketCANInterface(interface="can0", bitrate=1000000)
     
     # Test start
     print("\n1. Starting CAN interface...")
@@ -70,7 +70,7 @@ def test_read_messages():
     """Test reading messages from CAN bus."""
     print_section("Test 2: Read Messages")
     
-    can_interface = SocketCANInterface(interface="can0", bitrate=500000)
+    can_interface = SocketCANInterface(interface="can0", bitrate=1000000)
     
     if not can_interface.start():
         print("   ✗ Cannot test reading - interface failed to start")
@@ -123,7 +123,7 @@ def test_send_messages():
     """Test sending messages on CAN bus."""
     print_section("Test 3: Send Messages")
     
-    can_interface = SocketCANInterface(interface="can0", bitrate=500000)
+    can_interface = SocketCANInterface(interface="can0", bitrate=1000000)
     
     if not can_interface.start():
         print("   ✗ Cannot test sending - interface failed to start")
@@ -188,7 +188,7 @@ def test_loopback():
     
     print("\n⚠ Loopback mode requires:")
     print("   sudo ip link set can0 down")
-    print("   sudo ip link set can0 up type can bitrate 500000 loopback on")
+    print("   sudo ip link set can0 up type can bitrate 1000000 loopback on")
     print("\n   Continue anyway? (y/n): ", end='')
     
     response = input().strip().lower()
@@ -196,7 +196,7 @@ def test_loopback():
         print("   Skipping loopback test")
         return True
     
-    can_interface = SocketCANInterface(interface="can0", bitrate=500000)
+    can_interface = SocketCANInterface(interface="can0", bitrate=1000000)
     
     if not can_interface.start():
         print("   ✗ Cannot test loopback - interface failed to start")
@@ -243,7 +243,7 @@ def test_error_handling():
     """Test error handling."""
     print_section("Test 5: Error Handling")
     
-    can_interface = SocketCANInterface(interface="can0", bitrate=500000)
+    can_interface = SocketCANInterface(interface="can0", bitrate=1000000)
     
     # Test 1: Read when not started
     print("\n1. Testing read when interface not started...")
@@ -274,7 +274,7 @@ def test_statistics():
     """Test statistics tracking."""
     print_section("Test 6: Statistics")
     
-    can_interface = SocketCANInterface(interface="can0", bitrate=500000)
+    can_interface = SocketCANInterface(interface="can0", bitrate=1000000)
     
     if not can_interface.start():
         print("   ✗ Cannot test statistics - interface failed to start")

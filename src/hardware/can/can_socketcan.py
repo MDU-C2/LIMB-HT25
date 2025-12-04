@@ -14,7 +14,7 @@ class SocketCANInterface(CANInterface):
     Uses python-can library which provides SocketCAN support for Python.
     """
 
-    def __init__(self, interface: str = "can0", bitrate: int = 500000, timeout: float = 0.1):
+    def __init__(self, interface: str = "can0", bitrate: int = 1000000, timeout: float = 0.1):
         self.interface = interface
         self.bitrate = bitrate
         self.timeout = timeout
