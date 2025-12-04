@@ -3,14 +3,13 @@
 #include <math.h>
 
 #include "esp_err.h"
+#include "potentiometer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_check.h"
-
 #include "driver/gpio.h"
 #include "driver/ledc.h"
-// #include "adc_manager.h"
 #include "hal/ledc_types.h"
 #include "soc/soc_caps.h"
 #include "sys/param.h"
@@ -54,15 +53,17 @@ typedef struct {
 
 #define LIMB_ARR_LEN(arr) (sizeof(arr) / sizeof(*(arr)))
 
+static const Potentiometer s_potentiometer = {
+    .min_degree = DEG_MIN_CAL,
+    .max_degree = DEG_MAX_CAL,
+    .adc_bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
+};
+
 // We only support at most as many steppers as there are LEDC channels, since
 // they require exclusive access anyway.
 static motion_control_context_t s_contexts[SOC_LEDC_CHANNEL_NUM] = {0};
 
 // Helper functions
-
-static int clampi(int x, int lo, int hi) {
-    return x < lo ? lo : (x > hi ? hi : x);
-}
 
 static float clampf(float x, float lo, float hi)
 {
@@ -82,20 +83,6 @@ static int average(const uint16_t *values, int n)
         acc += values[i];
     }
     return acc / n;
-}
-
-// Performs a linear interpolation of x from the range [x0, x1] onto [y0, y1].
-static float lerp_from_range(float x, float x0, float x1, float y0, float y1) {
-    float x_range = x1 - x0;
-    float y_range = y1 - y0;
-    return y0 + ((x - x0) * y_range / x_range);
-}
-
-// Map pot raw -> degrees (calibrated)
-static float map_pot_to_deg(int raw)
-{
-    raw = clampi(raw, RAW_MIN_CAL, RAW_MAX_CAL);
-    return lerp_from_range((float)raw, RAW_MIN_CAL, RAW_MAX_CAL, DEG_MIN_CAL, DEG_MAX_CAL);
 }
 
 static void stop_motor(stepper_control_handle_t handle) 
@@ -211,7 +198,8 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     if (latest_potentiometer_values_len > 0) {
         // Use initial ADC value to set intial angle (averaged for stability).
         int raw_adc = average(latest_potentiometer_values, latest_potentiometer_values_len);
-        float initial_angle = map_pot_to_deg(raw_adc);
+
+        float initial_angle = potentiometer_adc_to_degrees(s_potentiometer, raw_adc);
         ctx.current_angle_deg = clamp_angle(initial_angle);
         ctx.target_angle_deg = ctx.current_angle_deg;
         ctx.use_position_feedback = true;
@@ -266,7 +254,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     // Read & filter pot
     int raw = average(latest_potentiometer_values, latest_potentiometer_values_len);
     ctx->filt = ctx->filt + ALPHA * ((float)raw - ctx->filt);
-    float angle_deg = map_pot_to_deg((int)(ctx->filt + 0.5f));
+    float angle_deg = potentiometer_adc_to_degrees(s_potentiometer, (uint16_t)(ctx->filt + 0.5f));
     angle_deg = clamp_angle(angle_deg);
 
     // Take snapshot of shared state and update current angle from feedback
