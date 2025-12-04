@@ -5,24 +5,30 @@ and dedicated **Inverse Kinematics (IK)** engine.
 Built using **PyBullet** for physics simulation, **Pygame** for real-time control,
 and **Tkinter** for sensor monitoring dashboard.
 
+Note: If you want to control this arm in real time using IMU sensors (ESP32), please refer to the dedicated guide: [`HARDWARE_SETUP.md`].
+
 ---
 
-## 📁 1. Project Structure
+### 📁 1. Project Structure
+
+---
 
 LIMB3/
-├── simulation.py              # Main script (PyBullet / Pygame / Tkinter logic)
-├── arm_kinamatics.py          # Inverse Kinematics (IK) calculations and reachability algorithm
-├── requirements.txt           # Python dependencies list
-├── README.md                  # This documentation file
-└── arm/                       # ROBOT ASSETS FOLDER
-    ├── right_arm.urdf         # Robot description file
-    ├── *.stl                  # Main arm segment meshes (e.g., bicep.stl)
-    └── fullhand2/             # Detailed Hand Meshes
-        └── *.stl              # Fingers, phalanges, and covers meshes
+├── simulation.py # Main script (PyBullet / Pygame / Tkinter)
+├── arm*kinamatics.py # IK computations + reachability algorithm
+├── requirements.txt # Python dependencies
+├── README.md # Documentation file
+└── arm/ # Robot assets
+├── right_arm.urdf # Robot description file (URDF)
+├── *.stl # Main arm segment meshes
+└── fullhand2/ # Detailed hand meshes
+└── \_.stl # Fingers, phalanges, covers
 
 ---
 
-## 🚀 2. Setup & Launch
+### 🚀 2. Setup & Launch
+
+---
 
 🔹 Requirements
 
@@ -46,7 +52,7 @@ python simulation.py
 
 ---
 
-## 🎮 3. Control Mapping
+## ###🎮 3. Control Mapping
 
 ⚠ IMPORTANT: Click inside the **Pygame window** before using commands,
 otherwise controls won’t be registered.
@@ -75,7 +81,9 @@ otherwise controls won’t be registered.
 
 ---
 
-## 🛰️ 4. Interface Interaction
+### 🛰️ 4. Interface Interaction
+
+---
 
 🎥 PyBullet Camera Controls
 
@@ -94,7 +102,9 @@ Displays:
 
 ---
 
-## 🧠 Notes & Tips
+### 🧠 Notes & Tips
+
+---
 
 ✔ GPU usage recommended for better simulation performance  
 ✔ If controls don’t work → ensure Pygame window has focus  
@@ -102,6 +112,8 @@ Displays:
 
 ---
 
-## 🚀 Ready to operate?
+### 🚀 Ready to operate?
+
+---
 
 → Run `simulation.py` and control the robotic arm in real time!
