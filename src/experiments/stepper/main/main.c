@@ -6,6 +6,7 @@
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
 #include "portmacro.h"
+#include "potentiometer.h"
 #include "stepper.h"
 #include "driver/gpio.h"
 #include "hal/adc_types.h"
@@ -96,17 +97,21 @@ static void status_task(void *pvParameters)
 
     ESP_LOGI(TAG, "Status task started (print period: %d ms)", STATUS_PERIOD_MS);
 
+    const stepper_control_config_t *foo = stepper_get_cfg(*stepper_handle);
+
     while (1) {
         // Get current status
-        float current_angle = stepper_get_current_angle_deg(*stepper_handle);
-        float target_angle = stepper_get_target_angle_deg(*stepper_handle);
+        PotentiometerAngle current_pot_angle = stepper_get_current_angle_deg(*stepper_handle);
+        PotentiometerAngle target_pot_angle = stepper_get_target_angle_deg(*stepper_handle);
+        JointAngle current_joint_angle = to_joint_angle(&foo->potentiometer, current_pot_angle);
+        JointAngle target_joint_angle = to_joint_angle(&foo->potentiometer, target_pot_angle);
         float velocity = stepper_get_current_velocity_dps(*stepper_handle);
         bool is_moving = stepper_is_moving(*stepper_handle);
         bool has_feedback = stepper_has_position_feedback(*stepper_handle);
 
         // Print status
-        ESP_LOGI(TAG, "Status: current=%.2f°, target=%.2f°, vel=%.2f°/s, moving=%d, feedback=%d",
-                 current_angle, target_angle, velocity, is_moving, has_feedback);
+        ESP_LOGI(TAG, "Status: current(pot)=%.2f°, target(pot)=%.2f°, current(joint)=%.2f°, target(joint)=%.2f°, vel=%.2f°/s, moving=%d, feedback=%d",
+                 current_pot_angle.degree, target_pot_angle.degree, current_joint_angle.degree, target_joint_angle.degree, velocity, is_moving, has_feedback);
 
         // Wait for next period
         vTaskDelayUntil(&last_wake_time, period);
@@ -119,6 +124,7 @@ static void status_task(void *pvParameters)
 static void test_sequence_task(void *pvParameters)
 {
     stepper_control_handle_t *stepper_handle = pvParameters;
+    const stepper_control_config_t *cfg = stepper_get_cfg(*stepper_handle);
 
     // Wait a bit for initialization
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -129,29 +135,29 @@ static void test_sequence_task(void *pvParameters)
     bool has_feedback = stepper_has_position_feedback(*stepper_handle);
     ESP_LOGI(TAG, "Test 1: Position feedback available: %s", has_feedback ? "YES" : "NO");
     if (has_feedback) {
-        float initial_angle = stepper_get_current_angle_deg(*stepper_handle);
-        ESP_LOGI(TAG, "  Initial angle: %.2f°", initial_angle);
+        PotentiometerAngle initial_angle = stepper_get_current_angle_deg(*stepper_handle);
+        ESP_LOGI(TAG, "  Initial angle: %.2f°", initial_angle.degree);
     }
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // Test 2: Move to positive angle
-    ESP_LOGI(TAG, "Test 2: Moving to +45°");
-    stepper_set_target_angle_deg(*stepper_handle, 45.0f);
+    ESP_LOGI(TAG, "Test 2: Moving joint to +45°");
+    stepper_set_target_angle_deg(*stepper_handle, to_potentiometer_angle(&cfg->potentiometer, (JointAngle){45.F}));
     vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for movement
 
-    // Test 3: Move to negative angle
-    ESP_LOGI(TAG, "Test 3: Moving to -45°");
-    stepper_set_target_angle_deg(*stepper_handle, -45.0f);
+    // Test 2: Move to negative angle
+    ESP_LOGI(TAG, "Test 3: Moving joint to -45°");
+    stepper_set_target_angle_deg(*stepper_handle, to_potentiometer_angle(&cfg->potentiometer, (JointAngle){-45.F}));
     vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for movement
 
     // Test 4: Move to zero
     ESP_LOGI(TAG, "Test 4: Moving to 0°");
-    stepper_set_target_angle_deg(*stepper_handle, 0.0f);
+    stepper_set_target_angle_deg(*stepper_handle, to_potentiometer_angle(&cfg->potentiometer, (JointAngle){0}));
     vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for movement
 
     // Test 5: Test emergency stop
     ESP_LOGI(TAG, "Test 5: Testing emergency stop");
-    stepper_set_target_angle_deg(*stepper_handle, 30.0f);
+    stepper_set_target_angle_deg(*stepper_handle, to_potentiometer_angle(&cfg->potentiometer, (JointAngle){30.F}));
     vTaskDelay(pdMS_TO_TICKS(1000)); // Start moving
     ESP_LOGI(TAG, "  Activating E-stop...");
     stepper_set_estop(*stepper_handle, true);
@@ -163,15 +169,15 @@ static void test_sequence_task(void *pvParameters)
     // Test 6: Continuous movement test
     ESP_LOGI(TAG, "Test 6: Continuous movement test (sine wave pattern)");
     for (int i = 0; i < 20; i++) {
-        float angle = 60.0f * sinf(i * 0.314f); // ±60° sine wave
-        stepper_set_target_angle_deg(*stepper_handle, angle);
+        JointAngle angle = {60.0f * sinf(i * 0.314f)}; // ±60° sine wave
+        stepper_set_target_angle_deg(*stepper_handle, to_potentiometer_angle(&cfg->potentiometer, angle));
         ESP_LOGI(TAG, "  Target: %.2f°", angle);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
     // Test 7: Return to center
     ESP_LOGI(TAG, "Test 7: Returning to center (0°)");
-    stepper_set_target_angle_deg(*stepper_handle, 0.0f);
+    stepper_set_target_angle_deg(*stepper_handle, (PotentiometerAngle){285.F / 2.F});
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     ESP_LOGI(TAG, "=== Test Sequence Complete ===");
@@ -214,24 +220,47 @@ void app_main(void)
     xSemaphoreGive(s_latest_potentiometer_mutex);
     ESP_LOGI(TAG, "Read %d initial adc values", s_adc_read_results.channel_buffers[POT_ADC_CHANNEL].length);
     
-    // Configure stepper motor
-    stepper_control_config_t config = {
-        .step_gpio = STEP_GPIO,
-        .dir_gpio = DIR_GPIO,
-        .enable_gpio = ENABLE_GPIO,
-        .steps_per_rev = STEPS_PER_REV,
-        .gear_ratio = GEAR_RATIO,
-        .max_velocity_dps = MAX_VELOCITY_DPS,
-        .min_velocity_dps = MIN_VELOCITY_DPS,
-        .max_accel_dps2 = MAX_ACCEL_DPS2,
-        .pot_adc_channel = POT_ADC_CHANNEL,
-    };
+    {
+        // Configure the potentiometer used.
+        Potentiometer potentiometer = {
+            // These values are the limits for the potentiometer itself.
+            .degrees_of_motion = (PotentiometerAngle){285},
 
-    // Initialize stepper
-    esp_err_t ret = stepper_init(&config, s_read_potentiometer_values_buf->data, s_read_potentiometer_values_buf->length, &s_stepper_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize stepper: %s", esp_err_to_name(ret));
-        return;
+            // These values are the ones used from the joint's frame of reference.
+            // The range has to align with the min/max_join_angle_as_potentiometer_angles.
+            .min_joint_angle = {-90.F},
+            .max_joint_angle = {90.F},
+
+            // These values determine the potentiometer's angle at the min and max
+            // joint angles.
+            .min_joint_angle_as_potentiometer_angle = (PotentiometerAngle){285.F / 2.F - 90.F},
+            .max_joint_angle_as_potentiometer_angle = (PotentiometerAngle){285.F / 2.F + 90.F},
+
+            // This needs to be calibrated.
+            .min_adc_value = 0,
+            .max_adc_value = 4035,
+        };
+
+        // Configure stepper motor
+        stepper_control_config_t config = {
+            .step_gpio = STEP_GPIO,
+            .dir_gpio = DIR_GPIO,
+            .enable_gpio = ENABLE_GPIO,
+            .steps_per_rev = STEPS_PER_REV,
+            .gear_ratio = GEAR_RATIO,
+            .max_velocity_dps = MAX_VELOCITY_DPS,
+            .min_velocity_dps = MIN_VELOCITY_DPS,
+            .max_accel_dps2 = MAX_ACCEL_DPS2,
+            .pot_adc_channel = POT_ADC_CHANNEL,
+            .potentiometer = potentiometer,
+        };
+
+        // Initialize stepper
+        esp_err_t ret = stepper_init(&config, s_read_potentiometer_values_buf->data, s_read_potentiometer_values_buf->length, &s_stepper_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize stepper: %s", esp_err_to_name(ret));
+            return;
+        }
     }
 
     ESP_LOGI(TAG, "Stepper initialized successfully");
@@ -250,7 +279,7 @@ void app_main(void)
     xTaskCreate(stepper_control_task, "stepper_ctrl", 4096, &s_stepper_handle, 5, NULL);
 
     // Create status monitoring task (low priority)
-    xTaskCreate(status_task, "status", 2048, &s_stepper_handle, 1, NULL);
+    xTaskCreate(status_task, "status", 4096, &s_stepper_handle, 1, NULL);
 
     // Create test sequence task (medium priority)
     xTaskCreate(test_sequence_task, "test_seq", 4096, &s_stepper_handle, 3, NULL);

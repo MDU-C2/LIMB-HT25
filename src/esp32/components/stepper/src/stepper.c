@@ -35,8 +35,8 @@ typedef struct {
     bool estop_active;
     bool is_moving;
     float current_veloctiy_dps;
-    float target_angle_deg;
-    float current_angle_deg;
+    PotentiometerAngle target_angle_deg;
+    PotentiometerAngle current_angle_deg;
     bool use_position_feedback;
 
     // Calculated parameters
@@ -53,12 +53,6 @@ typedef struct {
 
 #define LIMB_ARR_LEN(arr) (sizeof(arr) / sizeof(*(arr)))
 
-static const Potentiometer s_potentiometer = {
-    .min_degree = DEG_MIN_CAL,
-    .max_degree = DEG_MAX_CAL,
-    .adc_bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
-};
-
 // We only support at most as many steppers as there are LEDC channels, since
 // they require exclusive access anyway.
 static motion_control_context_t s_contexts[SOC_LEDC_CHANNEL_NUM] = {0};
@@ -70,9 +64,11 @@ static float clampf(float x, float lo, float hi)
     return x < lo ? lo : (x > hi ? hi : x);
 }
 
-static float clamp_angle(float angle_deg)
+static PotentiometerAngle clamp_angle(Potentiometer potentiometer, PotentiometerAngle angle_deg)
 {
-    return clampf(angle_deg, -MAX_JOINT_ANGLE_DEG, MAX_JOINT_ANGLE_DEG);
+    return (PotentiometerAngle){clampf(angle_deg.degree,
+                                       potentiometer.min_joint_angle_as_potentiometer_angle.degree,
+                                       potentiometer.max_joint_angle_as_potentiometer_angle.degree)};
 }
 
 // Calculates the average value 
@@ -199,18 +195,18 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
         // Use initial ADC value to set intial angle (averaged for stability).
         int raw_adc = average(latest_potentiometer_values, latest_potentiometer_values_len);
 
-        float initial_angle = potentiometer_adc_to_degrees(s_potentiometer, raw_adc);
-        ctx.current_angle_deg = clamp_angle(initial_angle);
+        PotentiometerAngle initial_angle = potentiometer_adc_to_angle(&ctx.cfg.potentiometer, raw_adc);
+        ctx.current_angle_deg = clamp_angle(ctx.cfg.potentiometer, initial_angle);
         ctx.target_angle_deg = ctx.current_angle_deg;
         ctx.use_position_feedback = true;
-        ctx.filt = initial_angle; // Initialize filter state
+        ctx.filt = initial_angle.degree; // Initialize filter state
         
         ESP_LOGI(TAG, "Potentiometer initialized: ADC channel=%d, raw=%d, angle=%.2f deg", 
                  cfg->pot_adc_channel, raw_adc, initial_angle);
     } else {
         ctx.use_position_feedback = false;
-        ctx.current_angle_deg = 0.0f;
-        ctx.target_angle_deg = 0.0f;
+        ctx.current_angle_deg.degree = 0.0f;
+        ctx.target_angle_deg.degree = 0.0f;
         ESP_LOGI(TAG, "Position feedback disabled (no ADC channel)");
     }
     
@@ -254,13 +250,13 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     // Read & filter pot
     int raw = average(latest_potentiometer_values, latest_potentiometer_values_len);
     ctx->filt = ctx->filt + ALPHA * ((float)raw - ctx->filt);
-    float angle_deg = potentiometer_adc_to_degrees(s_potentiometer, (uint16_t)(ctx->filt + 0.5f));
-    angle_deg = clamp_angle(angle_deg);
+    PotentiometerAngle angle_deg = potentiometer_adc_to_angle(&ctx->cfg.potentiometer, (uint16_t)(ctx->filt + 0.5f));
+    angle_deg = clamp_angle(ctx->cfg.potentiometer, angle_deg);
 
     // Take snapshot of shared state and update current angle from feedback
     portENTER_CRITICAL(&ctx->spinlock);
     bool estop = ctx->estop_active;
-    float target_angle = ctx->target_angle_deg;
+    PotentiometerAngle target_angle = ctx->target_angle_deg;
     float current_velocity_sps = ctx->current_veloctiy_dps * ctx->steps_per_degree;
     ctx->current_angle_deg = angle_deg;
     ctx->use_position_feedback = true;
@@ -272,7 +268,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     }
     
     // Compute the error and distance
-    float error_deg = target_angle - angle_deg;
+    float error_deg = target_angle.degree - angle_deg.degree;
     float distance_deg = fabsf(error_deg);
     float distance_sps = distance_deg * ctx->steps_per_degree;
 
@@ -324,11 +320,11 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
 
 // ------ Setters ------
 
-void stepper_set_target_angle_deg(stepper_control_handle_t handle, float angle_deg)
+void stepper_set_target_angle_deg(stepper_control_handle_t handle, PotentiometerAngle angle_deg)
 {
     motion_control_context_t *ctx = &s_contexts[handle];
 
-    angle_deg = clamp_angle(angle_deg);
+    angle_deg = clamp_angle(ctx->cfg.potentiometer, angle_deg);
     portENTER_CRITICAL(&ctx->spinlock);
     ctx->target_angle_deg = angle_deg;
     portEXIT_CRITICAL(&ctx->spinlock);
@@ -348,22 +344,22 @@ void stepper_set_estop(stepper_control_handle_t handle, bool active)
 
 // ------ Getters ------
 
-float stepper_get_current_angle_deg(stepper_control_handle_t handle)
+PotentiometerAngle stepper_get_current_angle_deg(stepper_control_handle_t handle)
 {
     const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
-    float angle = ctx->current_angle_deg;
+    PotentiometerAngle angle = ctx->current_angle_deg;
     portEXIT_CRITICAL(&ctx->spinlock);
     return angle;
 }
 
-float stepper_get_target_angle_deg(stepper_control_handle_t handle)
+PotentiometerAngle stepper_get_target_angle_deg(stepper_control_handle_t handle)
 {
     const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
-    float angle = ctx->target_angle_deg;
+    PotentiometerAngle angle = ctx->target_angle_deg;
     portEXIT_CRITICAL(&ctx->spinlock);
     return angle;
 }
@@ -396,4 +392,9 @@ bool stepper_has_position_feedback(stepper_control_handle_t handle)
     bool has_feedback = ctx->use_position_feedback;
     portEXIT_CRITICAL(&ctx->spinlock);
     return has_feedback;
+}
+
+const stepper_control_config_t *stepper_get_cfg(stepper_control_handle_t handle)
+{
+    return &s_contexts[handle].cfg;
 }
