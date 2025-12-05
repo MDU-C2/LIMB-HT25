@@ -4,14 +4,7 @@
 #include "driver/gpio.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
-
-// Calibration constants for potentiometer mapping
-// These should be calibrated for each joint
-#define RAW_MIN_CAL 0        // Minimum raw ADC value at minimum angle
-#define RAW_MAX_CAL 4095     // Maximum raw ADC value at maximum angle (12-bit ADC)
-#define DEG_MIN_CAL -90.0f   // Minimum angle in degrees
-#define DEG_MAX_CAL 90.0f    // Maximum angle in degrees
-#define MAX_JOINT_ANGLE_DEG 90.0f  // Maximum joint angle limit
+#include "potentiometer.h"
 
 // Stepper motor control configuration
 typedef struct {
@@ -31,6 +24,7 @@ typedef struct {
     
     // Position feedback
     adc_channel_t pot_adc_channel; // ADC channel for potentiometer (use -1 or value >= SOC_ADC_MAX_CHANNEL_NUM if not used)
+    Potentiometer potentiometer; // The potentiometer configuration/calibration used with the stepper.
 
     // The caller has to provide the PWM channel to use (since other
     // components might use some of the channels).
@@ -45,21 +39,24 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
 // Deinitialize stepper motor controller
 esp_err_t stepper_deinit(stepper_control_handle_t handle);
 
+// Get the config for the provided handle.
+const stepper_control_config_t *stepper_get_cfg(stepper_control_handle_t handle);
+
 // Update stepper control loop (call periodically, e.g., every 10ms)
 // dt_seconds: time delta since last update
 void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len);
 
 // Set target angle (degrees)
-void stepper_set_target_angle_deg(stepper_control_handle_t handle, float angle_deg);
+void stepper_set_target_angle_deg(stepper_control_handle_t handle, PotentiometerAngle angle_deg);
 
 // Set emergency stop state
 void stepper_set_estop(stepper_control_handle_t handle, bool active);
 
 // Get current angle from feedback (degrees)
-float stepper_get_current_angle_deg(stepper_control_handle_t handle);
+PotentiometerAngle stepper_get_current_angle_deg(stepper_control_handle_t handle);
 
 // Get target angle (degrees)
-float stepper_get_target_angle_deg(stepper_control_handle_t handle);
+PotentiometerAngle stepper_get_target_angle_deg(stepper_control_handle_t handle);
 
 // Get current velocity (degrees per second)
 float stepper_get_current_velocity_dps(stepper_control_handle_t handle);

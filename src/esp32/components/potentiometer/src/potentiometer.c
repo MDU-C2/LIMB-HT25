@@ -10,13 +10,35 @@ static float lerp_from_range(float x, float x0, float x1, float y0, float y1) {
   return y0 + ((x - x0) * y_range / x_range);
 }
 
-float potentiometer_adc_to_degrees(Potentiometer potentiometer,
-                                   uint16_t adc_value) {
-  const uint16_t max_adc_value = (1U << 12U) - 1U;
+#define LIMB_CLAMP(x, x_min, x_max) (MAX(MIN((x), (x_max)), (x_min)))
 
-  // Don't allow values larger than the max possible ADC value.
-  adc_value = MIN(adc_value, max_adc_value);
+PotentiometerAngle potentiometer_adc_to_angle(
+    const Potentiometer *potentiometer, uint16_t adc_value) {
+  // Don't allow values outside the acceptable range.
+  adc_value = LIMB_CLAMP(adc_value, potentiometer->min_adc_value,
+                         potentiometer->max_adc_value);
 
-  return lerp_from_range((float)adc_value, 0, max_adc_value,
-                         potentiometer.min_degree, potentiometer.max_degree);
+  return (PotentiometerAngle){
+      lerp_from_range((float)adc_value, potentiometer->min_adc_value,
+                      potentiometer->max_adc_value, 0,
+                      potentiometer->degrees_of_motion.degree)};
+}
+
+JointAngle to_joint_angle(const Potentiometer *potentiometer,
+                          PotentiometerAngle angle) {
+  float degrees_from_min_joint_angle =
+      angle.degree -
+      potentiometer->min_joint_angle_as_potentiometer_angle.degree;
+  return (JointAngle){potentiometer->min_joint_angle.degree +
+                      degrees_from_min_joint_angle};
+}
+
+PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
+                                          JointAngle angle) {
+  float degrees_from_min_joint_angle =
+      angle.degree - potentiometer->min_joint_angle.degree;
+
+  return (PotentiometerAngle){
+      potentiometer->min_joint_angle_as_potentiometer_angle.degree +
+      degrees_from_min_joint_angle};
 }

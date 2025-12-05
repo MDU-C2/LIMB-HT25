@@ -3,6 +3,7 @@ idf_component_register(
   "main.c"
   PRIV_REQUIRES
   stepper
+  potentiometer
   driver
   freertos
 )
