@@ -6,6 +6,7 @@ import math
 import pygame
 import tkinter as tk
 from arm_kinamatics import calculer_angles_triangle, is_reachable
+from Sensors_Calculations.sensor_logic import ArmController
 
 # --- Shoulder (Y/X/Z): Up/Down (Y) | Left/Right (X) | C/V (Z)
 # --- Elbow (Flexion): Z (close) / S (open)

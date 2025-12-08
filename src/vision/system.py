@@ -82,6 +82,15 @@ class SpatialVisualizer(dai.node.HostNode):
         cv2.putText(apriltags_frame, f"Tags: {num_tags}", (10, 30), 
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
+        # Create resizable windows and set larger sizes for Depth and RGB
+        cv2.namedWindow("Depth", cv2.WINDOW_NORMAL)
+        cv2.namedWindow("RGB", cv2.WINDOW_NORMAL)
+        cv2.namedWindow("AprilTags", cv2.WINDOW_NORMAL)
+        
+        # Resize windows to larger size (2x the original frame size)
+        cv2.resizeWindow("Depth", width * 2, height * 2)
+        cv2.resizeWindow("RGB", width * 3, height * 3)
+        
         cv2.imshow("Depth", depth_frame_color)
         cv2.imshow("RGB", rgb_frame)
         cv2.imshow("AprilTags", apriltags_frame)
@@ -255,7 +264,7 @@ class VisionSystem:
         self,
         model_path: Optional[str] = None,
         apriltag_family: str = "TAG36H11",
-        confidence_threshold: float = 0.5,
+        confidence_threshold: float = 0.3,
         spatial_threshold: int = 3000,  # Max depth in mm
         apriltag_quad_decimate: float = 1.5,
         apriltag_quad_sigma: float = 1.0,
