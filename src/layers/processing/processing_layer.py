@@ -23,7 +23,7 @@ class ProcessingLayer(Process):
                 packet = self.input_queue.get(timeout=0.001) # Why timeout?
 
                 # Check if packet is too old
-                if packet.is_stale():  # TODO: Implement this function
+                if packet.is_stale():
                     continue
 
                 
@@ -41,7 +41,37 @@ class ProcessingLayer(Process):
         self.running.clear() # Clear the event to signal the process to stop
 
     def process_packet(self, packet):
-        """Run ML inference and signal processing"""
+        """Run ML inference and signal processing
+        
+        Packet includes:
+        - sequence_id: int
+        - timestamp: float
+        - packet_age_ms: float
+        - human_data: HumanDataWindow
+        - sensors: SensorSnapshot
+        - motors: MotorState
+        - metadata: Dict[str, Any]
+
+        """
+
+        # What we need to be processed and fused:
+        """
+        PROCESSED:
+        - EMG data
+            - DC offest, band-pass, notch
+            - Create feature matrix
+            - Generate overlapping windows
+        - ML inference with features
+        - IMU data for motion intention detection?
+        - Piezo data for wrist rotation?
+
+        DATA FUSION:
+        - IMU and Vision data for object detection and tracking
+        - EMG/LSTM and IMU (and piezo) for motion intention detection?
+        - Vision and pressure data?
+        """
+
+
         features = 0 # TODO: Implement this function (self.feature_extractor.extract(packet.human_packet)) This does the signal processing
         
         prediction = self.ml_model.predict(features)

@@ -78,7 +78,7 @@ class InputLayer(Process):
 
                 elif msg.message_type == "motor_status":
                     # Store latest motor state
-                    # CAN parser returns: {'joint_positions': [j1, j2, j3, j4, j5]}
+                    # CAN parser returns: {'joint_positions': [j1, j2, j3, j4, j5]} # TODO: Clarify what joint correspond to what part of the arm
                     if msg.parsed_data:
                         from shared.models.packet import MotorState
                         positions = msg.parsed_data.get("joint_positions", [])
