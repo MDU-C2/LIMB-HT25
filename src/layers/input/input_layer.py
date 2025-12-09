@@ -6,6 +6,7 @@ from window_buffer import WindowBuffer
 from packet_builder import PacketBuilder
 from shared.queues import DataQueue
 import time
+import numpy as np
 
 # The difference between threading and multiprocessing:
 # Multiprocessing create separate OS processes, while threading creates separate threads within the same process.
@@ -18,10 +19,7 @@ class InputLayer(Process):
                     output_queue: DataQueue, 
                     window_size: int = 100, 
                     sample_rate: float = 100.0,
-                    vision_source = None,
-                    pressure_source = None,
-                    piezo_source = None,
-                    motor_state_source = None):
+                    vision_source = None):
 
         super().__init__(name="InputLayer")
         self.running = Event() # Event to signal the process to stop
@@ -32,12 +30,11 @@ class InputLayer(Process):
         self.sample_rate = sample_rate # Do we need this?
         self.output_queue = output_queue
 
-        self.packet_builder.set_sensor_sources(
-            vision_source=vision_source, 
-            pressure_source=pressure_source, 
-            piezo_source=piezo_source)
-
-        self.packet_builder.set_motor_state_source(motor_state_source)
+        self.vision_source = vision_source
+        #self.packet_builder.set_sensor_sources(
+        #    vision_source=vision_source, 
+        #    pressure_source=pressure_source, 
+        #    piezo_source=piezo_source)
 
     def run(self):
         """Main process loop"""
@@ -49,7 +46,7 @@ class InputLayer(Process):
         while self.running.is_set():
             
             # Read BLE data (EMG, IMU, piezo)
-            ble_data = self.ble_interface.read() # TODO: Implement this
+            ble_data = self.ble_interface.read() # TODO: Check that this works
             for sample in ble_data:
                 if sample.message_type == "EMG":
                     self.window_buffer.add_emg(sample.data["channels"], sample.timestamp)
@@ -66,17 +63,31 @@ class InputLayer(Process):
 
                 # TODO: EMG and IMU and other sensors have different sample rates, do we need to handle this somehow?
 
-                if msg.message_type == "IMU":
+                if msg.message_type == "IMU": # IMU are from the robot
                     self.window_buffer.add_imu(msg.data["data"], msg.timestamp)
 
                 elif msg.message_type == "pressure":
-                    pass # TODO: Implement this
+                    # Store the latest pressure (5 finger values)
+                    if msg.parsed_data and "values" in msg.parsed_data: # TODO: Can decide that the values are in parsed_data. Do we need the saftey if statement?
+                        self.latest_pressure = msg.parsed_data["values"]
 
                 elif msg.message_type == "motor_status":
-                    pass
+                    # Store latest motor state
+                    if msg.parsed_data:
+                        from shared.models.packet import MotorState
+                        self.latest_motor_state = MotorState(
+                            joint_positions=np.array(msg.parsed_data.get("positions", [])),
+                            gripper_state={}, # Will be updated from gripper status
+                            timestamp=msg.timestamp
+                        )
 
                 elif msg.message_type == "gripper_status":
-                    pass
+                    # Store latest gripper state
+                    if self.latest_motor_state and msg.parsed_data:
+                        self.latest_motor_state.gripper_state = {
+                            "open": msg.parsed_data.get("state", 0) == 1,
+                            "force": msg.parsed_data.get("force", 0.0)
+                        }
 
             # Create packet (only when window buffer is full)
             if self.window_buffer.is_full():

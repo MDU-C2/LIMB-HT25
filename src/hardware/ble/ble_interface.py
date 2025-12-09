@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from dataclass import dataclass
+from dataclasses import dataclass
 import time
 
 @dataclass
