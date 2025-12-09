@@ -19,10 +19,11 @@ class MotorState:
 @dataclass
 class HumanDataWindow:
     """
-    Time-series Window for human data (EMG/IMU)
+    Time-series Window for human data (EMG/IMU/Piezo)
     """
     emg: np.ndarray         # Shape: (window_size, num_channels)
     imu: np.ndarray         # Shape: (window_size, 6)
+    piezo: np.ndarray       # Shape: (window_size,) - piezo sensor values
     timestamp_start: float  # When window started (seconds since epoch)
     timestamp_end: float    # When window ended
     sample_rate: float      # In Hz
@@ -30,13 +31,12 @@ class HumanDataWindow:
 @dataclass
 class SensorSnapshot:
     """
-    Latest snapshot of sensor states (singe readings, not time-series)
+    Latest snapshot of sensor states (single readings, not time-series)
 
     These are "point-in-time" readings. The most recent value from each sensor at the moment the packet was created.
     """
     vision: Optional[Dict[str, Any]] = None                 # TODO: Define what vision data looks like
     pressure: Optional[List[float]] = None                  # 5 values: [thumb, index, middle, ring, little]
-    piezo: Optional[float] = None                           # TODO: Define what piezo data looks like
     timestamp: float = field(default_factory=time.time)     # When snapshot was taken
 
 @dataclass
@@ -53,7 +53,7 @@ class DataPacket:
     packet_age_ms: float = 0.0                          # How old oacket is (updated when received)
 
     # Core data
-    human_data: Optional[HumanDataWindow] = None                                # Time-series Window (EMG/IMU)
+    human_data: Optional[HumanDataWindow] = None                                # Time-series Window (EMG/IMU/Piezo)
     sensors: Optional[SensorSnapshot] = field(default_factory=SensorSnapshot)   # Latest sensor readings
     motors: Optional[MotorState] = None                                         # Current motor states
 

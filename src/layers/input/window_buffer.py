@@ -50,7 +50,9 @@ class WindowBuffer:
             self.piezo_buffer.pop(0) # Remove the oldest
 
     def is_full(self) -> bool:
-        return len(self.emg_buffer) >= self.window_size and len(self.imu_buffer) >= self.window_size
+        return (len(self.emg_buffer) >= self.window_size and 
+                len(self.imu_buffer) >= self.window_size and
+                len(self.piezo_buffer) >= self.window_size)
 
     def get_window(self):
         """Get complete window as nparray"""
@@ -60,13 +62,14 @@ class WindowBuffer:
         # Extract data arrays
         emg_data = np.array([sample["data"] for sample in self.emg_buffer])
         imu_data = np.array([sample["data"] for sample in self.imu_buffer])
+        piezo_data = np.array([sample["data"] for sample in self.piezo_buffer])
 
         # Extract timestamps
         timestamps = np.array([sample["timestamp"] for sample in self.emg_buffer])
         t_start = timestamps[0] if len(timestamps) > 0 else time.time()
         t_end = timestamps[-1] if len(timestamps) > 0 else time.time()
 
-        # Ensure the correct shapes? Maybe not needed but to be safe perhaps its good...
+        # Ensure the correct shapes
         # EMG
         if emg_data.ndim == 1:
             emg_data = emg_data.reshape(-1, 1)
@@ -87,12 +90,42 @@ class WindowBuffer:
                 else:
                     imu_data = imu_data[:, :6] # Truncate to 6 values
 
-        return {"emg": emg_data, "imu": imu_data, "timestamps": timestamps, "timestamp_start": t_start, "timestamp_end": t_end}
+        # Piezo
+        if piezo_data.ndim == 0:
+            # Scalar value, convert to 1D array
+            piezo_data = np.array([piezo_data])
+        elif piezo_data.ndim == 1:
+            # Ensure correct length
+            if len(piezo_data) != self.window_size:
+                piezo_data = piezo_data[:self.window_size] if len(piezo_data) > self.window_size else np.pad(piezo_data, (0, self.window_size - len(piezo_data)), 'constant')
+        elif piezo_data.ndim == 2:
+            # If 2D, flatten or take first column
+            if piezo_data.shape[0] != self.window_size:
+                piezo_data = piezo_data[:self.window_size]
+            if piezo_data.shape[1] == 1:
+                piezo_data = piezo_data.flatten()
+            else:
+                # Take first column if multiple columns
+                piezo_data = piezo_data[:, 0]
+
+        return {
+            "emg": emg_data, 
+            "imu": imu_data, 
+            "piezo": piezo_data,
+            "timestamps": timestamps, 
+            "timestamp_start": t_start, 
+            "timestamp_end": t_end
+        }
 
     def get_size(self):
-        return {"emg": len(self.emg_buffer), "imu": len(self.imu_buffer)}
+        return {
+            "emg": len(self.emg_buffer), 
+            "imu": len(self.imu_buffer),
+            "piezo": len(self.piezo_buffer)
+        }
     
     def clear(self):
         self.emg_buffer.clear()
         self.imu_buffer.clear()
+        self.piezo_buffer.clear()
 

@@ -26,15 +26,13 @@ class InputLayer(Process):
         self.can_interface = can_interface
         self.ble_interface = ble_interface
         self.window_buffer = WindowBuffer(window_size)
-        self.packet_builder = PacketBuilder(sequence_start=0)
-        self.sample_rate = sample_rate # Do we need this?
+        self.packet_builder = PacketBuilder(sequence_start=0, vision_source=vision_source)
+        self.sample_rate = sample_rate
         self.output_queue = output_queue
 
-        self.vision_source = vision_source
-        #self.packet_builder.set_sensor_sources(
-        #    vision_source=vision_source, 
-        #    pressure_source=pressure_source, 
-        #    piezo_source=piezo_source)
+        # Store latest sensor values (from CAN)
+        self.latest_pressure = None      # List[float] - 5 finger values
+        self.latest_motor_state = None   # MotorState object
 
     def run(self):
         """Main process loop"""
@@ -46,14 +44,17 @@ class InputLayer(Process):
         while self.running.is_set():
             
             # Read BLE data (EMG, IMU, piezo)
-            ble_data = self.ble_interface.read() # TODO: Check that this works
+            ble_data = self.ble_interface.read()
             for sample in ble_data:
                 if sample.message_type == "EMG":
                     self.window_buffer.add_emg(sample.data["channels"], sample.timestamp)
                 elif sample.message_type == "IMU":
                     self.window_buffer.add_imu(sample.data["data"], sample.timestamp)
                 elif sample.message_type == "piezo":
-                    self.window_buffer.add_piezo(sample.data["data"], sample.timestamp)
+                    # Add piezo to window buffer
+                    piezo_value = sample.data.get("value")
+                    if piezo_value is not None:
+                        self.window_buffer.add_piezo(piezo_value, sample.timestamp)
 
             # Read CAN messages (non-blocking)
             can_messages = self.can_interface.read() # Maybe read all? Is it a list or a dict?
@@ -63,35 +64,67 @@ class InputLayer(Process):
 
                 # TODO: EMG and IMU and other sensors have different sample rates, do we need to handle this somehow?
 
-                if msg.message_type == "IMU": # IMU are from the robot
-                    self.window_buffer.add_imu(msg.data["data"], msg.timestamp)
+                if msg.message_type == "IMU":  # IMU from robot (if any)
+                    # CAN parser returns: {'data': [ax, ay, az, wx, wy, wz]}
+                    if msg.parsed_data and "data" in msg.parsed_data:
+                        imu_data = msg.parsed_data["data"]
+                        self.window_buffer.add_imu(imu_data, msg.timestamp)
 
                 elif msg.message_type == "pressure":
                     # Store the latest pressure (5 finger values)
-                    if msg.parsed_data and "values" in msg.parsed_data: # TODO: Can decide that the values are in parsed_data. Do we need the saftey if statement?
+                    # CAN parser returns: {'values': [thumb, index, middle, ring, pinky]}
+                    if msg.parsed_data and "values" in msg.parsed_data:
                         self.latest_pressure = msg.parsed_data["values"]
+                
+                elif msg.message_type == "piezo":
+                    # Add piezo to window buffer (from CAN)
+                    # CAN parser returns: {'value': float}
+                    if msg.parsed_data and "value" in msg.parsed_data:
+                        piezo_value = msg.parsed_data["value"]
+                        self.window_buffer.add_piezo(piezo_value, msg.timestamp)
 
                 elif msg.message_type == "motor_status":
                     # Store latest motor state
+                    # CAN parser returns: {'joint_positions': [j1, j2, j3, j4, j5]}
                     if msg.parsed_data:
                         from shared.models.packet import MotorState
-                        self.latest_motor_state = MotorState(
-                            joint_positions=np.array(msg.parsed_data.get("positions", [])),
-                            gripper_state={}, # Will be updated from gripper status
-                            timestamp=msg.timestamp
-                        )
+                        positions = msg.parsed_data.get("joint_positions", [])
+                        # Ensure we have 5 joint positions
+                        if len(positions) == 5:
+                            self.latest_motor_state = MotorState(
+                                joint_positions=np.array(positions),
+                                gripper_state={},  # Will be updated from gripper_status
+                                timestamp=msg.timestamp
+                            )
 
                 elif msg.message_type == "gripper_status":
-                    # Store latest gripper state
+                    # Update gripper state in motor_state
+                    # CAN parser returns: {'state': int, 'force': float}
                     if self.latest_motor_state and msg.parsed_data:
                         self.latest_motor_state.gripper_state = {
                             "open": msg.parsed_data.get("state", 0) == 1,
                             "force": msg.parsed_data.get("force", 0.0)
                         }
+                    elif msg.parsed_data:
+                        # If no motor_state exists yet, create one with default joint positions
+                        from shared.models.packet import MotorState
+                        self.latest_motor_state = MotorState(
+                            joint_positions=np.array([0.0] * 5),
+                            gripper_state={
+                                "open": msg.parsed_data.get("state", 0) == 1,
+                                "force": msg.parsed_data.get("force", 0.0)
+                            },
+                            timestamp=msg.timestamp
+                        )
 
             # Create packet (only when window buffer is full)
             if self.window_buffer.is_full():
-                packet = self.packet_builder.build(self.window_buffer, self.sample_rate)
+                packet = self.packet_builder.build(
+                    self.window_buffer,
+                    self.sample_rate,
+                    latest_pressure=self.latest_pressure,
+                    latest_motor_state=self.latest_motor_state
+                )
                 
                 # Send packet to the next layer via an async queue
                 self.output_queue.put(packet)

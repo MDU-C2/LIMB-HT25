@@ -23,36 +23,40 @@ The packet builder should:
 class PacketBuilder:
     """Builds packets from window buffer and latest sensor snapshots"""
 
-    def __init__(self, sequence_start: int):
-        self.sequence_id = sequence_start
-        self.sensor_sources = {}            # Will be set by input layer
-        self.motor_state_sources = None     # Will be set by input layer
-
-    def set_sensor_sources(self, vision_source=None, pressure_source=None, piezo_source=None):
-
+    def __init__(self, sequence_start: int, vision_source=None):
         """
-        Set sensor sources for packet building.
-        """
-        self.sensor_sources = {
-            "vision": vision_source,
-            "pressure": pressure_source,
-            "piezo": piezo_source
-        }
-
-    def set_motor_state_source(self, motor_source):
-
-        """
-        Set motor state source for packet building.
-        """
-        self.motor_state_sources = motor_source
-
-    def build(self, window_buffer, sample_rate: float = 100.0) -> DataPacket:
-        """Builds a complete packet from window buffer and latest sensor snapshots"""
+        Initialize packet builder.
         
-        window_data = window_buffer.get_window() # Build human data window
-        human_data = self._build_human_data_window(window_data, sample_rate) # TODO: Implement this function
-        sensor_snapshots = self._get_latest_sensors() # Get latest sensors snapshots # TODO: Implement this function
-        motor_state = self._get_latest_motors()  # Get latest motor state # TODO: Implement this function
+        Args:
+            sequence_start: Starting sequence ID for packets
+            vision_source: Vision system object (optional) - only sensor that needs separate interface
+        """
+        self.sequence_id = sequence_start
+        self.vision_source = vision_source
+
+    def build(self, 
+              window_buffer, 
+              sample_rate: float = 100.0,
+              latest_pressure: Optional[List[float]] = None,
+              latest_motor_state: Optional[MotorState] = None) -> DataPacket:
+        """
+        Builds a complete packet from window buffer and latest sensor snapshots.
+        
+        Args:
+            window_buffer: WindowBuffer object with EMG/IMU/piezo data
+            sample_rate: Sample rate in Hz
+            latest_pressure: Latest pressure readings [thumb, index, middle, ring, pinky] (from CAN)
+            latest_motor_state: Latest motor state (from CAN)
+        
+        Returns:
+            DataPacket with all sensor data
+        """
+        
+        window_data = window_buffer.get_window()
+        human_data = self._build_human_data_window(window_data, sample_rate)
+        sensor_snapshot = self._build_sensor_snapshot(
+            latest_pressure=latest_pressure
+        )
         
         # Build packet
         packet = DataPacket(
@@ -60,15 +64,15 @@ class PacketBuilder:
             timestamp=time.time(),
             packet_age_ms=0.0,
             human_data=human_data,
-            sensors=sensor_snapshots,
-            motors=motor_state,
+            sensors=sensor_snapshot,
+            motors=latest_motor_state,
             metadata={
                 "sample_rate": sample_rate,
                 "window_size": window_buffer.window_size,
                 "build_time": time.time()
             }
         )
-        self.sequence_id += 1 # Increment the sequence ID
+        self.sequence_id += 1  # Increment the sequence ID
         return packet
 
 
@@ -76,18 +80,21 @@ class PacketBuilder:
         """
         Build HumanDataWindow from window buffer data.
         
-        Extracts EMG and IMU arrays, timestamps, and creates a HumanDataWindow object
+        Extracts EMG, IMU, and piezo arrays, timestamps, and creates a HumanDataWindow object
         with proper shapes matching the EMG processing pipeline expectations.
         """
-        # Extract EMG and IMU arrays
+        # Extract EMG, IMU, and piezo arrays
         emg_data = window_data.get('emg')
         imu_data = window_data.get('imu')
+        piezo_data = window_data.get('piezo')
         
         # Ensure they are numpy arrays
         if not isinstance(emg_data, np.ndarray):
             emg_data = np.array(emg_data)
         if not isinstance(imu_data, np.ndarray):
             imu_data = np.array(imu_data)
+        if not isinstance(piezo_data, np.ndarray):
+            piezo_data = np.array(piezo_data)
         
         # Extract timestamps
         timestamps = window_data.get('timestamps')
@@ -115,6 +122,26 @@ class PacketBuilder:
                     # Truncate to 6 values
                     imu_data = imu_data[:, :6]
         
+        # Piezo should be (window_size,) - 1D array
+        if piezo_data.ndim == 0:
+            # Scalar value, convert to 1D array
+            piezo_data = np.array([piezo_data])
+        elif piezo_data.ndim == 2:
+            # If 2D, flatten or take first column
+            if piezo_data.shape[1] == 1:
+                piezo_data = piezo_data.flatten()
+            else:
+                piezo_data = piezo_data[:, 0]
+        
+        # Ensure piezo has correct length
+        if len(piezo_data) != emg_data.shape[0]:
+            if len(piezo_data) > emg_data.shape[0]:
+                piezo_data = piezo_data[:emg_data.shape[0]]
+            else:
+                # Pad with last value or zeros
+                padding = np.full(emg_data.shape[0] - len(piezo_data), piezo_data[-1] if len(piezo_data) > 0 else 0.0)
+                piezo_data = np.concatenate([piezo_data, padding])
+        
         # Validate timestamps
         if timestamps is None or len(timestamps) == 0:
             # Fallback: calculate from sample rate
@@ -133,9 +160,71 @@ class PacketBuilder:
         human_data_window = HumanDataWindow(
             emg=emg_data,
             imu=imu_data,
+            piezo=piezo_data,
             timestamp_start=timestamp_start,
             timestamp_end=timestamp_end,
             sample_rate=sample_rate
         )
         
         return human_data_window
+
+    def _build_sensor_snapshot(self,
+                                latest_pressure: Optional[List[float]] = None) -> SensorSnapshot:
+        """
+        Build sensor snapshot from direct values (from CAN).
+        
+        Args:
+            latest_pressure: Latest pressure readings [thumb, index, middle, ring, pinky] (from CAN)
+        
+        Returns:
+            SensorSnapshot object
+        """
+        snapshot = SensorSnapshot()
+        snapshot.timestamp = time.time()
+
+        # Vision data (only sensor that needs separate interface)
+        snapshot.vision = self._get_vision_data()
+        
+        # Pressure sensor (from CAN)
+        if latest_pressure is not None:
+            # Validate it's a list with 5 values
+            if isinstance(latest_pressure, list) and len(latest_pressure) == 5:
+                snapshot.pressure = latest_pressure
+            else:
+                print(f"Warning: Invalid pressure data format. Expected list of 5 floats, got {type(latest_pressure)}")
+
+        return snapshot
+
+    def _get_vision_data(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the latest vision data (cup detections and AprilTag detections).
+        
+        Returns:
+            Dictionary with:
+                - 'cup_detections': List of cup detection objects
+                - 'apriltag_pose': Dict with AprilTag pose data
+            or None if vision_source not available
+        """
+        if self.vision_source is None:
+            return None
+        
+        try:
+            vision_data = {}
+            
+            # Get cup detections
+            if hasattr(self.vision_source, 'latest_cup_detections'):
+                vision_data['cup_detections'] = self.vision_source.latest_cup_detections
+            elif hasattr(self.vision_source, 'get_latest_cup_detections'):
+                vision_data['cup_detections'] = self.vision_source.get_latest_cup_detections()
+            
+            # Get AprilTag pose
+            if hasattr(self.vision_source, 'get_latest_pose'):
+                apriltag_pose = self.vision_source.get_latest_pose()
+                if apriltag_pose:
+                    vision_data['apriltag_pose'] = apriltag_pose
+            
+            return vision_data if vision_data else None
+            
+        except Exception as e:
+            print(f"Warning: Failed to get vision data: {e}")
+            return None
