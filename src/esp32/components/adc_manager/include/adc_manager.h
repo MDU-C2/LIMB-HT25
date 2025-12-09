@@ -12,7 +12,7 @@ typedef struct {
 
 // ADC configurations for multiple channels.
 typedef struct {
-  AdcMgrChannelConfig *channel_configs;
+  const AdcMgrChannelConfig *channel_configs;
   uint8_t channel_configs_len;
   uint16_t ms_worth_of_buffer_size;
 } AdcMgrConfig;
