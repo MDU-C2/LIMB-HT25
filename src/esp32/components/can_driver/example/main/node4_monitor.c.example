@@ -33,7 +33,7 @@ const char* get_node_name(uint32_t id) {
 }
 
 void app_main(void) {
-    can_init(5, 4, 500000); // TX=5, RX=4, 500 kbps (matches Orin interface)
+    can_init(5, 4, 500000, NULL); // TX=5, RX=4, 500 kbps (matches Orin interface)
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "   ESP32 #4 - MONITOR NODE STARTED");
     ESP_LOGI(TAG, "   Priority: LOW (ID: 0x040)");

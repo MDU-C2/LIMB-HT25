@@ -23,7 +23,7 @@
 #define ID_MONITOR_STATUS   0x040
 
 void app_main(void) {
-    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    can_init(5, 4, 125000, NULL); // TX=5, RX=4, 125 kbps
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "   ESP32 #1 - MASTER NODE STARTED");
     ESP_LOGI(TAG, "   Priority: HIGH (ID: 0x010)");
