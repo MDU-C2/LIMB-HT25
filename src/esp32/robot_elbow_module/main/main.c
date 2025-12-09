@@ -6,34 +6,37 @@
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
 #include "imu.h"
+#include "portmacro.h"
 #include "stepper.h"
 #include "potentiometer.h"
 #include "adc_manager.h"
 
-static const char *TAG = "robot_elbow_module";
+static const char * const TAG = "robot_elbow_module";
 
 #define ARR_LEN(x) (sizeof(x) / sizeof(*(x)))
 
-// CAN configuration
-#define CAN_TX_PIN 5 // TODO: Check that this is the correct pin for the CAN TX
-#define CAN_RX_PIN 4 // TODO: Check that this is the correct pin for the CAN RX
-#define CAN_BAUDRATE 125000 // TODO: Check that this is the correct baudrate
-#define CAN_MSG_SIZE 8 // TODO: Check that this is the correct size for the CAN message
+enum {
+    // CAN configuration
+    CAN_TX_PIN = 5,
+    CAN_RX_PIN = 4,
+    CAN_BAUDRATE = 1000000,
+    CAN_MSG_SIZE = 8,
 
-// CAN message IDs
-#define CAN_ID_ELBOW_STATUS 0x030 // TODO: Check that these are correct IDs
-#define CAN_ID_ELBOW_COMMAND 0x010 // TODO: Check that these are correct IDs
+    // CAN message IDs
+    CAN_ID_ELBOW_STATUS = 0x030,
+    CAN_ID_ELBOW_COMMAND = 0x010,
 
-// GPIO pin definitions
-#define STEPPER_STEP_PIN GPIO_NUM_6
-#define STEPPER_DIR_PIN GPIO_NUM_7
-#define STEPPER_ENABLE_PIN GPIO_NUM_8
+    // GPIO pin definitions
+    STEPPER_STEP_PIN = GPIO_NUM_6,
+    STEPPER_DIR_PIN = GPIO_NUM_7,
+    STEPPER_ENABLE_PIN = GPIO_NUM_8,
 
-// ADC channels
-#define ADC_ELBOW_CHANNEL ADC_CHANNEL_2
+    // ADC channels
+    ADC_ELBOW_CHANNEL = ADC_CHANNEL_2,
 
-// PWM channels
-#define PWM_ELBOW_CHANNEL LEDC_CHANNEL_0
+    // PWM channels
+    PWM_ELBOW_CHANNEL = LEDC_CHANNEL_0,
+};
 
 // Stepper configurations
 const stepper_control_config_t s_elbow_stepper_cfg = {
@@ -73,7 +76,12 @@ const AdcMgrConfig s_adc_mgr_config = {
 };
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
-uint16_t s_adc_elbow_channel_underlying_buffer[1024] = {0};
+// Assuming a sample rate of 1 kHz, we can comfortably keep a buffer of 1 seconds worth of data.
+enum {
+    ADC_ELBOW_UNDERLYING_BUF_SIZE = 1000,
+};
+
+uint16_t s_adc_elbow_channel_underlying_buffer[ADC_ELBOW_UNDERLYING_BUF_SIZE] = {0};
 
 AdcMgrReadResults s_adc_mgr_read_results = {
     .channel_buffers = {
@@ -90,16 +98,16 @@ stepper_control_handle_t s_elbow_stepper_handle = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 // CAN RX task commented out - no CAN hardware
-void can_rx_task(void *pvParameter) {
+void can_rx_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t* elbow_stepper_config = stepper_get_cfg(s_elbow_stepper_handle);
 
     uint8_t msg_rx[CAN_MSG_SIZE]; 
     uint8_t rx_len = CAN_MSG_SIZE;
-    uint32_t rx_id;
+    uint32_t rx_id = 0;
     
     
     while (1) {
-        if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
+        if (can_receive(&rx_id, msg_rx, &rx_len, portMAX_DELAY) == ESP_OK) {
             if (rx_id == CAN_ID_ELBOW_COMMAND) {
                 // Simple command: first byte is angle in degrees (signed), just for testing.
                 JointAngle target_angle = {*(float*)msg_rx};
@@ -112,7 +120,7 @@ void can_rx_task(void *pvParameter) {
 }
 
 
-void imu_task(void *pvParameter) {
+void imu_task([[maybe_unused]] void *pvParameter) {
     imu_data_t imu_data; // (imu_vector_t) accel and (imu_vector_t) gyro      
     
     while (1) {
@@ -126,7 +134,7 @@ void imu_task(void *pvParameter) {
     }
 }
 
-void stepper_task(void *pvParameter) {
+void stepper_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t* elbow_stepper_cfg = stepper_get_cfg(s_elbow_stepper_handle);
 
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -134,15 +142,18 @@ void stepper_task(void *pvParameter) {
     
     while (1) {
         // FIXME: This should probably be checked instead of just assumed.
-        float dt = 0.01f; // 10ms in seconds
+        const float dt_seconds = 0.01F; // 10ms in seconds
 
         adc_mgr_read(&s_adc_mgr_read_results, 0);
-        stepper_update(s_elbow_stepper_handle, dt, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
+        stepper_update(s_elbow_stepper_handle, dt_seconds, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
         s_adc_mgr_elbow_buffer->length = 0;
         
         // Send status over CAN and log
         static uint32_t status_counter = 0;
-        if (++status_counter >= 10) { // Every 100ms
+        enum {
+            ITERATIONS_PER_LOGGING = 10,
+        };
+        if (++status_counter >= ITERATIONS_PER_LOGGING) { // Every 100ms
             status_counter = 0;
             // FIXME: The actual angle that gets returned is extremely delayed. When changing the potentiometer, it takes a long time for the current angle to update to the actual proper value. The filtering is probably the culprit.
             PotentiometerAngle current_pot_angle = stepper_get_current_angle_deg(s_elbow_stepper_handle);
@@ -167,7 +178,7 @@ void stepper_task(void *pvParameter) {
 }
 
 // Test task to cycle through different target angles
-void stepper_test_task(void *pvParameter) {
+void stepper_test_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t *elbow_cfg = stepper_get_cfg(s_elbow_stepper_handle);
 
     // Wait a bit for system to initialize
@@ -208,8 +219,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
     
     imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
-    imu_cfg.sda_pin = 10;  // Custom SDA pin
-    imu_cfg.scl_pin = 9;   // Custom SCL pin
+    imu_cfg.sda_pin = GPIO_NUM_10;  // Custom SDA pin
+    imu_cfg.scl_pin = GPIO_NUM_9;   // Custom SCL pin
     imu_init(&imu_cfg);
     ESP_LOGI(TAG, "IMU initialized (SDA=10, SCL=9)");
 
@@ -231,10 +242,15 @@ void app_main(void) {
     s_adc_mgr_elbow_buffer->length = 0;
     
     // Create FreeRTOS tasks
-    xTaskCreate(can_rx_task, "can_rx", 4096, NULL, 5, NULL);  // Commented out - no CAN hardware
-    xTaskCreate(imu_task, "imu_task", 4096, NULL, 5, NULL);
-    xTaskCreate(stepper_task, "stepper_task", 4096, NULL, 5, NULL);
-    // xTaskCreate(stepper_test_task, "stepper_test", 4096, NULL, 4, NULL);  // Lower priority than stepper_task
-    
+    enum {
+        TASK_STACK_DEPTH = 4096,
+        TASK_HIGH_PRIORITY = 5,
+        TASK_LOW_PRIORITY = 4,
+    };
+    xTaskCreate(can_rx_task, "can_rx", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
+    xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
+    xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
+    // xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH, NULL, TASK_LOW_PRIORITY, NULL);  // Lower priority than stepper_task
+
     ESP_LOGI(TAG, "Tasks created, system running");
 }
