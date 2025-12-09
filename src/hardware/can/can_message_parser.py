@@ -14,7 +14,7 @@ class CANMessageParser:
         0x101: {"type": "IMU", "format": "<6f"},         # IMU: [ax, ay, az, gx, gy, gz]
         0x102: {"type": "pressure", "format": "<5f"},     # pressure [thumb, index, middle, ring, little]
         0x103: {"type": "piezo", "format": "<f"},        # piezo (float32)
-        0x104: {"type": "potentiometer", "format": "<f"}, # potentiometer (float32)
+        #0x104: {"type": "potentiometer", "format": "<f"}, # potentiometer (float32)
         
         # Actuator messages (to ESP32 nodes)
         0x200: {"type": "gripper_command", "format": "<Bf"},    # [action, force]
@@ -90,8 +90,8 @@ class CANMessageParser:
         elif msg_type == 'piezo':
             return {'value': parsed[0]}
         
-        elif msg_type == 'potentiometer':
-            return {'value': parsed[0]}
+        #elif msg_type == 'potentiometer':
+        #    return {'value': parsed[0]}
         
         elif msg_type == 'gripper_command':
             return {

@@ -7,7 +7,8 @@ class WindowBuffer:
         self.window_size = window_size
         self.emg_buffer = [] # List of EMG samples
         self.imu_buffer = [] # List of IMU samples
-
+        self.piezo_buffer = [] # List of PIEZO samples
+        
     def add_emg(self, samples, timestamp):
         """Add a new EMG sample to the buffer."""
         if timestamp is None:
@@ -35,6 +36,18 @@ class WindowBuffer:
         # Keep only the last window_size samples (sliding window)
         if len(self.imu_buffer) > self.window_size:
             self.imu_buffer.pop(0) # Remove the oldest
+
+    def add_piezo(self, data, timestamp):
+        if timestamp is None:
+            timestamp = time.time()
+
+        self.piezo_buffer.append({
+            "data": data.copy(),
+            "timestamp": timestamp
+        })
+
+        if len(self.piezo_buffer) > self.window_size:
+            self.piezo_buffer.pop(0) # Remove the oldest
 
     def is_full(self) -> bool:
         return len(self.emg_buffer) >= self.window_size and len(self.imu_buffer) >= self.window_size
