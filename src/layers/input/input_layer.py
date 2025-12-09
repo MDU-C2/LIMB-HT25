@@ -12,7 +12,7 @@ import numpy as np
 # Multiprocessing create separate OS processes, while threading creates separate threads within the same process.
 
 class InputLayer(Process):
-    """Input layer process: reads CAN and builds packets"""
+    """Input layer process: reads CAN, BLE and builds packets"""
 
     def __init__(self, can_interface: CANInterface,
                     ble_interface: BLEInterface, 
@@ -75,13 +75,6 @@ class InputLayer(Process):
                     # CAN parser returns: {'values': [thumb, index, middle, ring, pinky]}
                     if msg.parsed_data and "values" in msg.parsed_data:
                         self.latest_pressure = msg.parsed_data["values"]
-                
-                elif msg.message_type == "piezo":
-                    # Add piezo to window buffer (from CAN)
-                    # CAN parser returns: {'value': float}
-                    if msg.parsed_data and "value" in msg.parsed_data:
-                        piezo_value = msg.parsed_data["value"]
-                        self.window_buffer.add_piezo(piezo_value, msg.timestamp)
 
                 elif msg.message_type == "motor_status":
                     # Store latest motor state
