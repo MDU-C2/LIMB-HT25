@@ -12,8 +12,13 @@ class CANMessageParser:
         # Sensor messages (from ESP32 nodes)
         0x100: {"type": "EMG", "format": "<2f"},        # 2 EMG channels (#TODO: float32? int16?)
         0x101: {"type": "IMU", "format": "<6f"},         # IMU: [ax, ay, az, gx, gy, gz]
-        0x102: {"type": "pressure", "format": "<5f"},     # pressure [thumb, index, middle, ring, little]
-        #0x104: {"type": "potentiometer", "format": "<f"}, # potentiometer (float32)
+        # Pressure sensors - one message per finger
+        0x102: {"type": "pressure_thumb", "format": "<f"},     # thumb pressure (float32)
+        0x103: {"type": "pressure_index", "format": "<f"},     # index finger pressure (float32)
+        0x104: {"type": "pressure_middle", "format": "<f"},    # middle finger pressure (float32)
+        0x105: {"type": "pressure_ring", "format": "<f"},      # ring finger pressure (float32)
+        0x106: {"type": "pressure_little", "format": "<f"},    # little/pinky finger pressure (float32)
+        #0x107: {"type": "potentiometer", "format": "<f"}, # potentiometer (float32)
         
         # Actuator messages (to ESP32 nodes)
         0x200: {"type": "gripper_command", "format": "<Bf"},    # [action, force]
@@ -80,10 +85,12 @@ class CANMessageParser:
                 'data': list(parsed) # [ax, ay, az, wx, wy, wz]
             }
         
-        elif msg_type == 'pressure':
+        elif msg_type in ['pressure_thumb', 'pressure_index', 'pressure_middle', 'pressure_ring', 'pressure_little']:
+            # Extract finger name from message type (e.g., 'pressure_thumb' -> 'thumb')
+            finger_name = msg_type.replace('pressure_', '')
             return {
-                "values": list(parsed),
-                "finger_count": len(parsed)
+                "value": parsed[0],  # Single float value
+                "finger": finger_name  # 'thumb', 'index', 'middle', 'ring', or 'little'
             }
         
         #elif msg_type == 'potentiometer':

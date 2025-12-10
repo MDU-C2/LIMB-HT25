@@ -427,4 +427,5 @@ oak-template/
 emg_sequences_ch*.npz
 **/emg/checkpoints/
 
-
+# YOLO
+yolo11n.onnx*

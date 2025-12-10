@@ -31,7 +31,10 @@ class InputLayer(Process):
         self.output_queue = output_queue
 
         # Store latest sensor values (from CAN)
-        self.latest_pressure = None      # List[float] - 5 finger values
+        # Pressure: dictionary to accumulate individual finger values
+        # Keys: 'thumb', 'index', 'middle', 'ring', 'little'
+        self.pressure_values = {}  # Dict[str, float] - individual finger pressure values
+        self.latest_pressure = None      # List[float] - 5 finger values [thumb, index, middle, ring, little]
         self.latest_motor_state = None   # MotorState object
         self.latest_robot_imu = None     # Dict[str, np.ndarray] - {'data': [ax, ay, az, wx, wy, wz]}
 
@@ -67,11 +70,19 @@ class InputLayer(Process):
                     if msg.parsed_data and "data" in msg.parsed_data:
                         self.latest_robot_imu = {"data": msg.parsed_data["data"], "timestamp": msg.timestamp}
 
-                elif msg.message_type == "pressure":
-                    # Store the latest pressure (5 finger values)
-                    # CAN parser returns: {'values': [thumb, index, middle, ring, pinky]}
-                    if msg.parsed_data and "values" in msg.parsed_data:
-                        self.latest_pressure = msg.parsed_data["values"]
+                elif msg.message_type.startswith("pressure_"):
+                    # Handle individual finger pressure messages
+                    # CAN parser returns: {'value': float, 'finger': 'thumb'|'index'|'middle'|'ring'|'little'}
+                    if msg.parsed_data and "value" in msg.parsed_data and "finger" in msg.parsed_data:
+                        finger_name = msg.parsed_data["finger"]
+                        pressure_value = msg.parsed_data["value"]
+                        self.pressure_values[finger_name] = pressure_value
+                        
+                        # Update latest_pressure list when we have all 5 fingers
+                        # Order: [thumb, index, middle, ring, little]
+                        finger_order = ['thumb', 'index', 'middle', 'ring', 'little']
+                        if all(f in self.pressure_values for f in finger_order):
+                            self.latest_pressure = [self.pressure_values[f] for f in finger_order]
 
                 elif msg.message_type == "motor_status":
                     # Store latest motor state
