@@ -33,6 +33,7 @@ class InputLayer(Process):
         # Store latest sensor values (from CAN)
         self.latest_pressure = None      # List[float] - 5 finger values
         self.latest_motor_state = None   # MotorState object
+        self.latest_robot_imu = None     # Dict[str, np.ndarray] - {'data': [ax, ay, az, wx, wy, wz]}
 
     def run(self):
         """Main process loop"""
@@ -58,17 +59,13 @@ class InputLayer(Process):
 
             # Read CAN messages (non-blocking)
             can_messages = self.can_interface.read() # Maybe read all? Is it a list or a dict?
-            for msg in can_messages:
-                # Update window buffer with new data
-                # To add functions in each branch, to the window buffer?
-
+            for msg in can_messages: 
                 # TODO: EMG and IMU and other sensors have different sample rates, do we need to handle this somehow?
 
-                if msg.message_type == "IMU":  # IMU from robot (if any)
+                if msg.message_type == "IMU":  # IMU from robot
                     # CAN parser returns: {'data': [ax, ay, az, wx, wy, wz]}
                     if msg.parsed_data and "data" in msg.parsed_data:
-                        imu_data = msg.parsed_data["data"]
-                        self.window_buffer.add_imu(imu_data, msg.timestamp)
+                        self.latest_robot_imu = {"data": msg.parsed_data["data"], "timestamp": msg.timestamp}
 
                 elif msg.message_type == "pressure":
                     # Store the latest pressure (5 finger values)
@@ -116,7 +113,8 @@ class InputLayer(Process):
                     self.window_buffer,
                     self.sample_rate,
                     latest_pressure=self.latest_pressure,
-                    latest_motor_state=self.latest_motor_state
+                    latest_motor_state=self.latest_motor_state,
+                    latest_robot_imu=self.latest_robot_imu
                 )
                 
                 # Send packet to the next layer via an async queue

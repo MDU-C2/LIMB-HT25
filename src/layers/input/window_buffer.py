@@ -8,7 +8,7 @@ class WindowBuffer:
         self.emg_buffer = [] # List of EMG samples
         self.imu_buffer = [] # List of IMU samples
         self.piezo_buffer = [] # List of PIEZO samples
-        
+
     def add_emg(self, samples, timestamp):
         """Add a new EMG sample to the buffer."""
         if timestamp is None:

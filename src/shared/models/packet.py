@@ -37,6 +37,7 @@ class SensorSnapshot:
     """
     vision: Optional[Dict[str, Any]] = None                 # TODO: Define what vision data looks like
     pressure: Optional[List[float]] = None                  # 5 values: [thumb, index, middle, ring, little]
+    robot_imu: Optional[Dict[str, np.ndarray]] = None       # {'data': [ax, ay, az, wx, wy, wz]}
     timestamp: float = field(default_factory=time.time)     # When snapshot was taken
 
 @dataclass

@@ -38,7 +38,8 @@ class PacketBuilder:
               window_buffer, 
               sample_rate: float = 100.0,
               latest_pressure: Optional[List[float]] = None,
-              latest_motor_state: Optional[MotorState] = None) -> DataPacket:
+              latest_motor_state: Optional[MotorState] = None,
+              latest_robot_imu: Optional[Dict[str, np.ndarray]] = None) -> DataPacket:
         """
         Builds a complete packet from window buffer and latest sensor snapshots.
         
@@ -55,7 +56,8 @@ class PacketBuilder:
         window_data = window_buffer.get_window()
         human_data = self._build_human_data_window(window_data, sample_rate)
         sensor_snapshot = self._build_sensor_snapshot(
-            latest_pressure=latest_pressure
+            latest_pressure=latest_pressure,
+            latest_robot_imu=latest_robot_imu
         )
         
         # Build packet
@@ -169,12 +171,14 @@ class PacketBuilder:
         return human_data_window
 
     def _build_sensor_snapshot(self,
-                                latest_pressure: Optional[List[float]] = None) -> SensorSnapshot:
+                                latest_pressure: Optional[List[float]] = None,
+                                latest_robot_imu: Optional[Dict[str, np.ndarray]] = None) -> SensorSnapshot:
         """
         Build sensor snapshot from direct values (from CAN).
         
         Args:
             latest_pressure: Latest pressure readings [thumb, index, middle, ring, pinky] (from CAN)
+            latest_robot_imu: Latest robot IMU data (from CAN)
         
         Returns:
             SensorSnapshot object
@@ -192,6 +196,10 @@ class PacketBuilder:
                 snapshot.pressure = latest_pressure
             else:
                 print(f"Warning: Invalid pressure data format. Expected list of 5 floats, got {type(latest_pressure)}")
+
+        # Robot IMU (from CAN)
+        if latest_robot_imu is not None:
+            snapshot.robot_imu = latest_robot_imu
 
         return snapshot
 
