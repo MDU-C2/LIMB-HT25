@@ -16,6 +16,7 @@
 #define ID_ACTUATOR_STATUS  0x030  // Actuator status
 
 // IDs this node listens to
+#define ID_LISTEN_GROUP     0x010 // The group of CAN messages listened to.
 #define ID_MASTER_CMD       0x010
 #define ID_MASTER_FAN       0x011
 #define ID_MASTER_LED       0x012
@@ -25,7 +26,14 @@
 #define PIN_LED             GPIO_NUM_8  // Pin for additional LED
 
 void app_main(void) {
-    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    // We want to listen to all messages from 0x10 to 0x1F. 
+    CanMsgFilter filter = {
+        .id = ID_LISTEN_GROUP,
+        // If the listen group value ends with zeros, subtracting 1 will
+        // set all those zeros to 1.
+        .ignore_mask = ID_LISTEN_GROUP - 1U,
+    };
+    can_init(5, 4, 125000, &filter); // TX=5, RX=4, 125 kbps
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "   ESP32 #3 - ACTUATOR NODE STARTED");
     ESP_LOGI(TAG, "   Priority: MEDIUM (ID: 0x030)");
@@ -98,6 +106,9 @@ void app_main(void) {
                         ESP_LOGI(TAG, "LED TURNED OFF");
                         can_send(ID_ACTUATOR_STATUS, (uint8_t*)"LED:OFF", 7);
                     }
+                    break;
+                default:
+                    ESP_LOGW(TAG, "Unknown CAN msg ID: %x", rx_id);
                     break;
             }
         }

@@ -21,7 +21,12 @@
 #define ID_MASTER_CMD       0x010
 
 void app_main(void) {
-    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    // This node only listens to one message, so we can filter any other.
+    const CanMsgFilter filter = {
+        .id = ID_MASTER_CMD,
+        .ignore_mask = 0,
+    };
+    can_init(5, 4, 125000, &filter); // TX=5, RX=4, 125 kbps
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "   ESP32 #2 - SENSOR NODE STARTED");
     ESP_LOGI(TAG, "   Priority: MEDIUM-HIGH (ID: 0x020)");
@@ -49,6 +54,8 @@ void app_main(void) {
                     ESP_LOGI(TAG, "STOP command received");
                     system_active = false;
                 }
+            } else {
+                ESP_LOGW(TAG, "received unknown msg id %x", rx_id);
             }
         }
 

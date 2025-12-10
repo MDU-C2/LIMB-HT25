@@ -1,9 +1,10 @@
 #include "can_driver.h"
 #include "esp_log.h"
+#include "driver/twai.h"
 
 static const char *TAG = "CAN_DRIVER";
 
-esp_err_t can_init(int tx_pin, int rx_pin, int baudrate) {
+esp_err_t can_init(int tx_pin, int rx_pin, int baudrate, const CanMsgFilter *filter) {
     // General configuration
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(tx_pin, rx_pin, TWAI_MODE_NORMAL);
     g_config.tx_queue_len = 5;
@@ -41,8 +42,28 @@ esp_err_t can_init(int tx_pin, int rx_pin, int baudrate) {
         t_config = temp;
     }
 
-    // Filter configuration (accept all messages)
+    // Filter configuration (accept all messages by default)
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+    enum {
+        // The id field in the CAN frame is 11 bits wide and, in the acceptance
+        // code/mask, is located in the 11 most significant bits. By taking a
+        // value with the 11 least significant bits set and shifting it 21 bits,
+        // we get a value with the 11 most significant bits set and nothing else.
+        BITS_TO_SHIFT_ID = 21U,
+        // All bits set except for the most significant 11 bits.
+        ID_BITS_MASK = ~(0x7FFU << BITS_TO_SHIFT_ID),
+    };
+    if (filter != NULL) {
+        f_config.acceptance_code = filter->id << BITS_TO_SHIFT_ID;
+        // The ignore_mask determines which ID bits should be set or unset.
+        // However, we also want to make sure we ignore any other bits in the
+        // frame (the RTR bit and data bits) so we only filter on the ID. To
+        // do that, we have to make sure all other bits are set (ID_BITS_MASK).
+        // We then also have to shift the provided ignore mask so it covers the
+        // 11 most significant bits instead of the 11 least significant bits.
+        f_config.acceptance_mask = ID_BITS_MASK | (filter->ignore_mask << BITS_TO_SHIFT_ID);
+        f_config.single_filter = true;
+    }
 
     // Install and start TWAI driver
     esp_err_t ret = twai_driver_install(&g_config, &t_config, &f_config);
