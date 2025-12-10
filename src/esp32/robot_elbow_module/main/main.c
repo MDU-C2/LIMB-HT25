@@ -297,7 +297,7 @@ void app_main(void) {
     ESP_LOGI(TAG, "Robot elbow module starting...");
     
     // Initialize hardware
-    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
+    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
     ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
     
     imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
