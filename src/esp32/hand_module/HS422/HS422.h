@@ -1,3 +1,5 @@
+#pragma once
+
 #include "driver/mcpwm_prelude.h"
 #include "driver/gpio.h"
 #include "esp_err.h"
