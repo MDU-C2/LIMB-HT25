@@ -34,6 +34,11 @@ void command_task(void *pvParameter) {
         } else {
             ESP_LOGE(TAG, "Failed to send up down CAN message: %s", esp_err_to_name(ret));
         }
+        ret = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION, can_data, 8);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, ">>> Sent command: rotation target angle = %f degrees", target_angle);
+        } else {
+            ESP_LOGE(TAG, "Failed to send rotation CAN message: %s", esp_err_to_name(ret));
         }
         
         // Wait before sending next command
