@@ -4,6 +4,13 @@
 
 static const char *TAG = "CAN_DRIVER";
 
+
+uint16_t create_filter_mask(CanMessageTypeFilterMask msg_type_filter_mask,
+                            CanRecipientNodeFilterMask recipient_node_filter_mask,
+                            CanGenericFilterMask generic_filter_mask) {
+    return msg_type_filter_mask | recipient_node_filter_mask | generic_filter_mask;
+}
+
 esp_err_t can_init(int tx_pin, int rx_pin, int baudrate, const CanMsgFilter *filter) {
     // General configuration
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(tx_pin, rx_pin, TWAI_MODE_NORMAL);

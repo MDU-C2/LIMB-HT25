@@ -23,12 +23,6 @@ enum {
     CAN_BAUDRATE = 1000000,
     CAN_MSG_SIZE = 8,
 
-    // CAN message IDs
-    CAN_ID_ELBOW_STATUS = 0x030,
-    CAN_ID_ELBOW_COMMAND = 0x010,
-    CAN_ID_UPPER_ARM_ROTATION_STATUS = 0x040,
-    CAN_ID_UPPER_ARM_ROTATION_COMMAND = 0x015,
-
     // IMU pins.
     IMU_SDA_PIN = GPIO_NUM_2,
     IMU_SCL_PIN = GPIO_NUM_3,
@@ -156,14 +150,14 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
     
     while (1) {
         if (can_receive(&rx_id, msg_rx, &rx_len, portMAX_DELAY) == ESP_OK) {
-            if (rx_id == CAN_ID_ELBOW_COMMAND) {
+            if (rx_id == CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION) {
                 JointAngle target_angle = {*(float*)msg_rx};
                 stepper_set_target_angle_deg(s_elbow_stepper_handle, to_potentiometer_angle(&elbow_stepper_config->potentiometer, target_angle));
-                ESP_LOGI(TAG, "Received command: elbow target angle = %d degrees", target_angle.degree);
-            } else if (rx_id == CAN_ID_UPPER_ARM_ROTATION_COMMAND) {
+                ESP_LOGI(TAG, "Received command: elbow target angle = %f degrees", target_angle.degree);
+            } else if (rx_id == CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION) {
                 JointAngle target_angle = {*(float*)msg_rx};
                 stepper_set_target_angle_deg(s_upper_arm_rotation_stepper_handle, to_potentiometer_angle(&upper_arm_rotation_stepper_config->potentiometer, target_angle));
-                ESP_LOGI(TAG, "Received command: upper arm rotation target angle = %d degrees", target_angle.degree);
+                ESP_LOGI(TAG, "Received command: upper arm rotation target angle = %f degrees", target_angle.degree);
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -221,7 +215,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
                 // Send status over CAN
                 uint8_t can_data[CAN_MSG_SIZE] = {0};
                 *(float*)can_data = current_angle.degree;
-                esp_err_t err = can_send(CAN_ID_ELBOW_STATUS, can_data, CAN_MSG_SIZE);
+                esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER, can_data, sizeof(current_angle.degree));
                 if (err != ESP_OK) {
                     ESP_LOGW(TAG, "Error sending elbow status over CAN: %s", esp_err_to_name(err));
                 }
@@ -242,7 +236,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
                 // Send status over CAN
                 uint8_t can_data[CAN_MSG_SIZE] = {0};
                 *(float*)can_data = current_angle.degree;
-                esp_err_t err = can_send(CAN_ID_UPPER_ARM_ROTATION_STATUS, can_data, CAN_MSG_SIZE);
+                esp_err_t err = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER, can_data, sizeof(current_angle.degree));
                 if (err != ESP_OK) {
                     ESP_LOGW(TAG, "Error sending upper arm rotation status over CAN: %s", esp_err_to_name(err));
                 }
@@ -297,7 +291,12 @@ void app_main(void) {
     ESP_LOGI(TAG, "Robot elbow module starting...");
     
     // Initialize hardware
-    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
+    CanMsgFilter can_filter = {
+        // We want to accept all messages that are sent with the elbow node as the recipient.
+        .id = CAN_RECIPIENT_ROBOT_ELBOW,
+        .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY, CAN_RECIPIENT_FILTER_EXACT, CAN_GENERIC_FILTER_ANY),
+    };
+    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, &can_filter);
     ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
     
     imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();

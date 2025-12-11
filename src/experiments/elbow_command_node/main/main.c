@@ -10,12 +10,6 @@ static const char *TAG = "ELBOW_CMD";
 #define CAN_RX_PIN 4
 #define CAN_BAUDRATE 1000000
 
-// CAN message IDs (must match elbow module)
-#define CAN_ID_ELBOW_STATUS 0x030
-#define CAN_ID_ELBOW_COMMAND 0x010
-#define CAN_ID_UPPER_ARM_ROTATION_STATUS 0x040
-#define CAN_ID_UPPER_ARM_ROTATION_COMMAND 0x015
-
 // Task to send periodic commands
 void command_task(void *pvParameter) {
     // Wait for system to initialize
@@ -34,11 +28,17 @@ void command_task(void *pvParameter) {
         uint8_t can_data[8] = {0};
         *(float*)can_data = target_angle;
         
-        esp_err_t ret = can_send(CAN_ID_ELBOW_COMMAND, can_data, 8);
+        esp_err_t ret = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION, can_data, 8);
         if (ret == ESP_OK) {
-            ESP_LOGI(TAG, ">>> Sent command: target angle = %f degrees", target_angle);
+            ESP_LOGI(TAG, ">>> Sent command: up down target angle = %f degrees", target_angle);
         } else {
-            ESP_LOGE(TAG, "Failed to send CAN message: %s", esp_err_to_name(ret));
+            ESP_LOGE(TAG, "Failed to send up down CAN message: %s", esp_err_to_name(ret));
+        }
+        ret = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION, can_data, 8);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, ">>> Sent command: rotation target angle = %f degrees", target_angle);
+        } else {
+            ESP_LOGE(TAG, "Failed to send rotation CAN message: %s", esp_err_to_name(ret));
         }
         
         // Wait before sending next command
@@ -59,10 +59,10 @@ void status_rx_task(void *pvParameter) {
     
     while (1) {
         if (can_receive(&rx_id, msg_rx, &rx_len, 1000) == ESP_OK) {
-            if (rx_id == CAN_ID_ELBOW_STATUS) {
+            if (rx_id == CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER) {
                 float angle = *(float*)msg_rx;
                 ESP_LOGI(TAG, "<<< Received elbow status: current angle = %.1f°", angle);
-            } else if (rx_id == CAN_ID_UPPER_ARM_ROTATION_STATUS) {
+            } else if (rx_id == CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER) {
                 float angle = *(float*)msg_rx;
                 ESP_LOGI(TAG, "<<< Received upper arm rotation status: current angle = %.1f°", angle);
             } else {
@@ -78,7 +78,11 @@ void app_main(void) {
     ESP_LOGI(TAG, "========================================");
     
     // Initialize CAN
-    esp_err_t ret = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
+    CanMsgFilter can_filter = {
+        .id = CAN_RECIPIENT_ROBOT_MAIN_COMPUTER,
+        .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY, CAN_RECIPIENT_FILTER_EXACT, CAN_GENERIC_FILTER_ANY),
+    };
+    esp_err_t ret = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, &can_filter);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize CAN: %s", esp_err_to_name(ret));
         return;
