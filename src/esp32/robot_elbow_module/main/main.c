@@ -291,7 +291,12 @@ void app_main(void) {
     ESP_LOGI(TAG, "Robot elbow module starting...");
     
     // Initialize hardware
-    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
+    CanMsgFilter can_filter = {
+        // We want to accept all messages that are sent with the elbow node as the recipient.
+        .id = CAN_RECIPIENT_ROBOT_ELBOW,
+        .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY, CAN_RECIPIENT_FILTER_EXACT, CAN_GENERIC_FILTER_ANY),
+    };
+    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, &can_filter);
     ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
     
     imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
