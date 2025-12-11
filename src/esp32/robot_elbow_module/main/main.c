@@ -153,11 +153,11 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
             if (rx_id == CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION) {
                 JointAngle target_angle = {*(float*)msg_rx};
                 stepper_set_target_angle_deg(s_elbow_stepper_handle, to_potentiometer_angle(&elbow_stepper_config->potentiometer, target_angle));
-                ESP_LOGI(TAG, "Received command: elbow target angle = %d degrees", target_angle.degree);
+                ESP_LOGI(TAG, "Received command: elbow target angle = %f degrees", target_angle.degree);
             } else if (rx_id == CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION) {
                 JointAngle target_angle = {*(float*)msg_rx};
                 stepper_set_target_angle_deg(s_upper_arm_rotation_stepper_handle, to_potentiometer_angle(&upper_arm_rotation_stepper_config->potentiometer, target_angle));
-                ESP_LOGI(TAG, "Received command: upper arm rotation target angle = %d degrees", target_angle.degree);
+                ESP_LOGI(TAG, "Received command: upper arm rotation target angle = %f degrees", target_angle.degree);
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
