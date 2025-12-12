@@ -1,0 +1,13 @@
+build/
+sdkconfig
+sdkconfig.old
+.DS_Store
+__pycache__/
+*.pyc
+.vscode/.history
+.vscode/.DS_Store
+*.swp
+*.swo
+*~
+.clang_complete
+compile_commands.json
