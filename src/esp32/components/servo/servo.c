@@ -7,7 +7,7 @@
 #include "hal/ledc_types.h"
 #include "sys/param.h"
 
-const char *const TAG = "Servo";
+static const char *const TAG = "Servo";
 
 #define limb_clamp(x, x_min, x_max) (MIN(MAX((x), (x_min)), (x_max)))
 #define limb_lerp_from_range(x, x_min, x_max, y_min, y_max) \
