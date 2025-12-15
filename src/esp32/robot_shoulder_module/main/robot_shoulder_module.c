@@ -207,6 +207,56 @@ static void can_rx_task([[maybe_unused]] void* arg) {
   vTaskDelete(NULL);
 }
 
+static void imu_read_task([[maybe_unused]] void* arg) {
+  enum {
+    IMU_FREQUENCY_MS = 10,
+    CAN_LEN = 3,
+  };
+
+  TickType_t current_tick = xTaskGetTickCount();
+  ESP_LOGI(TAG, "imu_read_task started!");
+
+  uint16_t imu_xyz_buf[3] = {0};
+
+  while (true) {
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(IMU_FREQUENCY_MS));
+    imu_data_t data = {0};
+    {
+      esp_err_t err = imu_read_data(&data);
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error calling imu_read_data: %s", esp_err_to_name(err));
+        continue;
+      }
+    }
+
+    {
+      imu_xyz_buf[0] = data.gyro.x;
+      imu_xyz_buf[1] = data.gyro.y;
+      imu_xyz_buf[2] = data.gyro.z;
+      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_IMU_GYRO,
+                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf));
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error calling can_send with IMU gyro: %s",
+                 esp_err_to_name(err));
+      }
+    }
+
+    {
+      imu_xyz_buf[0] = data.accel.x;
+      imu_xyz_buf[1] = data.accel.y;
+      imu_xyz_buf[2] = data.accel.z;
+      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_IMU_ACCEL,
+                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf));
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error calling can_send with IMU accel: %s",
+                 esp_err_to_name(err));
+      }
+    }
+  }
+
+  vTaskDelete(NULL);
+}
+
 static void adc_read_task([[maybe_unused]] void* arg) {
   // We're only reading potentiometer ADC values. To make the values more
   // stable, we want to average the last couple of values. To do that, we have
@@ -351,4 +401,5 @@ void app_main(void) {
 
   xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
   xTaskCreate(adc_read_task, "ADC read task", 1024 * 2 * 2, NULL, 5, NULL);
+  xTaskCreate(imu_read_task, "IMU read task", 1024 * 2 * 2, NULL, 5, NULL);
 }
