@@ -1,3 +1,4 @@
+#include "adc_manager.h"
 #include "can_driver.h"
 #include "esp_check.h"
 #include "esp_err.h"
@@ -62,6 +63,51 @@ static const ServoConfig kServoConfigs[] = {
 static const ServoConfig* const kUpDownServo = &kServoConfigs[0];
 static const ServoConfig* const kLeftRightServo = &kServoConfigs[1];
 
+static const AdcMgrChannelConfig kAdcMgrChannelConfigs[] = {
+    (AdcMgrChannelConfig){
+        .channel = POTENTIOMETER_UP_DOWN_CHANNEL,
+        .sample_rate = 1000,
+    },
+    (AdcMgrChannelConfig){
+        .channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
+        .sample_rate = 1000,
+    },
+};
+
+static const AdcMgrConfig kAdcMgrConfig = {
+    .channel_configs = kAdcMgrChannelConfigs,
+    .channel_configs_len = LIMB_ARR_LEN(kAdcMgrChannelConfigs),
+    .ms_worth_of_buffer_size = 100,
+};
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+static uint16_t s_potentiometer_up_down_underlying_buffer[1024] = {0};
+static uint16_t s_potentiometer_left_right_underlying_buffer[1024] = {0};
+
+static AdcMgrReadResults s_adc_read_results = {
+    .channel_buffers =
+        {
+            [POTENTIOMETER_UP_DOWN_CHANNEL] =
+                {
+                    .data = s_potentiometer_up_down_underlying_buffer,
+                    .capacity =
+                        LIMB_ARR_LEN(s_potentiometer_up_down_underlying_buffer),
+                },
+            [POTENTIOMETER_LEFT_RIGHT_CHANNEL] =
+                {
+                    .data = s_potentiometer_left_right_underlying_buffer,
+                    .capacity = LIMB_ARR_LEN(
+                        s_potentiometer_left_right_underlying_buffer),
+                },
+        },
+};
+
+static AdcMgrChannelBuffer* s_potentiometer_up_down_buffer =
+    &s_adc_read_results.channel_buffers[POTENTIOMETER_UP_DOWN_CHANNEL];
+static AdcMgrChannelBuffer* s_potentiometer_left_right_buffer =
+    &s_adc_read_results.channel_buffers[POTENTIOMETER_LEFT_RIGHT_CHANNEL];
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
 void app_main(void) {
   {
     esp_err_t err = servos_init(kServoConfigs, LIMB_ARR_LEN(kServoConfigs));
@@ -89,5 +135,23 @@ void app_main(void) {
       ESP_LOGE(TAG, "Error calling can_init: %s", esp_err_to_name(err));
       return;
     }
+  }
+
+  {
+    esp_err_t err = adc_mgr_init(kAdcMgrConfig);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling adc_mgr_init: %s", esp_err_to_name(err));
+      return;
+    }
+
+    err = adc_mgr_read(&s_adc_read_results, 10);
+    ESP_LOGI(TAG, "Latest up/down value: %d",
+             s_potentiometer_up_down_buffer
+                 ->data[s_potentiometer_up_down_buffer->length - 1]);
+    s_potentiometer_up_down_buffer->length = 0;
+    ESP_LOGI(TAG, "Latest left/right value: %d",
+             s_potentiometer_left_right_buffer
+                 ->data[s_potentiometer_left_right_buffer->length - 1]);
+    s_potentiometer_left_right_buffer->length = 0;
   }
 }
