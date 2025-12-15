@@ -7,6 +7,7 @@
 #include "freertos/projdefs.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
+#include "imu.h"
 #include "potentiometer.h"
 #include "servo.h"
 #include "soc/gpio_num.h"
@@ -31,6 +32,8 @@ enum {
   POTENTIOMETER_LEFT_RIGHT_CHANNEL = ADC_CHANNEL_3,
   CAN_TX_GPIO = GPIO_NUM_5,
   CAN_RX_GPIO = GPIO_NUM_4,
+  IMU_SDA_GPIO = GPIO_NUM_6,
+  IMU_SCL_GPIO = GPIO_NUM_7,
 };
 
 // Motors are hv2060
@@ -146,6 +149,25 @@ void app_main(void) {
   servo_move_to_degree(kUpDownServo, kUpDownServo->max_angle);
   vTaskDelay(pdMS_TO_TICKS(1000));
   servo_move_to_degree(kUpDownServo, kUpDownServo->min_angle);
+
+  {
+    imu_config_t imu_config = IMU_CONFIG_DEFAULT();
+    imu_config.sda_pin = IMU_SDA_GPIO;
+    imu_config.scl_pin = IMU_SCL_GPIO;
+
+    esp_err_t err = imu_init(&imu_config);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling imu_init: %s", esp_err_to_name(err));
+      return;
+    }
+
+    if (!imu_is_present()) {
+      ESP_LOGE(TAG, "Error: IMU sensor isn't present");
+      return;
+    }
+
+    ESP_LOGI(TAG, "IMU initialized!");
+  }
 
   {
     CanMsgFilter can_filter = {
