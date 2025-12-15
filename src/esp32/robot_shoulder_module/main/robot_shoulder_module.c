@@ -110,6 +110,9 @@ static AdcMgrChannelBuffer* s_potentiometer_up_down_buffer =
     &s_adc_read_results.channel_buffers[POTENTIOMETER_UP_DOWN_CHANNEL];
 static AdcMgrChannelBuffer* s_potentiometer_left_right_buffer =
     &s_adc_read_results.channel_buffers[POTENTIOMETER_LEFT_RIGHT_CHANNEL];
+
+static uint16_t s_latest_potentiometer_up_down_value = 0;
+static uint16_t s_latest_potentiometer_left_right_value = 0;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 static const Potentiometer kUpDownPotentiometer = {
@@ -135,6 +138,89 @@ static const Potentiometer kLeftRightPotentiometer = {
     .min_joint_angle = {0},
     .max_joint_angle = {180},
 };
+
+static uint16_t average(const uint16_t* values, const uint16_t value_len) {
+  uint32_t sum = 0;
+
+  for (uint16_t i = 0; i < value_len; ++i) {
+    sum += values[i];
+  }
+
+  return sum / value_len;
+}
+
+static void adc_read_task([[maybe_unused]] void* arg) {
+  // We're only reading potentiometer ADC values. To make the values more
+  // stable, we want to average the last couple of values. To do that, we have
+  // a higher sample rate than the frequency we actually want to send the data
+  // at.
+  enum {
+    CAN_POTENTIOMETER_MSG_FREQUENCY_MS = 10,
+  };
+
+  TickType_t current_tick = xTaskGetTickCount();
+  ESP_LOGI(TAG, "adc_read_task started!");
+
+  while (true) {
+    xTaskDelayUntil(&current_tick,
+                    pdMS_TO_TICKS(CAN_POTENTIOMETER_MSG_FREQUENCY_MS));
+
+    {
+      esp_err_t err = adc_mgr_read(&s_adc_read_results, 0);
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error calling adc_mgr_read: %s", esp_err_to_name(err));
+        continue;
+      }
+    }
+
+    // Get the average of the potentiometer values.
+    if (s_potentiometer_up_down_buffer->length > 0) {
+      s_latest_potentiometer_up_down_value =
+          average(s_potentiometer_up_down_buffer->data,
+                  s_potentiometer_up_down_buffer->length);
+      s_potentiometer_up_down_buffer->length = 0;
+    }
+
+    if (s_potentiometer_left_right_buffer->length > 0) {
+      s_latest_potentiometer_left_right_value =
+          average(s_potentiometer_left_right_buffer->data,
+                  s_potentiometer_left_right_buffer->length);
+      s_potentiometer_left_right_buffer->length = 0;
+    }
+
+    // Send up/down potentiometer status update.
+    {
+      PotentiometerAngle potentiometer_angle = potentiometer_adc_to_angle(
+          &kUpDownPotentiometer, s_latest_potentiometer_up_down_value);
+      JointAngle joint_angle =
+          to_joint_angle(&kUpDownPotentiometer, potentiometer_angle);
+      esp_err_t err =
+          can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
+                   (uint8_t*)&joint_angle.degree, sizeof(joint_angle.degree));
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error sending shoulder up/down angle over CAN: %s",
+                 esp_err_to_name(err));
+      }
+    }
+
+    // Send left/right potentiometer status update.
+    {
+      PotentiometerAngle potentiometer_angle = potentiometer_adc_to_angle(
+          &kLeftRightPotentiometer, s_latest_potentiometer_left_right_value);
+      JointAngle joint_angle =
+          to_joint_angle(&kLeftRightPotentiometer, potentiometer_angle);
+      esp_err_t err =
+          can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
+                   (uint8_t*)&joint_angle.degree, sizeof(joint_angle.degree));
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error sending shoulder left/right angle over CAN: %s",
+                 esp_err_to_name(err));
+      }
+    }
+  }
+
+  vTaskDelete(NULL);
+}
 
 void app_main(void) {
   {
@@ -201,4 +287,6 @@ void app_main(void) {
                  ->data[s_potentiometer_left_right_buffer->length - 1]);
     s_potentiometer_left_right_buffer->length = 0;
   }
+
+  xTaskCreate(adc_read_task, "ADC read task", 1024 * 2 * 2, NULL, 5, NULL);
 }
