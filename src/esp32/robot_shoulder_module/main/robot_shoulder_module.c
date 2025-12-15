@@ -32,10 +32,10 @@ enum {
   SERVO_LEFT_RIGHT_GPIO = GPIO_NUM_2,
   // The channel number corresponds to the GPIO number.
   POTENTIOMETER_LEFT_RIGHT_CHANNEL = ADC_CHANNEL_3,
-  CAN_TX_GPIO = GPIO_NUM_5,
-  CAN_RX_GPIO = GPIO_NUM_4,
-  IMU_SDA_GPIO = GPIO_NUM_6,
-  IMU_SCL_GPIO = GPIO_NUM_7,
+  CAN_TX_GPIO = GPIO_NUM_6,
+  CAN_RX_GPIO = GPIO_NUM_7,
+  IMU_SDA_GPIO = GPIO_NUM_5,
+  IMU_SCL_GPIO = GPIO_NUM_4,
 };
 
 // Motors are hv2060
@@ -186,6 +186,8 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         JointAngle joint_angle = {*(float*)can_buf};
         PotentiometerAngle potentiometer_angle =
             to_potentiometer_angle(&kUpDownPotentiometer, joint_angle);
+        ESP_LOGI(TAG, "Received joint angle %f / potentiometer angle %f",
+                 joint_angle.degree, potentiometer_angle.degree);
         servo_move_to_degree(kUpDownServo, (int)potentiometer_angle.degree);
         break;
       }
@@ -298,10 +300,17 @@ static void adc_read_task([[maybe_unused]] void* arg) {
 
     // Send up/down potentiometer status update.
     {
+      static int i = 0;
       PotentiometerAngle potentiometer_angle = potentiometer_adc_to_angle(
           &kUpDownPotentiometer, s_latest_potentiometer_up_down_value);
       JointAngle joint_angle =
           to_joint_angle(&kUpDownPotentiometer, potentiometer_angle);
+      if (++i == 100) {
+        ESP_LOGI(TAG, "Current up/down pot angle: %f",
+                 potentiometer_angle.degree);
+        ESP_LOGI(TAG, "Current up/down joint angle: %f", joint_angle.degree);
+        i = 0;
+      }
       esp_err_t err =
           can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
                    (uint8_t*)&joint_angle.degree, sizeof(joint_angle.degree));
@@ -345,7 +354,7 @@ void app_main(void) {
   vTaskDelay(pdMS_TO_TICKS(1000));
   servo_move_to_degree(kUpDownServo, kUpDownServo->min_angle);
 
-  // CAN initialization.
+  // IMU initialization.
   {
     imu_config_t imu_config = IMU_CONFIG_DEFAULT();
     imu_config.sda_pin = IMU_SDA_GPIO;
@@ -365,6 +374,7 @@ void app_main(void) {
     ESP_LOGI(TAG, "IMU initialized!");
   }
 
+  // CAN initialization.
   {
     CanMsgFilter can_filter = {
         .id = CAN_RECIPIENT_ROBOT_SHOULDER,
