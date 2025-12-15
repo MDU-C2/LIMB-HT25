@@ -419,6 +419,10 @@ result-*
 # OAK D files
 oak-examples/
 oak-template/
+src/vision/.depthai_*
+src/vision/tools
+
+
 # EMG data files
 emg_sequences_ch*.npz
 **/emg/checkpoints/

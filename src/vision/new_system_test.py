@@ -4,6 +4,7 @@ import numpy as np
 from depthai_nodes.utils import AnnotationHelper
 from depthai_nodes import PRIMARY_COLOR, SECONDARY_COLOR
 from typing import List
+from ultralytics import YOLO
 
 class KalmanFilter:
     def __init__(self, acc_std, meas_std, z, time):
@@ -242,8 +243,8 @@ def main():
 
         # Detection  model
         # Get model from zoo with platform specification for correct compilation
-        model_desc = dai.NNModelDescription("luxonis/yolov6-nano:r2-coco-512x288")
-        #model_desc = dai.NNModelDescription("luxonis/yolov10-nano:coco-512x288")
+        #model_desc = dai.NNModelDescription.fromYamlFile("./models/yolo11.yaml") # Doesnt work...
+        model_desc = dai.NNModelDescription("luxonis/yolov6-nano:r2-coco-512x288") # Works
         model_desc.platform = platform  # platform is a string (e.g., "RVC2")
         #nn_archive = dai.NNArchive(dai.getModelFromZoo(model_desc))
         #labels = nn_archive.getConfig().model.heads[0].metadata.classes
@@ -266,11 +267,16 @@ def main():
         # Build network with archive for RVC2, or model_desc for other platforms
         
 
-        nn = pipeline.create(dai.node.SpatialDetectionNetwork).build(
-            cam, stereo, model_desc, fps=args.fps_limit
-        )
-        nn_archive = dai.NNArchive(dai.getModelFromZoo(model_desc))
-        nn.setNNArchive(nn_archive, numShaves=4)
+        #nn = pipeline.create(dai.node.SpatialDetectionNetwork).build(
+        #    cam, stereo, model_desc, fps=args.fps_limit
+        #)
+        nn = pipeline.create(dai.node.SpatialDetectionNetwork).build(cam, stereo, model_desc, fps=args.fps_limit)
+        #nn.setNumShavesPerInferenceThread(4)
+        #nn.setBlobPath("models/yolo11n_512_288_openvino_2022.1_4shave.blob")
+        
+        #n.build(input=cam, stereo=stereo, model=model_desc, fps=args.fps_limit)
+        #nn_archive = dai.NNArchive(dai.getModelFromZoo(model_desc))
+        #nn.setNNArchive(nn_archive, numShaves=4)
         
         nn.setBoundingBoxScaleFactor(0.7)
         nn.setDepthLowerThreshold(100)
