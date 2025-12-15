@@ -7,6 +7,7 @@
 #include "freertos/projdefs.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
+#include "potentiometer.h"
 #include "servo.h"
 #include "soc/gpio_num.h"
 
@@ -107,6 +108,30 @@ static AdcMgrChannelBuffer* s_potentiometer_up_down_buffer =
 static AdcMgrChannelBuffer* s_potentiometer_left_right_buffer =
     &s_adc_read_results.channel_buffers[POTENTIOMETER_LEFT_RIGHT_CHANNEL];
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
+static const Potentiometer kUpDownPotentiometer = {
+    .degrees_of_motion = {285},
+    // TODO(Johan): These are temporary test values. The proper values need to
+    // be measured on the actual robot.
+    .min_adc_value = 0,
+    .max_adc_value = 4095,
+    .min_joint_angle_as_potentiometer_angle = {(285.F / 2.F) - 90.F},
+    .max_joint_angle_as_potentiometer_angle = {(285.F / 2.F) + 90.F},
+    .min_joint_angle = {0},
+    .max_joint_angle = {180},
+};
+
+static const Potentiometer kLeftRightPotentiometer = {
+    .degrees_of_motion = {285},
+    // TODO(Johan): These are temporary test values. The proper values need to
+    // be measured on the actual robot.
+    .min_adc_value = 0,
+    .max_adc_value = 4095,
+    .min_joint_angle_as_potentiometer_angle = {(285.F / 2.F) - 90.F},
+    .max_joint_angle_as_potentiometer_angle = {(285.F / 2.F) + 90.F},
+    .min_joint_angle = {0},
+    .max_joint_angle = {180},
+};
 
 void app_main(void) {
   {
