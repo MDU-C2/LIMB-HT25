@@ -4,10 +4,12 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
 #include "imu.h"
+#include "portmacro.h"
 #include "potentiometer.h"
 #include "servo.h"
 #include "soc/gpio_num.h"
@@ -149,6 +151,62 @@ static uint16_t average(const uint16_t* values, const uint16_t value_len) {
   return sum / value_len;
 }
 
+static void can_rx_task([[maybe_unused]] void* arg) {
+  uint32_t can_id = 0;
+  uint8_t can_buf[CAN_MAX_MESSAGE_SIZE] = {0};
+  uint8_t can_buf_len = 0;
+
+  while (true) {
+    esp_err_t err = can_receive(&can_id, can_buf, &can_buf_len, portMAX_DELAY);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Error calling can_receive: %s", esp_err_to_name(err));
+      continue;
+    }
+
+    // NOTE: For the "stop" messages, we use the latest potentiometer values,
+    // which might be slighly out of date. This could result in a sudden change
+    // in direction which might be undesirable.
+    switch (can_id) {
+      case CAN_ID_ROBOT_SHOULDER_UP_DOWN_STOP: {
+        PotentiometerAngle angle = potentiometer_adc_to_angle(
+            &kUpDownPotentiometer, s_latest_potentiometer_up_down_value);
+
+        servo_move_to_degree(kUpDownServo, (int)angle.degree);
+        break;
+      }
+      case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_STOP: {
+        PotentiometerAngle angle = potentiometer_adc_to_angle(
+            &kLeftRightPotentiometer, s_latest_potentiometer_left_right_value);
+
+        servo_move_to_degree(kLeftRightServo, (int)angle.degree);
+        break;
+      }
+      case CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION: {
+        assert(can_buf_len == 4);
+        JointAngle joint_angle = {*(float*)can_buf};
+        PotentiometerAngle potentiometer_angle =
+            to_potentiometer_angle(&kUpDownPotentiometer, joint_angle);
+        servo_move_to_degree(kUpDownServo, (int)potentiometer_angle.degree);
+        break;
+      }
+      case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION: {
+        assert(can_buf_len == 4);
+        JointAngle joint_angle = {*(float*)can_buf};
+        PotentiometerAngle potentiometer_angle =
+            to_potentiometer_angle(&kUpDownPotentiometer, joint_angle);
+        servo_move_to_degree(kLeftRightServo, (int)potentiometer_angle.degree);
+        break;
+      }
+      default: {
+        ESP_LOGW(TAG, "Unknown CAN Message received: 0x%x", can_id);
+        break;
+      }
+    }
+  }
+
+  vTaskDelete(NULL);
+}
+
 static void adc_read_task([[maybe_unused]] void* arg) {
   // We're only reading potentiometer ADC values. To make the values more
   // stable, we want to average the last couple of values. To do that, we have
@@ -223,6 +281,7 @@ static void adc_read_task([[maybe_unused]] void* arg) {
 }
 
 void app_main(void) {
+  // Servo initialization.
   {
     esp_err_t err = servos_init(kServoConfigs, LIMB_ARR_LEN(kServoConfigs));
     if (err != ESP_OK) {
@@ -236,6 +295,7 @@ void app_main(void) {
   vTaskDelay(pdMS_TO_TICKS(1000));
   servo_move_to_degree(kUpDownServo, kUpDownServo->min_angle);
 
+  // CAN initialization.
   {
     imu_config_t imu_config = IMU_CONFIG_DEFAULT();
     imu_config.sda_pin = IMU_SDA_GPIO;
@@ -270,6 +330,7 @@ void app_main(void) {
     }
   }
 
+  // ADC initialization.
   {
     esp_err_t err = adc_mgr_init(kAdcMgrConfig);
     if (err != ESP_OK) {
@@ -288,5 +349,6 @@ void app_main(void) {
     s_potentiometer_left_right_buffer->length = 0;
   }
 
+  xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
   xTaskCreate(adc_read_task, "ADC read task", 1024 * 2 * 2, NULL, 5, NULL);
 }

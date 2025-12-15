@@ -99,6 +99,10 @@ typedef enum {
   CAN_ID_HUMAN_UPPER_ARM_IMU_ACCEL = 0x5C1,
 } CanMessageId;
 
+enum {
+  CAN_MAX_MESSAGE_SIZE = 8,
+};
+
 // Allows for filtering which messages to accept from the CAN bus.
 // It follows the same format as in the [ESP-IDF documentation](
 // https://docs.espressif.com/projects/esp-idf/en/v5.4.3/esp32c3/api-reference/peripherals/twai.html#acceptance-filter
