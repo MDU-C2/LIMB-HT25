@@ -1,3 +1,4 @@
+#include "can_driver.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -62,14 +63,31 @@ static const ServoConfig* const kUpDownServo = &kServoConfigs[0];
 static const ServoConfig* const kLeftRightServo = &kServoConfigs[1];
 
 void app_main(void) {
-  esp_err_t err = servos_init(kServoConfigs, LIMB_ARR_LEN(kServoConfigs));
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Error calling servos_init: %s", esp_err_to_name(err));
-    return;
+  {
+    esp_err_t err = servos_init(kServoConfigs, LIMB_ARR_LEN(kServoConfigs));
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling servos_init: %s", esp_err_to_name(err));
+      return;
+    }
   }
 
   vTaskDelay(pdMS_TO_TICKS(5000));
   servo_move_to_degree(kUpDownServo, kUpDownServo->max_angle);
   vTaskDelay(pdMS_TO_TICKS(1000));
   servo_move_to_degree(kUpDownServo, kUpDownServo->min_angle);
+
+  {
+    CanMsgFilter can_filter = {
+        .id = CAN_RECIPIENT_ROBOT_SHOULDER,
+        .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY,
+                                          CAN_RECIPIENT_FILTER_EXACT,
+                                          CAN_GENERIC_FILTER_ANY),
+    };
+
+    esp_err_t err = can_init(CAN_TX_GPIO, CAN_RX_GPIO, 1000000, &can_filter);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling can_init: %s", esp_err_to_name(err));
+      return;
+    }
+  }
 }
