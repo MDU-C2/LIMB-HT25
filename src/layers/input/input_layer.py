@@ -2,8 +2,8 @@
 from multiprocessing import Process, Event
 from hardware.can.can_interface import CANInterface
 from hardware.ble.ble_interface import BLEInterface
-from window_buffer import WindowBuffer
-from packet_builder import PacketBuilder
+from .window_buffer import WindowBuffer
+from .packet_builder import PacketBuilder
 from shared.queues import DataQueue
 import time
 import numpy as np

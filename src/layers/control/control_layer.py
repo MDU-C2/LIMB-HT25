@@ -782,15 +782,15 @@ class ControlLayer(Process):
         x, y, z = position[0], position[1], position[2]
 
         if not (workspace_limits["x"][0] <= x <= workspace_limits["x"][1]):
-            print(f"[Control Layer] Target position X {x} is out of range [{workspace_limits["x"][0]}, {workspace_limits["x"][1]}]")
+            print(f"[Control Layer] Target position X {x} is out of range [{workspace_limits['x'][0]}, {workspace_limits['x'][1]}]")
             return False
         
         if not (workspace_limits["y"][0] <= y <= workspace_limits["y"][1]):
-            print(f"[Control Layer] Target position Y {y} is out of range [{workspace_limits["y"][0]}, {workspace_limits["y"][1]}]")
+            print(f"[Control Layer] Target position Y {y} is out of range [{workspace_limits['y'][0]}, {workspace_limits['y'][1]}]")
             return False
         
         if not (workspace_limits["z"][0] <= z <= workspace_limits["z"][1]):
-            print(f"[Control Layer] Target position Z {z} is out of range [{workspace_limits["z"][0]}, {workspace_limits["z"][1]}]")
+            print(f"[Control Layer] Target position Z {z} is out of range [{workspace_limits['z'][0]}, {workspace_limits['z'][1]}]")
             return False
         
         return True

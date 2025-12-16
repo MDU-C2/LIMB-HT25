@@ -11,8 +11,8 @@ import os
 
 from shared.queues import DataQueue
 from shared.models.packet import DataPacket
-from emg_utils import preprocess_emg_signal, extract_time_domain_features
-from emg.models import get_lstm_model # TODO: Fix pathing to this
+from .emg_utils import preprocess_emg_signal, extract_time_domain_features
+from emg.models import get_simple_lstm
 from data_fusion.complementary_filter import ComplementaryFilter
 from data_fusion.ekf_filter import ExtendedKalmanFilter
 
@@ -120,7 +120,7 @@ class ProcessingLayer(Process):
                 input_dim = 12 # 6 feature * 2 channels # TODO: Check that this is correct
                 hidden_dim = 32 
 
-            self.model = get_lstm_model(input_dim=input_dim, hidden_dim=hidden_dim, num_classes=self.num_classes).to(self.device) # TODO: Check that this works.
+            self.model = get_simple_lstm(input_dim=input_dim, hidden_dim=hidden_dim, num_classes=self.num_classes).to(self.device) # TODO: Check that this works.
 
             # Load model weights
             if "model_state_dict" in checkpoint:
@@ -483,7 +483,7 @@ class ProcessingLayer(Process):
                     apriltag_pose = vision_data["apriltag_pose"]
 
                     if isinstance(apriltag_pose, dict):
-                        if "position" is apriltag_pose:
+                        if "position" in apriltag_pose:
                             vision_position = np.array(apriltag_pose["position"], dtype=np.float64)
                         if "orientation" in apriltag_pose:
                             vision_orientation = np.array(apriltag_pose["orientation"], dtype=np.float64)

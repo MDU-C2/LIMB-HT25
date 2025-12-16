@@ -29,7 +29,7 @@ class WindowBuffer:
             timestamp = time.time()
 
         self.imu_buffer.append({
-            "data": data.copy(), # Make a copy to avoid modifying the original data (needed?)
+            "data": data, # Make a copy to avoid modifying the original data (needed?)
             "timestamp": timestamp
         })
 
@@ -42,7 +42,7 @@ class WindowBuffer:
             timestamp = time.time()
 
         self.piezo_buffer.append({
-            "data": data.copy(),
+            "data": data,
             "timestamp": timestamp
         })
 
