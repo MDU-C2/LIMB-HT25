@@ -1,4 +1,4 @@
-#include "fsr400.h"
+#include "FSR400.h"
 
 
 static adc_channel_t channel[5] = {ADC_CHANNEL_0, ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4};

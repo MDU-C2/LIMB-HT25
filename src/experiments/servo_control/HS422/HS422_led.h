@@ -50,7 +50,7 @@ typedef struct {
     int current_angle;             // Current servo position
     float current_force;           // Current force applied, measured by FSR
     servo_direction_t direction;   // Direction of servo movement
-    const char* name;              // Human-readable name for debugging
+    const char* name;              // Name for debugging
 } servo_config_t;
 
 // Calibration state
