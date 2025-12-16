@@ -142,7 +142,18 @@ idf.py -p COMx flash monitor  # Replace COMx with your port
 ## Configuration Options
 
 ```c
-can_init(5, 4, 125000);  // TX=5, RX=4, 125 kbps
+
+CanMsgFilter filter = {
+    // The ID we want to accept.
+    .id = 0x10,
+    // Set bits of ID can differ, unset bits must match.
+    // Allows accepting multiple IDs.
+    .ignore_mask = 0x0F,
+};
+
+// TX=5, RX=4, 125 kbps, only accept messages based on filter
+// (NULL accepts all messages).
+can_init(5, 4, 125000, &filter);
 ```
 
 

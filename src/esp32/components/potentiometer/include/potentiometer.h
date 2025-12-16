@@ -1,67 +1,49 @@
 #pragma once
 
 #include <stdint.h>
-#include <stdbool.h>
-#include "esp_err.h"
-#include "esp_adc/adc_oneshot.h"
-#include "hal/adc_types.h"
 
-/**
- * @brief Potentiometer configuration structure
- */
+// These are angles from the potentiometer's frame of reference.
 typedef struct {
-    uint8_t gpio_pin;           // GPIO pin number (e.g., GPIO0)
-    adc_channel_t adc_channel;  // ADC channel (e.g., ADC_CHANNEL_0)
-    adc_atten_t adc_atten;      // ADC attenuation (ADC_ATTEN_DB_0 to ADC_ATTEN_DB_12)
-    adc_bitwidth_t adc_bitwidth; // ADC bit width (ADC_BITWIDTH_DEFAULT, etc.)
-} potentiometer_config_t;
+  float degree;
+} PotentiometerAngle;
 
-/**
- * @brief Default potentiometer configuration for GPIO0
- */
-#define POTENTIOMETER_CONFIG_DEFAULT() (potentiometer_config_t) { \
-    .gpio_pin = 0, \
-    .adc_channel = ADC_CHANNEL_0, \
-    .adc_atten = ADC_ATTEN_DB_12, \
-    .adc_bitwidth = ADC_BITWIDTH_DEFAULT, \
-}
+// These are angles from the joint's frame of reference.
+typedef struct {
+  float degree;
+} JointAngle;
 
-/**
- * @brief Initialize the potentiometer ADC
- *
- * @param config Configuration structure. If NULL, uses default configuration.
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t potentiometer_init(const potentiometer_config_t *config);
+// This represents the characteristics of the potentiometer used.
+typedef struct {
+  // The range of motion that the potentiometer supports.
+  PotentiometerAngle degrees_of_motion;
 
-/**
- * @brief Read raw ADC value from potentiometer
- *
- * @param raw_value Pointer to store the raw ADC value
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t potentiometer_read_raw(int *raw_value);
+  // The range of motion that the joint supports in its own frame of reference.
+  JointAngle min_joint_angle;
+  JointAngle max_joint_angle;
 
-/**
- * @brief Read voltage in millivolts from potentiometer
- *
- * @param voltage_mv Pointer to store the voltage in millivolts
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t potentiometer_read_voltage(int *voltage_mv);
+  // The range of motion that the joint supports in values expressed by the
+  // potentiometer.
+  PotentiometerAngle min_joint_angle_as_potentiometer_angle;
+  PotentiometerAngle max_joint_angle_as_potentiometer_angle;
 
-/**
- * @brief Read normalized value (0-1000) from potentiometer
- *
- * @param normalized_value Pointer to store the normalized value (0-1000)
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t potentiometer_read_normalized(uint16_t *normalized_value);
+  // In ideal conditions this should be [0, 2^bitwidth - 1]. However, in
+  // practice we might be slightly off, so this should be set to the actual
+  // values measured when turning the potentiometer to its minimum and maximum
+  // angles.
+  uint16_t min_adc_value;
+  uint16_t max_adc_value;
+} Potentiometer;
 
-/**
- * @brief Deinitialize the potentiometer ADC
- *
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t potentiometer_deinit(void);
+// Converts the provided ADC value to the potentiometer's corresponding angle.
+PotentiometerAngle potentiometer_adc_to_angle(
+    const Potentiometer *potentiometer, uint16_t adc_value);
 
+// Converts an angle from the potentiometer's frame of reference to the joint's
+// frame of reference.
+JointAngle to_joint_angle(const Potentiometer *potentiometer,
+                          PotentiometerAngle angle);
+
+// Converts an angle from the joint's frame of reference to the potentiometer's
+// frame of reference.
+PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
+                                          JointAngle angle);
