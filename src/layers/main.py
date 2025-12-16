@@ -26,6 +26,7 @@ from layers.control.control_layer import ControlLayer
 from shared.queues import DataQueue
 from hardware.can.can_socketcan import SocketCANInterface
 from hardware.ble.ble_bleak import BleakBLEInterface
+from vision.system import VisionSystem
 
 
 class LIMBSystem:
@@ -78,6 +79,9 @@ class LIMBSystem:
         except Exception as e:
             print(f"[System] ERROR: Failed to initialize BLE interface: {e}")
             raise
+
+        # Vision system source
+        self.vision_source = vision_source
 
         # Create queues between layers
         print("[System] Creating data queues...")
@@ -181,6 +185,14 @@ class LIMBSystem:
 
         print("[System] System stopped")
 
+        # Stop vision system
+        if self.vision_source is not None:
+            try:
+                self.vision_source.shutdown()
+                print("[System] Vision system stopped")
+            except Exception as e:
+                print(f"[System] ERROR: Failed to stop vision system: {e}")
+
     def run(self):
         """Run the system (blocking until stopped)"""
         if not self.start():
@@ -254,7 +266,7 @@ def main():
 
     config = load_config(args.config)
 
-    # OVerride with command line arguments
+    # Override with command line arguments
     if args.can_interface:
         config["can_interface"] = args.can_interface
     if args.can_bitrate:
@@ -268,6 +280,27 @@ def main():
     if args.scaler_path:
         config["scaler_path"] = args.scaler_path
         
+    # Initialize vision system
+    vision_system = None
+    try:
+        print("[System] Initializing vision system...")
+        vision_system = VisionSystem(
+            confidence_threshold=0.5,
+            spatial_threshold=5000,
+            tag_size=0.05,
+            enable_visualization=False
+        )
+        # Start the pipeline
+        if not vision_system.start_pipeline():
+            print("[System] WARNING: Failed to start vision pipeline, continuing without vision")
+            vision_system = None
+        else:
+            print("[System] Vision pipeline started successfully")
+    except Exception as e:
+        print(f"[System] WARNING: Failed to initialize vision system: {e}")
+        print(f"[System] WARNING: Continuing without vision")
+        vision_system = None
+
     try:
         system = LIMBSystem(
             can_interface=config["can_interface"],
@@ -278,7 +311,7 @@ def main():
             sample_rate=config["sample_rate"],
             model_path=config["model_path"],
             scaler_path=config["scaler_path"],
-            vision_source=None #TODO: Initialize vision system if needed
+            vision_source=vision_system
         )
 
         system.run()

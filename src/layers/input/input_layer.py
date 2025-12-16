@@ -29,6 +29,7 @@ class InputLayer(Process):
         self.packet_builder = PacketBuilder(sequence_start=0, vision_source=vision_source)
         self.sample_rate = sample_rate
         self.output_queue = output_queue
+        self.vision_source = vision_source
 
         # Store latest sensor values (from CAN)
         # Pressure: dictionary to accumulate individual finger values
@@ -120,6 +121,12 @@ class InputLayer(Process):
 
             # Create packet (only when window buffer is full)
             if self.window_buffer.is_full():
+
+                # Update vision system to poll queues and get latest detections and pose estimates
+                if self.vision_source is not None:
+                    self.vision_source.update()    
+
+
                 packet = self.packet_builder.build(
                     self.window_buffer,
                     self.sample_rate,
