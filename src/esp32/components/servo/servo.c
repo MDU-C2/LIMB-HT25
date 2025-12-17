@@ -77,8 +77,8 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_config), TAG,
                       "Couldn't configure ledc_channel");
 
-  uint16_t current_pot_adc_value =
-      limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
+  uint16_t current_pot_adc_value = limb_average16(
+      latest_potentiometer_values, latest_potentiometer_values_len);
   PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &servo_config->potentiometer, current_pot_adc_value);
 
@@ -94,7 +94,7 @@ esp_err_t servo_init(const ServoConfig *servo_config,
            current_angle.degree);
 
   // TODO(johan): Remove once we have an update function.
-  servo_move_to_degree(servo_config, servo_config->initial_angle);
+  servo_move_to_degree(*out_handle, servo_config->initial_angle);
 
   ESP_LOGI(TAG, "All channels configured");
 
@@ -112,27 +112,34 @@ static uint32_t angle_to_pulse_width(PotentiometerAngle deg,
                               servo->max_pulse_us);
 }
 
-void servo_move_to_pulse_width(ServoConfig *cfg, uint16_t pulse_width) {
-  uint32_t duty = us_to_duty(cfg, pulse_width);
+static ServoContext *servo_get_context(ServoHandle handle) {
+  return &s_servo_contexts[handle];
+}
 
-  ledc_set_duty(LEDC_LOW_SPEED_MODE, cfg->ledc_channel, duty);
-  ledc_update_duty(LEDC_LOW_SPEED_MODE, cfg->ledc_channel);
+void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width) {
+  ServoContext *ctx = servo_get_context(handle);
+  uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
+
+  ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel, duty);
+  ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel);
 }
 
 // Write angle to specific servo channel
-void servo_move_to_degree(const ServoConfig *servo, PotentiometerAngle deg) {
-  deg.degree =
-      LIMB_CLAMP(deg.degree, servo->min_angle.degree, servo->max_angle.degree);
+void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg) {
+  ServoContext *ctx = servo_get_context(handle);
 
-  uint32_t us = angle_to_pulse_width(deg, servo);
+  deg.degree = LIMB_CLAMP(deg.degree, ctx->cfg.min_angle.degree,
+                          ctx->cfg.max_angle.degree);
+
+  uint32_t us = angle_to_pulse_width(deg, &ctx->cfg);
 
   // Set duty cycle
-  uint32_t duty = us_to_duty(servo, us);
+  uint32_t duty = us_to_duty(&ctx->cfg, us);
 
   // TODO(johan): Avoid jerkiness by adjusting movement speed based on distance
   // and direction?
-  ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
-  ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
+  ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel, duty);
+  ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel);
 
-  ESP_LOGI(TAG, "%s -> %.2f° (%lu us)", servo->name, deg.degree, us);
+  // ESP_LOGI(TAG, "%s -> %.2f° (%lu us)", ctx->cfg.name, deg.degree, us);
 }

@@ -91,7 +91,7 @@ void app_main(void) {
 
   while (true) {
     for (int i = 0; i < LIMB_ARR_LEN(stops); ++i) {
-      servo_move_to_degree(&servo_config, stops[i]);
+      servo_move_to_degree(servo, stops[i]);
       vTaskDelay(pdMS_TO_TICKS(1000));
     }
   }

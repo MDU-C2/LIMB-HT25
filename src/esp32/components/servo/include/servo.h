@@ -51,8 +51,8 @@ esp_err_t servo_init(const ServoConfig *servo_config,
                      ServoHandle *out_handle);
 
 // Actuate servo to the specified degree.
-void servo_move_to_degree(const ServoConfig *servo, PotentiometerAngle deg);
+void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg);
 
 // Move the servo to the specified pulse width. The value is clamped to the
 // servo's min and max pulse widths before being written.
-void servo_move_to_pulse_width(ServoConfig *cfg, uint16_t pulse_width);
+void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width);
