@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "hal/ledc_types.h"
+#include "potentiometer.h"
 #include "servo.h"
 
 #define LIMB_ARR_LEN(arr) (sizeof(arr) / sizeof(*(arr)))
@@ -21,10 +22,11 @@ const ServoConfig servo_configs[] = {
     (ServoConfig){
         .gpio_pin = GPIO_NUM_0,
         .direction = SERVO_DIR_NORMAL,
-        .initial_angle = SERVO_DIR_NORMAL,
+        .initial_angle = {((float)(HV2060_MAX_ANGLE - HV2060_MIN_ANGLE) / 2.F) +
+                          (float)HV2060_MIN_ANGLE},
         .ledc_channel = LEDC_CHANNEL_0,
-        .min_angle = HV2060_MIN_ANGLE,
-        .max_angle = HV2060_MAX_ANGLE,
+        .min_angle = {HV2060_MIN_ANGLE},
+        .max_angle = {HV2060_MAX_ANGLE},
         .min_pulse_us = HV2060_MIN_PULSEWIDTH_US,
         .max_pulse_us = HV2060_MAX_PULSEWIDTH_US,
         .name = "hv2060",
@@ -33,8 +35,8 @@ const ServoConfig servo_configs[] = {
 
 void app_main(void) {
   ESP_ERROR_CHECK(servos_init(servo_configs, LIMB_ARR_LEN(servo_configs)));
-  int stops[] = {
-      0, 10, 45, 90, 180, 135, 90, 45,
+  PotentiometerAngle stops[] = {
+      {0}, {10}, {45}, {90}, {180}, {135}, {90}, {45},
   };
 
   while (true) {

@@ -1,6 +1,7 @@
 #pragma once
 #include "esp_err.h"
 #include "hal/ledc_types.h"
+#include "potentiometer.h"
 
 // Determines if low angles should generate low or high pulse widths, and vice
 // versa for high angles.
@@ -17,15 +18,15 @@ typedef struct {
   // LEDC channel used by the servo.
   ledc_channel_t ledc_channel;
   // Minimum angle in degrees.
-  int min_angle;
+  PotentiometerAngle min_angle;
   // Maximum angle in degrees.
-  int max_angle;
+  PotentiometerAngle max_angle;
   // The pulse width that corresponds to the minimum angle.
   uint32_t min_pulse_us;
   // The pulse width that corresponds to the maximum angle.
   uint32_t max_pulse_us;
   // The angle the servo should be set to right after initialization.
-  int initial_angle;
+  PotentiometerAngle initial_angle;
   // If the angles should be reversed.
   ServoDirection direction;
   // Human-readable name for debugging
@@ -36,4 +37,4 @@ typedef struct {
 esp_err_t servos_init(const ServoConfig *configs, uint8_t configs_len);
 
 // Actuate servo to the specified degree.
-void servo_move_to_degree(const ServoConfig *servo, int deg);
+void servo_move_to_degree(const ServoConfig *servo, PotentiometerAngle deg);

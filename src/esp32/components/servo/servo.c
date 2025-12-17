@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "hal/ledc_types.h"
 #include "limb_utils.h"
+#include "potentiometer.h"
 
 static const char *const TAG = "Servo";
 
@@ -71,17 +72,21 @@ esp_err_t servos_init(const ServoConfig *servo_configs, uint8_t configs_len) {
   return ESP_OK;
 }
 
-static uint32_t angle_to_pulse_width(int deg, const ServoConfig *servo) {
+static uint32_t angle_to_pulse_width(PotentiometerAngle deg,
+                                     const ServoConfig *servo) {
   if (servo->direction == SERVO_DIR_REVERSE) {
-    deg = servo->max_angle - (deg - servo->min_angle);
+    deg.degree =
+        servo->max_angle.degree - (deg.degree - servo->min_angle.degree);
   }
-  return LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
-                              servo->min_pulse_us, servo->max_pulse_us);
+  return LIMB_LERP_FROM_RANGE(deg.degree, servo->min_angle.degree,
+                              servo->max_angle.degree, servo->min_pulse_us,
+                              servo->max_pulse_us);
 }
 
 // Write angle to specific servo channel
-void servo_move_to_degree(const ServoConfig *servo, int deg) {
-  deg = LIMB_CLAMP(deg, servo->min_angle, servo->max_angle);
+void servo_move_to_degree(const ServoConfig *servo, PotentiometerAngle deg) {
+  deg.degree =
+      LIMB_CLAMP(deg.degree, servo->min_angle.degree, servo->max_angle.degree);
 
   uint32_t us = angle_to_pulse_width(deg, servo);
 
@@ -93,5 +98,5 @@ void servo_move_to_degree(const ServoConfig *servo, int deg) {
   ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
 
-  ESP_LOGI(TAG, "%s -> %d° (%lu us)", servo->name, deg, us);
+  ESP_LOGI(TAG, "%s -> %.2f° (%lu us)", servo->name, deg.degree, us);
 }
