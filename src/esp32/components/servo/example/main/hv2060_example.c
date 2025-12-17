@@ -34,7 +34,7 @@ const ServoConfig servo_configs[] = {
 };
 
 void app_main(void) {
-  ESP_ERROR_CHECK(servos_init(servo_configs, LIMB_ARR_LEN(servo_configs)));
+  ESP_ERROR_CHECK(servo_init(servo_configs));
   PotentiometerAngle stops[] = {
       {0}, {10}, {45}, {90}, {180}, {135}, {90}, {45},
   };

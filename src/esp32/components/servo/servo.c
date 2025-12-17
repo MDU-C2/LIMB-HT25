@@ -17,6 +17,12 @@ enum {
   SERVO_PERIOD_US = 1000000UL / SERVO_FREQUENCY,
 };
 
+// We support a static amount of servo motors, so we statically allocate space
+// for them.
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+static bool s_channels_assigned[LEDC_CHANNEL_MAX] = {false};
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
 // Convert microseconds to duty cycle
 static uint32_t us_to_duty(const ServoConfig *servo, uint16_t us) {
   us = LIMB_CLAMP(us, servo->min_pulse_us, servo->max_pulse_us);
@@ -24,7 +30,7 @@ static uint32_t us_to_duty(const ServoConfig *servo, uint16_t us) {
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
 }
 
-esp_err_t servos_init(const ServoConfig *servo_configs, uint8_t configs_len) {
+esp_err_t servo_init(const ServoConfig *servo_config) {
   // Configure LEDC timer (shared by all servos).
   ledc_timer_config_t ledc_timer = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
@@ -38,34 +44,28 @@ esp_err_t servos_init(const ServoConfig *servo_configs, uint8_t configs_len) {
                       "Couldn't configure ledc_timer");
   ESP_LOGI(TAG, "Timer configured");
 
-  bool channels_assigned[LEDC_CHANNEL_MAX] = {false};
+  ESP_LOGI(TAG, "Configuring %s on GPIO%d, Channel %d", servo_config->name,
+           servo_config->gpio_pin, servo_config->ledc_channel);
 
-  // Configure each servo channel individually
-  for (uint8_t i = 0; i < configs_len; i++) {
-    const ServoConfig *servo_config = &servo_configs[i];
-    ESP_LOGI(TAG, "Configuring %s on GPIO%d, Channel %d", servo_config->name,
-             servo_config->gpio_pin, servo_config->ledc_channel);
-
-    if (channels_assigned[servo_config->ledc_channel]) {
-      ESP_LOGE(
-          TAG,
-          "Configuring multiple servos using the same channel in servos_init!");
-      return ESP_ERR_INVALID_ARG;
-    }
-    channels_assigned[servo_config->ledc_channel] = true;
-
-    ledc_channel_config_t channel_config = {
-        .gpio_num = servo_config->gpio_pin,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = servo_config->ledc_channel,
-        .intr_type = LEDC_INTR_DISABLE,
-        .timer_sel = LEDC_TIMER_0,
-    };
-
-    ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_config), TAG,
-                        "Couldn't configure ledc_channel");
-    servo_move_to_degree(servo_config, servo_config->initial_angle);
+  if (s_channels_assigned[servo_config->ledc_channel]) {
+    ESP_LOGE(
+        TAG,
+        "Configuring multiple servos using the same channel in servos_init!");
+    return ESP_ERR_INVALID_ARG;
   }
+  s_channels_assigned[servo_config->ledc_channel] = true;
+
+  ledc_channel_config_t channel_config = {
+      .gpio_num = servo_config->gpio_pin,
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .channel = servo_config->ledc_channel,
+      .intr_type = LEDC_INTR_DISABLE,
+      .timer_sel = LEDC_TIMER_0,
+  };
+
+  ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_config), TAG,
+                      "Couldn't configure ledc_channel");
+  servo_move_to_degree(servo_config, servo_config->initial_angle);
 
   ESP_LOGI(TAG, "All channels configured");
 

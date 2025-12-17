@@ -34,7 +34,7 @@ typedef struct {
 } ServoConfig;
 
 // Initialize servos using provided configurations.
-esp_err_t servos_init(const ServoConfig *configs, uint8_t configs_len);
+esp_err_t servo_init(const ServoConfig *config);
 
 // Actuate servo to the specified degree.
 void servo_move_to_degree(const ServoConfig *servo, PotentiometerAngle deg);
