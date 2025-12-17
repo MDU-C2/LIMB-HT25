@@ -116,6 +116,12 @@ static ServoContext *servo_get_context(ServoHandle handle) {
   return &s_servo_contexts[handle];
 }
 
+static PotentiometerAngle clamp_servo_angle(const ServoConfig *cfg,
+                                            PotentiometerAngle angle) {
+  return (PotentiometerAngle){
+      LIMB_CLAMP(angle.degree, cfg->min_angle.degree, cfg->max_angle.degree)};
+}
+
 void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width) {
   ServoContext *ctx = servo_get_context(handle);
   uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
@@ -128,8 +134,7 @@ void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width) {
 void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg) {
   ServoContext *ctx = servo_get_context(handle);
 
-  deg.degree = LIMB_CLAMP(deg.degree, ctx->cfg.min_angle.degree,
-                          ctx->cfg.max_angle.degree);
+  deg = clamp_servo_angle(&ctx->cfg, deg);
 
   uint32_t us = angle_to_pulse_width(deg, &ctx->cfg);
 
