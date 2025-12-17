@@ -38,7 +38,7 @@ class ProcessingLayer(Process):
                 seq_length: int = 10, # Number of windows in the sequence
                 num_classes: int = 2, # Number of classes for the LSTM model
                 #IMU movement intention parameters
-                imu_accel_threshold: float = 0.5, # Minimum acc to detect movement
+                imu_accel_threshold: float = 0.3, # Minimum acc to detect movement
                 imu_gravity_removal: bool = True, # Remove gravity
 
                 # IMU+vision fusion parameters
@@ -240,8 +240,8 @@ class ProcessingLayer(Process):
             # Step 2: Extract time domain features (Mav, RMS, WL, ZC, SSC, VAR)
             num_channels, window_size = emg_preprocessed.shape
 
-            window_matrix = emg_preprocessed.flatten().reshape(-1, 1) # Create single-row window matrix by flattening channels
-
+            window_matrix = emg_preprocessed.flatten().reshape(1, -1) # Create single-row window matrix by flattening channels
+            
             # Extract features (returns shape: (1, num_channels*6))
             feature_matrix = extract_time_domain_features(
                 window_matrix=window_matrix, 
@@ -319,7 +319,6 @@ class ProcessingLayer(Process):
         4. Determine dominant direction based on thresholds
         5. Return movement intention with condifence
         """
-
         try:
             # Step 1: Extract accelerometer and gyroscope data from IMU window
             imu_data = human_data.imu # Shape: (window_size, 6) - [ax, ay, az, gx, gy, gz]

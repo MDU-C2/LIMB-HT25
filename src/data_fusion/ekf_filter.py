@@ -105,7 +105,7 @@ class ExtendedKalmanFilter:
         self.last_update_time = None
         self.initialized = False
         
-        print(f"EKF initialized (state_dim={self.state_dim})")
+        #print(f"EKF initialized (state_dim={self.state_dim})")
     
     def initialize(
         self,
@@ -143,7 +143,7 @@ class ExtendedKalmanFilter:
         self.last_update_time = time.time()
         self.initialized = True
         
-        print(f"EKF initialized at position: {position}")
+        #print(f"EKF initialized at position: {position}")
     
     def predict(
         self,
