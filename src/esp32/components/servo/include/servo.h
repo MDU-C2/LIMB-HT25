@@ -30,6 +30,8 @@ typedef struct {
   PotentiometerAngle initial_angle;
   // The maximum allowed velocity of the servo.
   float max_velocity_dps;
+  // The maximum allowed acceleration of the servo.
+  float max_accel_dps2;
 
   // The ADC channel used for the servo's potentiometer.
   adc_channel_t pot_adc_channel;
@@ -49,6 +51,14 @@ esp_err_t servo_init(const ServoConfig *servo_config,
                      const uint16_t *latest_potentiometer_values,
                      uint16_t latest_potentiometer_values_len,
                      ServoHandle *out_handle);
+
+// This function is meant to be called periodically. It determines how far it
+// should move the servo based on the distance to the target angle and the time
+// taken since the last call to servo_update, determined by dt_seconds passed by
+// the caller.
+void servo_update(ServoHandle handle, float dt_seconds,
+                  const uint16_t *potentiometer_values,
+                  uint16_t potentiometer_values_len);
 
 // Actuate servo to the specified degree.
 void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg);
