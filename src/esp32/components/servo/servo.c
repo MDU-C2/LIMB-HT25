@@ -10,6 +10,13 @@
 
 static const char *const TAG = "Servo";
 
+typedef struct {
+  ServoConfig cfg;
+  float current_velocity_dps;
+  PotentiometerAngle target_angle_deg;
+  PotentiometerAngle current_angle_deg;
+} ServoContext;
+
 enum {
   SERVO_MAX_DUTY = ((1U << LEDC_TIMER_13_BIT) - 1),
   // We assume that the frequency used by the servo is 50 Hz.
@@ -21,6 +28,7 @@ enum {
 // for them.
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 static bool s_channels_assigned[LEDC_CHANNEL_MAX] = {false};
+static ServoContext s_servo_contexts[LEDC_CHANNEL_MAX] = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 // Convert microseconds to duty cycle
@@ -30,7 +38,10 @@ static uint32_t us_to_duty(const ServoConfig *servo, uint16_t us) {
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
 }
 
-esp_err_t servo_init(const ServoConfig *servo_config) {
+esp_err_t servo_init(const ServoConfig *servo_config,
+                     const uint16_t *latest_potentiometer_values,
+                     uint16_t latest_potentiometer_values_len,
+                     ServoHandle *out_handle) {
   // Configure LEDC timer (shared by all servos).
   ledc_timer_config_t ledc_timer = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
@@ -65,6 +76,24 @@ esp_err_t servo_init(const ServoConfig *servo_config) {
 
   ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_config), TAG,
                       "Couldn't configure ledc_channel");
+
+  uint16_t current_pot_adc_value =
+      limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
+  PotentiometerAngle current_angle = potentiometer_adc_to_angle(
+      &servo_config->potentiometer, current_pot_adc_value);
+
+  s_servo_contexts[servo_config->ledc_channel] = (ServoContext){
+      .cfg = *servo_config,
+      .current_angle_deg = current_angle,
+      .target_angle_deg = servo_config->initial_angle,
+  };
+
+  *out_handle = servo_config->ledc_channel;
+
+  ESP_LOGI(TAG, "Initializing servo angle to %.2f degrees.",
+           current_angle.degree);
+
+  // TODO(johan): Remove once we have an update function.
   servo_move_to_degree(servo_config, servo_config->initial_angle);
 
   ESP_LOGI(TAG, "All channels configured");

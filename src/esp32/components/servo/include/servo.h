@@ -1,5 +1,6 @@
 #pragma once
 #include "esp_err.h"
+#include "hal/adc_types.h"
 #include "hal/ledc_types.h"
 #include "potentiometer.h"
 
@@ -27,14 +28,27 @@ typedef struct {
   uint32_t max_pulse_us;
   // The angle the servo should be set to right after initialization.
   PotentiometerAngle initial_angle;
+  // The maximum allowed velocity of the servo.
+  float max_velocity_dps;
+
+  // The ADC channel used for the servo's potentiometer.
+  adc_channel_t pot_adc_channel;
+  // The configuration/calibration of the servo's potentiometer.
+  Potentiometer potentiometer;
+
   // If the angles should be reversed.
   ServoDirection direction;
   // Human-readable name for debugging
   const char *name;
 } ServoConfig;
 
+typedef ledc_channel_t ServoHandle;
+
 // Initialize servos using provided configurations.
-esp_err_t servo_init(const ServoConfig *config);
+esp_err_t servo_init(const ServoConfig *servo_config,
+                     const uint16_t *latest_potentiometer_values,
+                     uint16_t latest_potentiometer_values_len,
+                     ServoHandle *out_handle);
 
 // Actuate servo to the specified degree.
 void servo_move_to_degree(const ServoConfig *servo, PotentiometerAngle deg);
