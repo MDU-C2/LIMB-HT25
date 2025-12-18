@@ -18,13 +18,13 @@ typedef struct {
   int gpio_pin;
   // LEDC channel used by the servo.
   ledc_channel_t ledc_channel;
-  // Minimum angle in degrees.
+  // Minimum potentiometer angle that the servo should be able to actuate at.
   PotentiometerAngle min_angle;
-  // Maximum angle in degrees.
+  // Maximum potentiometer angle that the servo should be able to actuate at.
   PotentiometerAngle max_angle;
-  // The pulse width that corresponds to the minimum angle.
+  // The pulse width that corresponds to min_angle.
   uint32_t min_pulse_us;
-  // The pulse width that corresponds to the maximum angle.
+  // The pulse width that corresponds to max_angle.
   uint32_t max_pulse_us;
   // The angle the servo should be set to right after initialization.
   PotentiometerAngle initial_angle;
@@ -56,9 +56,11 @@ esp_err_t servo_init(const ServoConfig *servo_config,
 // should move the servo based on the distance to the target angle and the time
 // taken since the last call to servo_update, determined by dt_seconds passed by
 // the caller.
-void servo_update(ServoHandle handle, float dt_seconds,
+bool servo_update(ServoHandle handle, float dt_seconds,
                   const uint16_t *potentiometer_values,
                   uint16_t potentiometer_values_len);
+
+void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);
 
 // Actuate servo to the specified degree.
 void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg);

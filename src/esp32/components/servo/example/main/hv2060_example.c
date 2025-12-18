@@ -104,18 +104,133 @@ void app_main(void) {
                  s_servo_potentiometer_adc_channel_buffer->length, &servo));
   s_servo_potentiometer_adc_channel_buffer->length = 0;
 
-  PotentiometerAngle stops[] = {
-      {0}, {10}, {30}, {60}, {120}, {90}, {60}, {30},
+  JointAngle stops[] = {
+      {0}, {30}, {60}, {90}, {130}, {155},
   };
+
+  int i = 0;
+  servo_set_target_angle(servo, stops[i]);
 
   TickType_t current_tick = xTaskGetTickCount();
   ESP_LOGI("test", "tick: %d", current_tick);
 
+  // {
+  //   servo_move_to_pulse_width(servo, HV2060_MIN_PULSEWIDTH_US);
+  //   adc_mgr_read(&s_adc_read_results, 0);
+  //   uint16_t latest =
+  //       s_servo_potentiometer_adc_channel_buffer
+  //           ->data[s_servo_potentiometer_adc_channel_buffer->length - 1];
+  //   s_servo_potentiometer_adc_channel_buffer->length = 0;
+  //   PotentiometerAngle angle =
+  //       potentiometer_adc_to_angle(&servo_config.potentiometer, latest);
+  //   ESP_LOGI("mid servo angle", "adc: %u, angle: %.2f", latest,
+  //   angle.degree);
+  // }
+
   while (true) {
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(10));
+    // vTaskDelay(pdMS_TO_TICKS(100));
+    // adc_mgr_read(&s_adc_read_results, 0);
+    // uint32_t average = 0;
+    // for (int i = 0; i < s_servo_potentiometer_adc_channel_buffer->length;
+    // ++i) {
+    //   average += s_servo_potentiometer_adc_channel_buffer->data[i];
+    // }
+    // average /= s_servo_potentiometer_adc_channel_buffer->length;
+    // s_servo_potentiometer_adc_channel_buffer->length = 0;
+    // PotentiometerAngle angle =
+    //     potentiometer_adc_to_angle(&servo_config.potentiometer, average);
+    // ESP_LOGI("current servo angle", "adc: %u, angle: %.2f", average,
+    //          angle.degree);
+
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(100));
     ESP_ERROR_CHECK(adc_mgr_read(&s_adc_read_results, 0));
-    servo_update(servo, 0.01, s_servo_potentiometer_adc_channel_buffer->data,
-                 s_servo_potentiometer_adc_channel_buffer->length);
+    bool done =
+        servo_update(servo, 0.1,
+        s_servo_potentiometer_adc_channel_buffer->data,
+                     s_servo_potentiometer_adc_channel_buffer->length);
+    uint32_t average = 0;
+    for (int i = 0; i < s_servo_potentiometer_adc_channel_buffer->length;
+    ++i) {
+      average += s_servo_potentiometer_adc_channel_buffer->data[i];
+    }
+    average /= s_servo_potentiometer_adc_channel_buffer->length;
+    // ESP_LOGI("test", "ADC value %u",
+    //          average);
     s_servo_potentiometer_adc_channel_buffer->length = 0;
+    if (done) {
+      i = (i + 1) % LIMB_ARR_LEN(stops);
+      ESP_LOGI("test", "switching to joint angle %.2f", stops[i].degree);
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      servo_set_target_angle(servo, stops[i]);
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // {
+    //   servo_move_to_pulse_width(servo, HV2060_MID_PULSEWIDTH_US - 207);
+    //   vTaskDelay(pdMS_TO_TICKS(5000));
+    //   adc_mgr_read(&s_adc_read_results, 0);
+    //   uint16_t latest =
+    //       s_servo_potentiometer_adc_channel_buffer
+    //           ->data[s_servo_potentiometer_adc_channel_buffer->length - 1];
+    //   s_servo_potentiometer_adc_channel_buffer->length = 0;
+    //   PotentiometerAngle angle =
+    //       potentiometer_adc_to_angle(&servo_config.potentiometer, latest);
+    //   ESP_LOGI("min servo angle", "adc: %u, angle: %.2f", latest,
+    //   angle.degree);
+    // }
+
+    // {
+    //   servo_move_to_pulse_width(servo, HV2060_MAX_PULSEWIDTH_US);
+    //   vTaskDelay(pdMS_TO_TICKS(5000));
+    //   adc_mgr_read(&s_adc_read_results, 0);
+    //   uint16_t latest =
+    //       s_servo_potentiometer_adc_channel_buffer
+    //           ->data[s_servo_potentiometer_adc_channel_buffer->length - 1];
+    //   s_servo_potentiometer_adc_channel_buffer->length = 0;
+    //   PotentiometerAngle angle =
+    //       potentiometer_adc_to_angle(&servo_config.potentiometer, latest);
+    //   ESP_LOGI("max servo angle", "adc: %u, angle: %.2f", latest,
+    //   angle.degree);
+    // }
+
+    // {
+    //   servo_move_to_pulse_width(servo, HV2060_MID_PULSEWIDTH_US);
+    //   vTaskDelay(pdMS_TO_TICKS(5000));
+    //   adc_mgr_read(&s_adc_read_results, 0);
+    //   uint16_t latest =
+    //       s_servo_potentiometer_adc_channel_buffer
+    //           ->data[s_servo_potentiometer_adc_channel_buffer->length - 1];
+    //   s_servo_potentiometer_adc_channel_buffer->length = 0;
+    //   PotentiometerAngle angle =
+    //       potentiometer_adc_to_angle(&servo_config.potentiometer, latest);
+    //   ESP_LOGI("mid servo angle", "adc: %u, angle: %.2f", latest,
+    //   angle.degree);
+    // }
+
+    // {
+    //   servo_move_to_degree(servo, (PotentiometerAngle){60});
+    //   vTaskDelay(pdMS_TO_TICKS(2000));
+    //   adc_mgr_read(&s_adc_read_results, 0);
+    //   uint16_t latest =
+    //       s_servo_potentiometer_adc_channel_buffer
+    //           ->data[s_servo_potentiometer_adc_channel_buffer->length - 1];
+    //   s_servo_potentiometer_adc_channel_buffer->length = 0;
+    //   PotentiometerAngle angle =
+    //       potentiometer_adc_to_angle(&servo_config.potentiometer, latest);
+    //   ESP_LOGI("low angle", "adc: %u, angle: %.2f", latest, angle.degree);
+    // }
+
+    // {
+    //   servo_move_to_degree(servo, (PotentiometerAngle){150});
+    //   vTaskDelay(pdMS_TO_TICKS(2000));
+    //   adc_mgr_read(&s_adc_read_results, 0);
+    //   uint16_t latest =
+    //       s_servo_potentiometer_adc_channel_buffer
+    //           ->data[s_servo_potentiometer_adc_channel_buffer->length - 1];
+    //   s_servo_potentiometer_adc_channel_buffer->length = 0;
+    //   PotentiometerAngle angle =
+    //       potentiometer_adc_to_angle(&servo_config.potentiometer, latest);
+    //   ESP_LOGI("hi angle", "adc: %u, angle: %.2f", latest, angle.degree);
+    // }
   }
 }

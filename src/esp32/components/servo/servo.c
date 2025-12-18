@@ -18,8 +18,11 @@ typedef struct {
   portMUX_TYPE spinlock;
   ServoConfig cfg;
   float current_velocity_dps;
+  float min_velocity_dps;
   PotentiometerAngle target_angle_deg;
   PotentiometerAngle current_angle_deg;
+
+  bool is_moving;
 
   // ADC filter state.
   float filt;
@@ -30,10 +33,12 @@ enum {
   // We assume that the frequency used by the servo is 50 Hz.
   SERVO_FREQUENCY = 50,
   SERVO_PERIOD_US = 1000000UL / SERVO_FREQUENCY,
+
+  HV2060_INTERNAL_POTENTIOMETER_DEGREES_OF_MOTION = 220,
 };
 
 #define ALPHA 0.1F
-#define DEADBAND_DEG 0.5F
+#define DEADBAND_DEG 1.5F
 
 // We support a static amount of servo motors, so we statically allocate space
 // for them.
@@ -83,6 +88,7 @@ esp_err_t servo_init(const ServoConfig *servo_config,
       .channel = servo_config->ledc_channel,
       .intr_type = LEDC_INTR_DISABLE,
       .timer_sel = LEDC_TIMER_0,
+      .duty = us_to_duty(servo_config, servo_config->min_pulse_us),
   };
 
   ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_config), TAG,
@@ -142,6 +148,8 @@ void servo_set_target_angle(ServoHandle handle, JointAngle target_angle) {
       LIMB_CLAMP(target_potentiometer_angle.degree,
                  context->cfg.min_angle.degree, context->cfg.max_angle.degree);
 
+  ESP_LOGI(TAG, "setting target pot angle: %.2f",
+           target_potentiometer_angle.degree);
   portENTER_CRITICAL(&context->spinlock);
   context->target_angle_deg = target_potentiometer_angle;
   portEXIT_CRITICAL(&context->spinlock);
@@ -154,10 +162,8 @@ void stop_motor(ServoHandle handle) {
   // might be off from the original intended target angle. This might(?) result
   // in drift?
   portENTER_CRITICAL(&ctx->spinlock);
-  ctx->target_angle_deg = ctx->current_angle_deg;
   ctx->current_velocity_dps = 0.F;
   portEXIT_CRITICAL(&ctx->spinlock);
-  servo_move_to_degree(handle, ctx->current_angle_deg);
 }
 
 static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
@@ -165,20 +171,34 @@ static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
   ServoContext *ctx = servo_get_context(handle);
 
   float degrees_delta = velocity_dps * dt_seconds;
+  // FIXME: Figure out if this is even needed once we have the final version
+  //
+  // We need to move at least one step to prevent becoming stuck.
+  float min_degree_delta =
+      ctx->cfg.min_angle.degree -
+      LIMB_LERP_FROM_RANGE(ctx->cfg.min_pulse_us + 1, ctx->cfg.min_pulse_us,
+                           ctx->cfg.max_pulse_us, ctx->cfg.min_angle.degree,
+                           ctx->cfg.max_angle.degree);
 
-  float target_angle = ctx->current_angle_deg.degree + degrees_delta;
-  ESP_LOGI(TAG, "curr: %.2f, delta: %.2f, target: %.2f",
-           ctx->current_angle_deg.degree, degrees_delta, target_angle);
+  if (degrees_delta < 0.F) {
+    min_degree_delta = -min_degree_delta;
+  }
 
-  servo_move_to_degree(handle, (PotentiometerAngle){target_angle});
+  float new_angle = ctx->current_angle_deg.degree + degrees_delta;
+  ESP_LOGI(TAG,
+           "curr: %.2f, delta: %.2f, mindelta: %.2f new: %.2f, target: %.2f",
+           ctx->current_angle_deg.degree, degrees_delta, min_degree_delta,
+           new_angle, ctx->target_angle_deg.degree);
+
+  servo_move_to_degree(handle, (PotentiometerAngle){new_angle});
 }
 
-void servo_update(ServoHandle handle, float dt_seconds,
+bool servo_update(ServoHandle handle, float dt_seconds,
                   const uint16_t *potentiometer_values,
                   uint16_t potentiometer_values_len) {
   // TODO(johan): Should this work without the latest potentiometer position?
   if (dt_seconds <= 0.0F || potentiometer_values_len == 0) {
-    return;
+    return false;
   }
 
   ServoContext *ctx = servo_get_context(handle);
@@ -201,8 +221,12 @@ void servo_update(ServoHandle handle, float dt_seconds,
 
   if (distance_deg < DEADBAND_DEG) {
     ESP_LOGI(TAG, "STOPPING!");
+    ESP_LOGI(TAG,
+             "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
+             ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
+             error_deg, ctx->current_velocity_dps);
     stop_motor(handle);
-    return;
+    return true;
   }
 
   // Braking: max velocity from remaining distance (trapezoidal profile)
@@ -244,12 +268,15 @@ void servo_update(ServoHandle handle, float dt_seconds,
              ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
              error_deg, ctx->current_velocity_dps);
   }
+
+  return false;
 }
 
 void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width) {
   ServoContext *ctx = servo_get_context(handle);
   uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
 
+  ESP_LOGI(TAG, "pw: %u, duty: %u", pulse_width, duty);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel);
 }
@@ -262,13 +289,13 @@ void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg) {
 
   uint32_t us = angle_to_pulse_width(deg, &ctx->cfg);
 
-  // Set duty cycle
-  uint32_t duty = us_to_duty(&ctx->cfg, us);
+  servo_move_to_pulse_width(handle, us);
 
-  // TODO(johan): Avoid jerkiness by adjusting movement speed based on distance
-  // and direction?
-  ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel, duty);
-  ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel);
-
-  // ESP_LOGI(TAG, "%s -> %.2f° (%lu us)", ctx->cfg.name, deg.degree, us);
+  static int i = 0;
+  if (++i > 0) {
+    i = 0;
+    uint32_t duty = us_to_duty(&ctx->cfg, us);
+    ESP_LOGI(TAG, "%s -> %.2f° (%lu us, %u)", ctx->cfg.name, deg.degree, us,
+             duty);
+  }
 }
