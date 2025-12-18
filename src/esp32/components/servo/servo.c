@@ -112,6 +112,13 @@ static uint32_t angle_to_pulse_width(PotentiometerAngle deg,
                               servo->max_pulse_us);
 }
 
+void servo_move_to_pulse_width(ServoConfig *cfg, uint16_t pulse_width) {
+  uint32_t duty = us_to_duty(cfg, pulse_width);
+
+  ledc_set_duty(LEDC_LOW_SPEED_MODE, cfg->ledc_channel, duty);
+  ledc_update_duty(LEDC_LOW_SPEED_MODE, cfg->ledc_channel);
+}
+
 // Write angle to specific servo channel
 void servo_move_to_degree(const ServoConfig *servo, PotentiometerAngle deg) {
   deg.degree =
