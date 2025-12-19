@@ -1,6 +1,12 @@
 # To do : pip install -r requirements.txt
 # python main.py
 
+#Configuration required to make the execute the code :
+#Python v3.10.11
+#DepthAI v2.28.0
+
+#The best.pt and finally blob model were trained on a dataset of 250 images of a specific cup, a starbucks cup, 
+#be carefull with that, If you want to test the model on an other type of cup, it would be less efficient.
 
 import cv2
 import depthai as dai
