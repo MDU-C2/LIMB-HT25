@@ -21,7 +21,7 @@ THRESHOLD = 1.0  # Minimum magnitude threshold (m/s²) - tune between 0.6-1.5
 MIN_SAMPLES_FOR_DETECTION = 15  # Minimum samples needed before detecting
 GRAVITY_MAGNITUDE = 9.81  # Gravity magnitude in m/s²
 CALIBRATION_SAMPLES = 50  # Number of samples to use for initial orientation calibration
-CALIBRATION_TIME_MS = 1000  # Time to wait for calibration (ms)
+CALIBRATION_TIME_MS = 2000  # Time to wait for calibration (ms)
 
 def quaternion_multiply(q1, q2):
     """Multiply two quaternions: q1 ⊗ q2"""
@@ -233,6 +233,34 @@ def visualize_imu_orientation(quaternion, accel_body=None, accel_world=None, ax=
     
     return fig, ax
 
+def show_accelration(accel_world):
+    """Show the acceleration in the world frame"""
+    pass
+
+
+def get_up_direction(norm_accel_world):
+    """Get the up direction of the acceleration in the world frame"""
+    
+    #up_direction = np.array([0.0, 0.0, 1.0])
+    threshold = 0.2
+    # Compute the mean acceleration over the window
+    mean_accel = np.mean(norm_accel_world, axis=0)
+    #print(f"Mean acceleration: {mean_accel}")
+
+    # Z-component is vertical (up/down)
+    z_accel = mean_accel[2]
+
+    is_up = z_accel > threshold
+    print(f"Is up: {is_up}")
+    #print(f"Z-accel: {z_accel}")
+    #magnitude = np.linalg.norm(mean_accel)
+    #print(f"Magnitude: {magnitude}")
+    #max_mag = 0
+    #if magnitude > max_mag:
+    #    max_mag = magnitude
+    #    print(f"Max magnitude: {max_mag}")
+    return is_up
+
 def get_direction(accel_world):
     """Get the direction of the acceleration in the world frame"""
     pass
@@ -396,9 +424,9 @@ def detect_movement(imu_samples_with_timestamps, current_time, initial_quaternio
     #print(f"Gyro data: {gyro_data}", gyro_data.shape)
 
     if gyro_bias is not None:
-        print(f"Gyro bias: {gyro_bias}")
+        #print(f"Gyro bias: {gyro_bias}")
         gyro_data = gyro_data - gyro_bias
-        print(f"Gyro data: {gyro_data}")
+        #print(f"Gyro data: {gyro_data}")
         
     quaternions = np.zeros((len(gyro_data), 4)) # (N, 4), max (WINDOW_TIME_MS, 4)
 
@@ -457,17 +485,12 @@ def detect_movement(imu_samples_with_timestamps, current_time, initial_quaternio
     #print(f"Mean in X-axis: {np.mean(linear_accel_world[:, 0])}") # Mean of linear acceleration in x-axis
     #print(f"Mean in Y-axis: {np.mean(linear_accel_world[:, 1])}") # Mean of linear acceleration in y-axis
     #print(f"Mean in Z-axis: {np.mean(linear_accel_world[:, 2])}") # Mean of linear acceleration in z-axis
-    print(f"Linear acceleration world: {linear_accel_world}")
+    #print(f"Linear acceleration world: {linear_accel_world}")
     # Print linear acceleration if one axis has a value greater than 2
     #print(f"Linear acceleration world greater than 3: {np.any(np.abs(linear_accel_world) > 3)}")
+
+    up_direction = get_up_direction(linear_accel_world)
     
-
-    #print(f"Mean linear acceleration world (X): {np.sqrt(np.mean(linear_accel_world[:, 0]**2))}")
-    #print(f"Mean linear acceleration world (Y): {np.sqrt(np.mean(linear_accel_world[:, 1]**2))}")
-    #print(f"Mean linear acceleration world (Z): {np.sqrt(np.mean(linear_accel_world[:, 2]**2))}")
-
-
-
     # Return the latest acceleration for visualization
     latest_accel_body = accel_data[-1] if len(accel_data) > 0 else np.array([0.0, 0.0, 0.0])
     latest_accel_world = linear_accel_world[-1] if len(linear_accel_world) > 0 else np.array([0.0, 0.0, 0.0])
@@ -576,7 +599,8 @@ def main():
                         # Logic here
                         if movement: # and movemnt["direction"] != "none":
                             #len(timestamps)
-                            print(f"Direction: {movement['direction']}")
+                            #print(f"Direction: {movement['direction']}")
+                            pass
                         last_detection_time = current_time
                         
                         # Update orientation visualization (every 100ms to avoid too frequent updates)
