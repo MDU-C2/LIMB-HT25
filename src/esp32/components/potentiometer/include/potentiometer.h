@@ -47,3 +47,7 @@ JointAngle to_joint_angle(const Potentiometer *potentiometer,
 // frame of reference.
 PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
                                           JointAngle angle);
+
+// Clamps a potentiometer angle to the limits determined by the potentiometer.
+PotentiometerAngle clamp_potentiometer_angle(const Potentiometer *potentiometer,
+                                             PotentiometerAngle angle);

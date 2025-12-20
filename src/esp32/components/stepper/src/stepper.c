@@ -56,16 +56,6 @@ typedef struct {
 // they require exclusive access anyway.
 static motion_control_context_t s_contexts[SOC_LEDC_CHANNEL_NUM] = {0};
 
-// Helper functions
-
-static PotentiometerAngle clamp_angle(Potentiometer potentiometer, PotentiometerAngle angle_deg)
-{
-    return (PotentiometerAngle){
-        LIMB_CLAMP(angle_deg.degree,
-                   potentiometer.min_joint_angle_as_potentiometer_angle.degree,
-                   potentiometer.max_joint_angle_as_potentiometer_angle.degree)};
-}
-
 static void stop_motor(stepper_control_handle_t handle) 
 {
     motion_control_context_t *ctx = &s_contexts[handle];
@@ -181,7 +171,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
         uint16_t raw_adc = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
 
         PotentiometerAngle initial_angle = potentiometer_adc_to_angle(&ctx.cfg.potentiometer, raw_adc);
-        ctx.current_angle_deg = clamp_angle(ctx.cfg.potentiometer, initial_angle);
+        ctx.current_angle_deg = clamp_potentiometer_angle(&ctx.cfg.potentiometer, initial_angle);
         ctx.target_angle_deg = ctx.current_angle_deg;
         ctx.use_position_feedback = true;
         ctx.filt = initial_angle.degree; // Initialize filter state
@@ -236,7 +226,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     uint16_t raw = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
     ctx->filt = ctx->filt + ALPHA * ((float)raw - ctx->filt);
     PotentiometerAngle angle_deg = potentiometer_adc_to_angle(&ctx->cfg.potentiometer, (uint16_t)(ctx->filt + 0.5f));
-    angle_deg = clamp_angle(ctx->cfg.potentiometer, angle_deg);
+    angle_deg = clamp_potentiometer_angle(&ctx->cfg.potentiometer, angle_deg);
 
     // Take snapshot of shared state and update current angle from feedback
     portENTER_CRITICAL(&ctx->spinlock);
@@ -309,7 +299,7 @@ void stepper_set_target_angle_deg(stepper_control_handle_t handle, Potentiometer
 {
     motion_control_context_t *ctx = &s_contexts[handle];
 
-    angle_deg = clamp_angle(ctx->cfg.potentiometer, angle_deg);
+    angle_deg = clamp_potentiometer_angle(&ctx->cfg.potentiometer, angle_deg);
     portENTER_CRITICAL(&ctx->spinlock);
     ctx->target_angle_deg = angle_deg;
     portEXIT_CRITICAL(&ctx->spinlock);
