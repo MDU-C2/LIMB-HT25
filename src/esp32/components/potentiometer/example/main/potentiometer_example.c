@@ -73,16 +73,22 @@ void app_main(void) {
     ESP_LOGI(TAG, "Reading value %d", i);
     uint16_t value = pot_channel_buffer->data[i];
 
-    // Set the angle limits of your potentiometer and the ADC bitwidth used.
+    // Set the angle limits of your potentiometer and the ADC readings when the
+    // potentiometer is turned to its extremes (these should be measured).
     const Potentiometer potentiometer = {
-        .min_degree = -90.0F,
-        .max_degree = 90.0F,
-        .adc_bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
+        .degrees_of_motion = {285.F},
+        .min_joint_angle = {-90.0F},
+        .max_joint_angle = {90.0F},
+        .min_joint_angle_as_potentiometer_angle = {20.F},
+        .max_joint_angle_as_potentiometer_angle = {200.F},
+        .min_adc_value = 5,
+        .max_adc_value = 3200,
     };
 
     // Then you can convert the ADC values to the corresponding degrees.
-    float degrees = potentiometer_adc_to_degrees(potentiometer, value);
+    PotentiometerAngle degrees =
+        potentiometer_adc_to_angle(&potentiometer, value);
     ESP_LOGI(TAG, "Raw ADC value: %u, corresponding degree: %f", value,
-             degrees);
+             degrees.degree);
   }
 }
