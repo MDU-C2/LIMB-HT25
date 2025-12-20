@@ -5,13 +5,9 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "hal/ledc_types.h"
-#include "sys/param.h"
+#include "limb_utils.h"
 
 static const char *const TAG = "Servo";
-
-#define limb_clamp(x, x_min, x_max) (MIN(MAX((x), (x_min)), (x_max)))
-#define limb_lerp_from_range(x, x_min, x_max, y_min, y_max) \
-  ((y_min) + (((x) - (x_min)) * ((y_max) - (y_min)) / ((x_max) - (x_min))))
 
 enum {
   SERVO_MAX_DUTY = ((1U << LEDC_TIMER_13_BIT) - 1),
@@ -22,7 +18,7 @@ enum {
 
 // Convert microseconds to duty cycle
 static uint32_t us_to_duty(const ServoConfig *servo, uint16_t us) {
-  us = limb_clamp(us, servo->min_pulse_us, servo->max_pulse_us);
+  us = LIMB_CLAMP(us, servo->min_pulse_us, servo->max_pulse_us);
 
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
 }
@@ -79,13 +75,13 @@ static uint32_t angle_to_pulse_width(int deg, const ServoConfig *servo) {
   if (servo->direction == SERVO_DIR_REVERSE) {
     deg = servo->max_angle - (deg - servo->min_angle);
   }
-  return limb_lerp_from_range(deg, servo->min_angle, servo->max_angle,
+  return LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
                               servo->min_pulse_us, servo->max_pulse_us);
 }
 
 // Write angle to specific servo channel
 void servo_move_to_degree(const ServoConfig *servo, int deg) {
-  deg = limb_clamp(deg, servo->min_angle, servo->max_angle);
+  deg = LIMB_CLAMP(deg, servo->min_angle, servo->max_angle);
 
   uint32_t us = angle_to_pulse_width(deg, servo);
 

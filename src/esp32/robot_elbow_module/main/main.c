@@ -11,10 +11,9 @@
 #include "stepper.h"
 #include "potentiometer.h"
 #include "adc_manager.h"
+#include "limb_utils.h"
 
 static const char * const TAG = "robot_elbow_module";
-
-#define ARR_LEN(x) (sizeof(x) / sizeof(*(x)))
 
 enum {
     // CAN configuration
@@ -106,7 +105,7 @@ const AdcMgrChannelConfig s_adc_mgr_channel_configs[] = {
 
 const AdcMgrConfig s_adc_mgr_config = {
     .channel_configs = s_adc_mgr_channel_configs,
-    .channel_configs_len = ARR_LEN(s_adc_mgr_channel_configs),
+    .channel_configs_len = LIMB_ARR_LEN(s_adc_mgr_channel_configs),
     .ms_worth_of_buffer_size = 100,
 };
 
@@ -123,11 +122,11 @@ AdcMgrReadResults s_adc_mgr_read_results = {
     .channel_buffers = {
         [ADC_ELBOW_CHANNEL] = {
             .data = s_adc_elbow_channel_underlying_buffer,
-            .capacity = ARR_LEN(s_adc_elbow_channel_underlying_buffer)
+            .capacity = LIMB_ARR_LEN(s_adc_elbow_channel_underlying_buffer)
         },
         [ADC_UPPER_ARM_ROTATION_CHANNEL] = {
             .data = s_adc_upper_arm_rotation_channel_underlying_buffer,
-            .capacity = ARR_LEN(s_adc_upper_arm_rotation_channel_underlying_buffer)
+            .capacity = LIMB_ARR_LEN(s_adc_upper_arm_rotation_channel_underlying_buffer)
         }
     }
 };

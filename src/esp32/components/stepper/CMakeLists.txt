@@ -8,6 +8,6 @@ idf_component_register(
   freertos
   esp_driver_gpio
   esp_driver_ledc
+  limb_utils
   INCLUDE_DIRS
   "include")
-

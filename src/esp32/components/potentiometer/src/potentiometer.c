@@ -3,14 +3,7 @@
 #include <stdint.h>
 #include <sys/param.h>
 
-// Performs a linear interpolation of x from the range [x0, x1] onto [y0, y1].
-static float lerp_from_range(float x, float x0, float x1, float y0, float y1) {
-  float x_range = x1 - x0;
-  float y_range = y1 - y0;
-  return y0 + ((x - x0) * y_range / x_range);
-}
-
-#define LIMB_CLAMP(x, x_min, x_max) (MAX(MIN((x), (x_max)), (x_min)))
+#include "limb_utils.h"
 
 PotentiometerAngle potentiometer_adc_to_angle(
     const Potentiometer *potentiometer, uint16_t adc_value) {
@@ -19,7 +12,7 @@ PotentiometerAngle potentiometer_adc_to_angle(
                          potentiometer->max_adc_value);
 
   return (PotentiometerAngle){
-      lerp_from_range((float)adc_value, potentiometer->min_adc_value,
+      LIMB_LERP_FROM_RANGE((float)adc_value, potentiometer->min_adc_value,
                       potentiometer->max_adc_value, 0,
                       potentiometer->degrees_of_motion.degree)};
 }

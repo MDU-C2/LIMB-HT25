@@ -4,6 +4,7 @@
 
 #include "esp_err.h"
 #include "potentiometer.h"
+#include "limb_utils.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -51,34 +52,18 @@ typedef struct {
     bool is_initialized;
 } motion_control_context_t;
 
-#define LIMB_ARR_LEN(arr) (sizeof(arr) / sizeof(*(arr)))
-
 // We only support at most as many steppers as there are LEDC channels, since
 // they require exclusive access anyway.
 static motion_control_context_t s_contexts[SOC_LEDC_CHANNEL_NUM] = {0};
 
 // Helper functions
 
-static float clampf(float x, float lo, float hi)
-{
-    return x < lo ? lo : (x > hi ? hi : x);
-}
-
 static PotentiometerAngle clamp_angle(Potentiometer potentiometer, PotentiometerAngle angle_deg)
 {
-    return (PotentiometerAngle){clampf(angle_deg.degree,
-                                       potentiometer.min_joint_angle_as_potentiometer_angle.degree,
-                                       potentiometer.max_joint_angle_as_potentiometer_angle.degree)};
-}
-
-// Calculates the average value 
-static int average(const uint16_t *values, int n)
-{
-    int acc = 0;
-    for (int i = 0; i < n; i++) {
-        acc += values[i];
-    }
-    return acc / n;
+    return (PotentiometerAngle){
+        LIMB_CLAMP(angle_deg.degree,
+                   potentiometer.min_joint_angle_as_potentiometer_angle.degree,
+                   potentiometer.max_joint_angle_as_potentiometer_angle.degree)};
 }
 
 static void stop_motor(stepper_control_handle_t handle) 
@@ -193,7 +178,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     // ADC setup & filtered initial angle
     if (latest_potentiometer_values_len > 0) {
         // Use initial ADC value to set intial angle (averaged for stability).
-        int raw_adc = average(latest_potentiometer_values, latest_potentiometer_values_len);
+        uint16_t raw_adc = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
 
         PotentiometerAngle initial_angle = potentiometer_adc_to_angle(&ctx.cfg.potentiometer, raw_adc);
         ctx.current_angle_deg = clamp_angle(ctx.cfg.potentiometer, initial_angle);
@@ -201,7 +186,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
         ctx.use_position_feedback = true;
         ctx.filt = initial_angle.degree; // Initialize filter state
         
-        ESP_LOGI(TAG, "Potentiometer initialized: ADC channel=%d, raw=%d, angle=%.2f deg", 
+        ESP_LOGI(TAG, "Potentiometer initialized: ADC channel=%d, raw=%u, angle=%.2f deg", 
                  cfg->pot_adc_channel, raw_adc, initial_angle);
     } else {
         ctx.use_position_feedback = false;
@@ -248,7 +233,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     if (dt_seconds <= 0.0f || latest_potentiometer_values_len == 0) return;
 
     // Read & filter pot
-    int raw = average(latest_potentiometer_values, latest_potentiometer_values_len);
+    uint16_t raw = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
     ctx->filt = ctx->filt + ALPHA * ((float)raw - ctx->filt);
     PotentiometerAngle angle_deg = potentiometer_adc_to_angle(&ctx->cfg.potentiometer, (uint16_t)(ctx->filt + 0.5f));
     angle_deg = clamp_angle(ctx->cfg.potentiometer, angle_deg);
@@ -291,7 +276,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     // Velocity ramping (simplified with clamp)
     float accel_limit = ctx->max_accel_sps2 * dt_seconds;
     float velocity_delta = target_velocity_sps - current_velocity_sps;
-    current_velocity_sps += clampf(velocity_delta, -accel_limit, accel_limit);
+    current_velocity_sps += LIMB_CLAMP(velocity_delta, -accel_limit, accel_limit);
 
     // Clamp to minimum velocity if moving
     bool is_moving = current_velocity_sps > 0.0f;
