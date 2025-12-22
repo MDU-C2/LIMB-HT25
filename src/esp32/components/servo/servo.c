@@ -167,10 +167,11 @@ void stop_motor(ServoHandle handle) {
 }
 
 static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
-                                 float dt_seconds) {
-  ServoContext *ctx = servo_get_context(handle);
+                                 uint16_t actuation_time_in_ms) {
+  const ServoContext *ctx = servo_get_context(handle);
 
-  float degrees_delta = velocity_dps * dt_seconds;
+  const float degrees_delta =
+      velocity_dps * (float)actuation_time_in_ms / 1000.F;
   // FIXME: Figure out if this is even needed once we have the final version
   //
   // We need to move at least one step to prevent becoming stuck.
@@ -208,7 +209,7 @@ typedef struct {
   AngularVelocity current_velocity;
   AngularAcceleration max_acceleration;
   AngularVelocity max_velocity;
-  float dt_seconds;
+  uint32_t ms_until_next_period;
 } CalculateUpdatedVelocityArgs;
 
 static AngularVelocity calculate_updated_velocity(
@@ -218,8 +219,18 @@ static AngularVelocity calculate_updated_velocity(
   const PotentiometerAngle abs_distance_to_target = {
       fabsf(distance_to_target.degree)};
 
-  // If we're within the deadband, we want to stop.
-  if (abs_distance_to_target.degree < args->deadband.degree) {
+  // The maximum velocity allowed until next period.
+  const AngularVelocity abs_max_velocity_delta = {
+      args->max_acceleration.dps2 * (float)args->ms_until_next_period / 1000.F};
+
+  // If we're within the deadband and the current velocity is within the allowed
+  // acceleration limit, we want to stop entirely.
+  const bool within_deadband =
+      abs_distance_to_target.degree < args->deadband.degree;
+  const bool slow_enough =
+      fabsf(args->current_velocity.dps) <= abs_max_velocity_delta.dps;
+
+  if (within_deadband && slow_enough) {
     return (AngularVelocity){0};
   }
 
@@ -236,20 +247,18 @@ static AngularVelocity calculate_updated_velocity(
   // Velocity ramping (simplified with clamp)
   const AngularVelocity velocity_delta = {target_velocity.dps -
                                           args->current_velocity.dps};
-  const AngularVelocity velocity_accel_limit = {args->max_acceleration.dps2 *
-                                                args->dt_seconds};
   const AngularVelocity new_velocity = {args->current_velocity.dps +
                                         LIMB_CLAMP(velocity_delta.dps,
-                                                   -velocity_accel_limit.dps,
-                                                   velocity_accel_limit.dps)};
+                                                   -abs_max_velocity_delta.dps,
+                                                   abs_max_velocity_delta.dps)};
   return new_velocity;
 }
 
-bool servo_update(ServoHandle handle, float dt_seconds,
+bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                   const uint16_t *potentiometer_values,
                   uint16_t potentiometer_values_len) {
   // TODO(johan): Should this work without the latest potentiometer position?
-  if (dt_seconds <= 0.0F || potentiometer_values_len == 0) {
+  if (ms_until_next_period == 0 || potentiometer_values_len == 0) {
     return false;
   }
 
@@ -261,33 +270,33 @@ bool servo_update(ServoHandle handle, float dt_seconds,
   const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &ctx->cfg.potentiometer, potentiometer_adc_value);
 
-  portENTER_CRITICAL(&ctx->spinlock);
-  ctx->current_angle_deg = current_angle;
-  PotentiometerAngle target_angle = ctx->target_angle_deg;
-  float current_velocity_dps = ctx->current_velocity_dps;
-  portEXIT_CRITICAL(&ctx->spinlock);
-
   CalculateUpdatedVelocityArgs args = {
       .current_angle = current_angle,
-      .target_angle = target_angle,
+      .target_angle = ctx->target_angle_deg,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
-      .current_velocity = (AngularVelocity){current_velocity_dps},
+      .current_velocity = (AngularVelocity){ctx->current_velocity_dps},
       .max_acceleration = (AngularAcceleration){ctx->cfg.max_accel_dps2},
       .max_velocity = (AngularVelocity){ctx->cfg.max_velocity_dps},
-      .dt_seconds = dt_seconds,
+      .ms_until_next_period = ms_until_next_period,
   };
   const AngularVelocity new_velocity = calculate_updated_velocity(&args);
+
+  // Update the current state.
+  portENTER_CRITICAL(&ctx->spinlock);
+  ctx->current_angle_deg = current_angle;
+  ctx->current_velocity_dps = new_velocity.dps;
+  portEXIT_CRITICAL(&ctx->spinlock);
 
   // NOTE: Normally checking equality of floats is imprecise, but in this case
   // the literal value 0.F gets returned when within the deadband, so it should
   // be fine checking against the same literal.
   if (new_velocity.dps == 0.F) {
-    ctx->current_velocity_dps = 0.F;
     ESP_LOGI(TAG, "STOPPING!");
-    ESP_LOGI(
-        TAG, "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
-        ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
-        target_angle.degree - current_angle.degree, ctx->current_velocity_dps);
+    ESP_LOGI(TAG,
+             "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
+             args.target_angle.degree, ctx->current_angle_deg.degree,
+             args.target_angle.degree - ctx->current_angle_deg.degree,
+             ctx->current_velocity_dps);
     stop_motor(handle);
     return true;
   }
@@ -296,19 +305,16 @@ bool servo_update(ServoHandle handle, float dt_seconds,
   // Clamp to minimum velocity if moving
   // new_velocity.dps = MAX(current_velocity_dps, ctx->cfg.min_velocity_dps);
 
-  apply_motor_velocity(handle, new_velocity.dps, dt_seconds);
-
-  portENTER_CRITICAL(&ctx->spinlock);
-  ctx->current_velocity_dps = new_velocity.dps;
-  portEXIT_CRITICAL(&ctx->spinlock);
+  apply_motor_velocity(handle, new_velocity.dps, ms_until_next_period);
 
   static uint32_t log_counter = 0;
   if (++log_counter >= 10) {  // Log every 100 updates
     log_counter = 0;
-    ESP_LOGI(
-        TAG, "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
-        ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
-        target_angle.degree - current_angle.degree, ctx->current_velocity_dps);
+    ESP_LOGI(TAG,
+             "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
+             args.target_angle.degree, ctx->current_angle_deg.degree,
+             args.target_angle.degree - ctx->current_angle_deg.degree,
+             ctx->current_velocity_dps);
     stop_motor(handle);
   }
 

@@ -142,12 +142,12 @@ void app_main(void) {
     // ESP_LOGI("current servo angle", "adc: %u, angle: %.2f", average,
     //          angle.degree);
 
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(100));
+    const uint16_t period_in_ms = 100;
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(period_in_ms));
     ESP_ERROR_CHECK(adc_mgr_read(&s_adc_read_results, 0));
-    bool done =
-        servo_update(servo, 0.1,
-        s_servo_potentiometer_adc_channel_buffer->data,
-                     s_servo_potentiometer_adc_channel_buffer->length);
+    bool done = servo_update(servo, period_in_ms,
+                             s_servo_potentiometer_adc_channel_buffer->data,
+                             s_servo_potentiometer_adc_channel_buffer->length);
     uint32_t average = 0;
     for (int i = 0; i < s_servo_potentiometer_adc_channel_buffer->length;
     ++i) {

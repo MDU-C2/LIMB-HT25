@@ -54,9 +54,8 @@ esp_err_t servo_init(const ServoConfig *servo_config,
 
 // This function is meant to be called periodically. It determines how far it
 // should move the servo based on the distance to the target angle and the time
-// taken since the last call to servo_update, determined by dt_seconds passed by
-// the caller.
-bool servo_update(ServoHandle handle, float dt_seconds,
+// remaining until the next call to servo_update.
+bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                   const uint16_t *potentiometer_values,
                   uint16_t potentiometer_values_len);
 
