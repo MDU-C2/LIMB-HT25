@@ -193,6 +193,58 @@ static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
   servo_move_to_degree(handle, (PotentiometerAngle){new_angle});
 }
 
+typedef struct {
+  float dps;
+} AngularVelocity;
+
+typedef struct {
+  float dps2;
+} AngularAcceleration;
+
+typedef struct {
+  PotentiometerAngle current_angle;
+  PotentiometerAngle target_angle;
+  PotentiometerAngle deadband;
+  AngularVelocity current_velocity;
+  AngularAcceleration max_acceleration;
+  AngularVelocity max_velocity;
+  float dt_seconds;
+} CalculateUpdatedVelocityArgs;
+
+static AngularVelocity calculate_updated_velocity(
+    const CalculateUpdatedVelocityArgs *args) {
+  const PotentiometerAngle distance_to_target = {args->target_angle.degree -
+                                                 args->current_angle.degree};
+  const PotentiometerAngle abs_distance_to_target = {
+      fabsf(distance_to_target.degree)};
+
+  // If we're within the deadband, we want to stop.
+  if (abs_distance_to_target.degree < args->deadband.degree) {
+    return (AngularVelocity){0};
+  }
+
+  // Braking: max velocity from remaining distance (trapezoidal profile)
+  // v_max^2 = 2 * a * d  =>  v_max = sqrt(2 * a * d)
+  const AngularVelocity vmax_from_distance = {sqrtf(
+      2.0F * args->max_acceleration.dps2 * abs_distance_to_target.degree)};
+  const AngularVelocity abs_target_velocity = {
+      fminf(args->max_velocity.dps, vmax_from_distance.dps)};
+  const AngularVelocity target_velocity = {distance_to_target.degree < 0.F
+                                               ? -abs_target_velocity.dps
+                                               : abs_target_velocity.dps};
+
+  // Velocity ramping (simplified with clamp)
+  const AngularVelocity velocity_delta = {target_velocity.dps -
+                                          args->current_velocity.dps};
+  const AngularVelocity velocity_accel_limit = {args->max_acceleration.dps2 *
+                                                args->dt_seconds};
+  const AngularVelocity new_velocity = {args->current_velocity.dps +
+                                        LIMB_CLAMP(velocity_delta.dps,
+                                                   -velocity_accel_limit.dps,
+                                                   velocity_accel_limit.dps)};
+  return new_velocity;
+}
+
 bool servo_update(ServoHandle handle, float dt_seconds,
                   const uint16_t *potentiometer_values,
                   uint16_t potentiometer_values_len) {
