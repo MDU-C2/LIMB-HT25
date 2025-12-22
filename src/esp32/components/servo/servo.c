@@ -258,9 +258,8 @@ bool servo_update(ServoHandle handle, float dt_seconds,
   uint16_t potentiometer_adc_value =
       limb_average16(potentiometer_values, potentiometer_values_len);
   ctx->filt = ctx->filt + ALPHA * ((float)potentiometer_adc_value - ctx->filt);
-  PotentiometerAngle current_angle = potentiometer_adc_to_angle(
+  const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &ctx->cfg.potentiometer, potentiometer_adc_value);
-  current_angle = clamp_servo_angle(&ctx->cfg, current_angle);
 
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->current_angle_deg = current_angle;

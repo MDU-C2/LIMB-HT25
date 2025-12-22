@@ -7,10 +7,6 @@
 
 PotentiometerAngle potentiometer_adc_to_angle(
     const Potentiometer *potentiometer, uint16_t adc_value) {
-  // Don't allow values outside the acceptable range.
-  adc_value = LIMB_CLAMP(adc_value, potentiometer->min_adc_value,
-                         potentiometer->max_adc_value);
-
   return (PotentiometerAngle){
       LIMB_LERP_FROM_RANGE((float)adc_value, potentiometer->min_adc_value,
                            potentiometer->max_adc_value, 0,
