@@ -44,15 +44,15 @@ class ControlLayer(Process):
             cycle_start = time.time()
 
             # 1. Get latest processed packet
-            packet = self._get_latest_packet() # TODO: Implement this function
+            packet = self._get_latest_packet()
 
             if packet is not None:
                 # 2. Decide what to do (contol logic)
-                commands = self._compute_commands(packet) # TODO: Implement this function
+                commands = self._compute_commands(packet)
 
                 # 3. Sned commands to actuators via CAN
                 if commands:
-                    self._send_commands(commands) # TODO: Implement this function
+                    self._send_commands(commands)
 
             # 4. Maintain control rate (sleep to hit target freq)
             elapsed = time.time() - cycle_start
@@ -79,6 +79,7 @@ class ControlLayer(Process):
         while not self.input_queue.empty():
             try:
                 packet = self.input_queue.get_nowait()
+                time.sleep(0.005)
 
                 # Update packet age
                 packet.update_age()
@@ -91,8 +92,6 @@ class ControlLayer(Process):
             except:
                 break # Queue empty or other error
 
-        # TODO: Could add logging to track dropped packets.
-        if latest_packet is None: print(f"Latest packet is None")
         return latest_packet
 
     def _compute_commands(self, packet):
@@ -280,6 +279,7 @@ class ControlLayer(Process):
 
                 fused_arm_pose = packet.metadata.get("fused_arm_pose")
                 hand_position = None
+                hand_pos_m = None
                 if fused_arm_pose and "position" in fused_arm_pose:
                     hand_position = fused_arm_pose["position"] # [x, y, z] in mm, convert to meter
 
@@ -351,7 +351,7 @@ class ControlLayer(Process):
 
         if cup_detection:
             # Try to get position from first cup detection
-            cup_det = cup_detection[0] if isinstance(cup_detection, list) else cup_detection # TODO: Can change this when I know the format for sure
+            cup_det = cup_detection[0] if isinstance(cup_detection, list) else cup_detection 
             
             if isinstance(cup_det, dict):
                 cup_position = cup_det.get("position")
@@ -402,7 +402,7 @@ class ControlLayer(Process):
         cup_detection = vision_data.get("cup_detections", [])
 
         if cup_detection:
-            cup_det = cup_detection[0] if isinstance(cup_detection, list) else cup_detection # TODO: Can change this when I know the format for sure
+            cup_det = cup_detection[0] if isinstance(cup_detection, list) else cup_detection 
             if isinstance(cup_det, dict):
                 cup_position = cup_det.get("position")
             elif hasattr(cup_det, "position"):
