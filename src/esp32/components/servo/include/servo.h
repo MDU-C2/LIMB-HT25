@@ -2,6 +2,7 @@
 #include "esp_err.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
+#include "limb_utils.h"
 #include "potentiometer.h"
 
 // Determines if low angles should generate low or high pulse widths, and vice
@@ -29,9 +30,9 @@ typedef struct {
   // The angle the servo should be set to right after initialization.
   PotentiometerAngle initial_angle;
   // The maximum allowed velocity of the servo.
-  float max_velocity_dps;
+  AngularVelocity max_angular_velocity;
   // The maximum allowed acceleration of the servo.
-  float max_accel_dps2;
+  AngularAcceleration max_angular_acceleration;
 
   // The ADC channel used for the servo's potentiometer.
   adc_channel_t pot_adc_channel;

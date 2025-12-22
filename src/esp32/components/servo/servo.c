@@ -17,10 +17,10 @@ static const char *const TAG = "Servo";
 typedef struct {
   portMUX_TYPE spinlock;
   ServoConfig cfg;
-  float current_velocity_dps;
-  float min_velocity_dps;
-  PotentiometerAngle target_angle_deg;
-  PotentiometerAngle current_angle_deg;
+  AngularVelocity current_angular_velocity;
+  AngularVelocity min_angular_velocity;
+  PotentiometerAngle target_angle;
+  PotentiometerAngle current_angle;
 
   bool is_moving;
 
@@ -101,8 +101,8 @@ esp_err_t servo_init(const ServoConfig *servo_config,
 
   s_servo_contexts[servo_config->ledc_channel] = (ServoContext){
       .cfg = *servo_config,
-      .current_angle_deg = current_angle,
-      .target_angle_deg = servo_config->initial_angle,
+      .current_angle = current_angle,
+      .target_angle = servo_config->initial_angle,
   };
 
   *out_handle = servo_config->ledc_channel;
@@ -151,7 +151,7 @@ void servo_set_target_angle(ServoHandle handle, JointAngle target_angle) {
   ESP_LOGI(TAG, "setting target pot angle: %.2f",
            target_potentiometer_angle.degree);
   portENTER_CRITICAL(&context->spinlock);
-  context->target_angle_deg = target_potentiometer_angle;
+  context->target_angle = target_potentiometer_angle;
   portEXIT_CRITICAL(&context->spinlock);
 }
 
@@ -162,7 +162,7 @@ void stop_motor(ServoHandle handle) {
   // might be off from the original intended target angle. This might(?) result
   // in drift?
   portENTER_CRITICAL(&ctx->spinlock);
-  ctx->current_velocity_dps = 0.F;
+  ctx->current_angular_velocity.dps = 0.F;
   portEXIT_CRITICAL(&ctx->spinlock);
 }
 
@@ -185,11 +185,11 @@ static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
     min_degree_delta = -min_degree_delta;
   }
 
-  float new_angle = ctx->current_angle_deg.degree + degrees_delta;
+  float new_angle = ctx->current_angle.degree + degrees_delta;
   ESP_LOGI(TAG,
            "curr: %.2f, delta: %.2f, mindelta: %.2f new: %.2f, target: %.2f",
-           ctx->current_angle_deg.degree, degrees_delta, min_degree_delta,
-           new_angle, ctx->target_angle_deg.degree);
+           ctx->current_angle.degree, degrees_delta, min_degree_delta,
+           new_angle, ctx->target_angle.degree);
 
   servo_move_to_degree(handle, (PotentiometerAngle){new_angle});
 }
@@ -264,19 +264,19 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 
   CalculateUpdatedVelocityArgs args = {
       .current_angle = current_angle,
-      .target_angle = ctx->target_angle_deg,
+      .target_angle = ctx->target_angle,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
-      .current_velocity = (AngularVelocity){ctx->current_velocity_dps},
-      .max_acceleration = (AngularAcceleration){ctx->cfg.max_accel_dps2},
-      .max_velocity = (AngularVelocity){ctx->cfg.max_velocity_dps},
+      .current_velocity = ctx->current_angular_velocity,
+      .max_acceleration = ctx->cfg.max_angular_acceleration,
+      .max_velocity = ctx->cfg.max_angular_velocity,
       .ms_until_next_period = ms_until_next_period,
   };
   const AngularVelocity new_velocity = calculate_updated_velocity(&args);
 
   // Update the current state.
   portENTER_CRITICAL(&ctx->spinlock);
-  ctx->current_angle_deg = current_angle;
-  ctx->current_velocity_dps = new_velocity.dps;
+  ctx->current_angle = current_angle;
+  ctx->current_angular_velocity = new_velocity;
   portEXIT_CRITICAL(&ctx->spinlock);
 
   // NOTE: Normally checking equality of floats is imprecise, but in this case
@@ -286,16 +286,16 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
     ESP_LOGI(TAG, "STOPPING!");
     ESP_LOGI(TAG,
              "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
-             args.target_angle.degree, ctx->current_angle_deg.degree,
-             args.target_angle.degree - ctx->current_angle_deg.degree,
-             ctx->current_velocity_dps);
+             args.target_angle.degree, ctx->current_angle.degree,
+             args.target_angle.degree - ctx->current_angle.degree,
+             ctx->current_angular_velocity);
     stop_motor(handle);
     return true;
   }
 
   // TODO(johan): Check if we want a minimum velocity.
   // Clamp to minimum velocity if moving
-  // new_velocity.dps = MAX(current_velocity_dps, ctx->cfg.min_velocity_dps);
+  // new_velocity.dps = MAX(new_velocity.dps, ctx->min_angular_velocity.dps);
 
   apply_motor_velocity(handle, new_velocity.dps, ms_until_next_period);
 
@@ -304,9 +304,9 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
     log_counter = 0;
     ESP_LOGI(TAG,
              "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
-             args.target_angle.degree, ctx->current_angle_deg.degree,
-             args.target_angle.degree - ctx->current_angle_deg.degree,
-             ctx->current_velocity_dps);
+             args.target_angle.degree, ctx->current_angle.degree,
+             args.target_angle.degree - ctx->current_angle.degree,
+             ctx->current_angular_velocity);
     stop_motor(handle);
   }
 

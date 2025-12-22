@@ -46,8 +46,8 @@ const ServoConfig servo_config = {
     .max_pulse_us = HV2060_MAX_PULSEWIDTH_US,
     .initial_angle = {HV2060_MID_POTENTIOMETER_ANGLE},
 
-    .max_velocity_dps = 90.F,
-    .max_accel_dps2 = 100.F,
+    .max_angular_velocity = {90.F},
+    .max_angular_acceleration = {100.F},
     .pot_adc_channel = SERVO_POT_ADC_CHANNEL,
     .potentiometer =
         (Potentiometer){
