@@ -15,13 +15,203 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
 from data_fusion.complementary_filter import ComplementaryFilter
 
+
+class MovementStateMachine:
+
+    def __init__(self, thresholds: dict, neutral_timeout: float = 5.0, consecutive_detections: int = 5):
+        self.x_state = "neutral" # "neutral", "right", "left"
+        self.y_state = "neutral" # "neutral", "forward", "backward"
+        self.z_state = "neutral" # "neutral", "up", "down"
+
+        self.x_threshold = thresholds["x"]
+        self.y_threshold = thresholds["y"]
+        self.z_threshold = thresholds["z"]
+
+        self.neutral_timeout = neutral_timeout # timeout in seconds
+        self.state_change_time = None
+
+        self.last_detection_time_x = None
+        self.last_detection_time_y = None
+        self.last_detection_time_z = None
+        self.consecutive_detections = consecutive_detections # Number of consecutive detections to consider as up movement
+
+        # Counter for X-axis
+        self.consecutive_right_count = 0
+        self.consecutive_left_count = 0
+
+        # Counter for Y-axis
+        self.consecutive_forward_count = 0
+        self.consecutive_backward_count = 0
+
+        # Counter for Z-axis
+        self.consecutive_up_count = 0
+        self.consecutive_down_count = 0
+
+    def update(self, accel_world, current_time):
+        """Update the state machine on current acceleration"""
+        if self.state_change_time is None:
+            self.stae_change_time = current_time
+
+        # Check if any axis is currently active (not neutral)
+        x_active = self.x_state != "neutral"
+        y_active = self.y_state != "neutral"
+        z_active = self.z_state != "neutral"
+
+        # Update X-axis state
+        if not y_active and not z_active:
+            x_direction = self._update_x_axis(accel_world[0], current_time)
+        else:
+            # Another axis is active, keep current state
+            x_direction = "neutral"
+            self.consecutive_right_count = 0
+            self.consecutive_left_count = 0
+
+        # Update Y-axis state
+        if not x_active and not z_active:
+            y_direction = self._update_y_axis(accel_world[1], current_time)
+        else:
+            # Another axis is active, keep current state
+            y_direction = "neutral"
+            self.consecutive_forward_count = 0
+            self.consecutive_backward_count = 0
+
+        # Update Z-axis state
+        if not x_active and not y_active:
+            z_direction = self._update_z_axis(accel_world[2], current_time)
+        else:
+            # Another axis is active, keep current state
+            z_direction = "neutral"
+            self.consecutive_up_count = 0
+            self.consecutive_down_count = 0
+
+        return {"x_direction": x_direction, "y_direction": y_direction, "z_direction": z_direction}
+
+    def _update_x_axis(self, accel_x, current_time):
+        """Update the x-axis state machine"""
+        #print(f"Acc X: {accel_x}")
+        if self.x_state == "neutral":
+            if self.last_detection_time_x is None or (current_time - self.last_detection_time_x) >= self.neutral_timeout:
+                if accel_x > self.x_threshold:
+                    self.consecutive_right_count += 1
+                    self.consecutive_left_count = 0
+
+                    if self.consecutive_right_count >= self.consecutive_detections:
+                        self.x_state = "right"
+                        self.last_detection_time_x = current_time
+                        return "right"
+                elif accel_x < -self.x_threshold:
+                    self.consecutive_left_count += 1
+                    self.consecutive_right_count = 0
+
+                    if self.consecutive_left_count >= self.consecutive_detections:
+                        self.x_state = "left"
+                        self.last_detection_time_x = current_time
+                        return "left"
+                else:
+                    self.consecutive_right_count = 0
+                    self.consecutive_left_count = 0
+                
+                return "neutral"
+            else:
+                self.consecutive_right_count = 0
+                self.consecutive_left_count = 0
+                return "neutral"
+        elif self.x_state == "right" or self.x_state == "left":
+            self.x_state = "neutral"
+            self.consecutive_right_count = 0
+            self.consecutive_left_count = 0
+            return "neutral"
+
+        return self.x_state
+
+
+    def _update_y_axis(self, accel_y, current_time):
+        """Update the y-axis state machine"""
+        #print(f"Acc Y: {accel_y}")
+        if self.y_state == "neutral":
+            if self.last_detection_time_y is None or (current_time - self.last_detection_time_y) >= self.neutral_timeout:
+                if accel_y > self.y_threshold:
+                    self.consecutive_forward_count += 1
+                    self.consecutive_backward_count = 0
+
+                    if self.consecutive_forward_count >= self.consecutive_detections:
+                        self.y_state = "forward"
+                        self.last_detection_time_y = current_time
+                        return "forward"
+                elif accel_y < -self.y_threshold:
+                    self.consecutive_backward_count += 1
+                    self.consecutive_forward_count = 0
+
+                    if self.consecutive_backward_count >= self.consecutive_detections:
+                        self.y_state = "backward"
+                        self.last_detection_time_y = current_time
+                        return "backward"
+                else:
+                    self.consecutive_forward_count = 0
+                    self.consecutive_backward_count = 0
+                return "neutral"
+            else:
+                self.consecutive_forward_count = 0
+                self.consecutive_backward_count = 0
+                return "neutral"
+
+        elif self.y_state == "forward" or self.y_state == "backward":
+            self.y_state = "neutral"
+            self.consecutive_forward_count = 0
+            self.consecutive_backward_count = 0
+            return "neutral"
+
+        return self.y_state
+
+    def _update_z_axis(self, accel_z, current_time):
+        """Update the z-axis state machine"""
+        #print(f"Acc Z: {accel_z}")
+        if self.z_state == "neutral":
+            if self.last_detection_time_z is None or (current_time - self.last_detection_time_z) >= self.neutral_timeout:
+                if accel_z > self.z_threshold:
+                    self.consecutive_up_count += 1
+                    self.consecutive_down_count = 0
+
+                    if self.consecutive_up_count >= self.consecutive_detections:
+                        self.z_state = "up"
+                        self.last_detection_time_z = current_time
+                        return "up"
+                    
+                elif accel_z < -self.z_threshold:
+                    self.consecutive_down_count += 1
+                    self.consecutive_up_count = 0
+
+                    if self.consecutive_down_count >= self.consecutive_detections:
+                        self.z_state = "down"
+                        self.last_detection_time_z = current_time
+                        return "down"
+                else:
+                    self.consecutive_up_count = 0
+                    self.consecutive_down_count = 0
+                    return "neutral"
+            else:
+                self.consecutive_up_count = 0
+                self.consecutive_down_count = 0
+                return "neutral"
+
+        elif self.z_state == "up" or self.z_state == "down":
+            self.z_state = "neutral"
+            self.consecutive_up_count = 0
+            self.consecutive_down_count = 0
+            return "neutral"
+        return self.z_state
+
+movement_fsm = MovementStateMachine(thresholds={"x": 0.5, "y": 0.5, "z": 0.8}, neutral_timeout=2.0, consecutive_detections=5)
+
+
+
 # Movement detection parameters
 WINDOW_TIME_MS = 250  # Rolling window size in milliseconds
 THRESHOLD = 1.0  # Minimum magnitude threshold (m/s²) - tune between 0.6-1.5
 MIN_SAMPLES_FOR_DETECTION = 15  # Minimum samples needed before detecting
 GRAVITY_MAGNITUDE = 9.81  # Gravity magnitude in m/s²
 CALIBRATION_SAMPLES = 50  # Number of samples to use for initial orientation calibration
-CALIBRATION_TIME_MS = 2000  # Time to wait for calibration (ms)
+CALIBRATION_TIME_MS = 5000  # Time to wait for calibration (ms)
 
 def quaternion_multiply(q1, q2):
     """Multiply two quaternions: q1 ⊗ q2"""
@@ -233,37 +423,26 @@ def visualize_imu_orientation(quaternion, accel_body=None, accel_world=None, ax=
     
     return fig, ax
 
-def show_accelration(accel_world):
-    """Show the acceleration in the world frame"""
-    pass
-
-
-def get_up_direction(norm_accel_world):
+def get_direction(norm_accel_world, current_time):
     """Get the up direction of the acceleration in the world frame"""
-    
-    #up_direction = np.array([0.0, 0.0, 1.0])
-    threshold = 0.2
     # Compute the mean acceleration over the window
+    #print(f"Norm acceleration: {norm_accel_world}")
     mean_accel = np.mean(norm_accel_world, axis=0)
     #print(f"Mean acceleration: {mean_accel}")
+    direction = movement_fsm.update(mean_accel, current_time)
+    
+    # direction is a dictionary with the keys "x_direction", "y_direction", "z_direction"
+    if direction["x_direction"] != "neutral":
+        pass
+        #print(f"X-axis direction: {direction['x_direction']}")
+    if direction["y_direction"] != "neutral":
+        pass
+        #print(f"Y-axis direction: {direction['y_direction']}")
+    if direction["z_direction"] != "neutral":
+        pass
+        #print(f"Z-axis direction: {direction['z_direction']}")
 
-    # Z-component is vertical (up/down)
-    z_accel = mean_accel[2]
-
-    is_up = z_accel > threshold
-    print(f"Is up: {is_up}")
-    #print(f"Z-accel: {z_accel}")
-    #magnitude = np.linalg.norm(mean_accel)
-    #print(f"Magnitude: {magnitude}")
-    #max_mag = 0
-    #if magnitude > max_mag:
-    #    max_mag = magnitude
-    #    print(f"Max magnitude: {max_mag}")
-    return is_up
-
-def get_direction(accel_world):
-    """Get the direction of the acceleration in the world frame"""
-    pass
+    return direction
 
 def init_orientation_from_accel(accel_body):
     """Initialize the orientation from the acceleration in the body frame
@@ -414,10 +593,6 @@ def detect_movement(imu_samples_with_timestamps, current_time, initial_quaternio
     ]
     timestamps = np.array([ts for ts, _ in window_samples_with_timestamps]) # Shape (N,), max (WINDOW_TIME_MS,) sometimes (WINDOW_TIME_MS+1,)
     samples = np.array([sample for _, sample in window_samples_with_timestamps]) # Shape (N, 6), max (WINDOW_TIME_MS, 6) (sometimes (WINDOW_TIME_MS+1, 6))
-    
-    #print(f"Timestamps: {timestamps}", timestamps.shape)
-    #print(f"Samples: {samples}", samples.shape)
-    # We want to remove gravity, but we first need to rotate to the world frame.
 
     # Step 1 - Compute quaternion derivatie from gyro data
     gyro_data = samples[:, 3:] # Shape (N, 3), max (WINDOW_TIME_MS, 3)
@@ -427,7 +602,12 @@ def detect_movement(imu_samples_with_timestamps, current_time, initial_quaternio
         #print(f"Gyro bias: {gyro_bias}")
         gyro_data = gyro_data - gyro_bias
         #print(f"Gyro data: {gyro_data}")
-        
+    
+    if initial_quaternion is not None:
+        quaternions = np.tile(initial_quaternion, (len(gyro_data), 1))
+    else:
+        quaternions = np.tile(np.array([1.0, 0.0, 0.0, 0.0]), (len(gyro_data), 1))
+    """   
     quaternions = np.zeros((len(gyro_data), 4)) # (N, 4), max (WINDOW_TIME_MS, 4)
 
     if initial_quaternion is not None:
@@ -459,7 +639,7 @@ def detect_movement(imu_samples_with_timestamps, current_time, initial_quaternio
             q_new = np.array([1.0, 0.0, 0.0, 0.0])
 
         quaternions[i] = q_new
-    
+    """
     # Rotate acceleration into world frame and subtract gravity
     accel_data = samples[:, :3] # Shape (N, 3), max (WINDOW_TIME_MS, 3)
     gravity_world = np.array([0.0, 0.0, GRAVITY_MAGNITUDE])
@@ -477,6 +657,27 @@ def detect_movement(imu_samples_with_timestamps, current_time, initial_quaternio
         linear_accel_world[i] = accel_world - gravity_world
         #print(f"Linear acceleration world: {linear_accel_world[i]}")
 
+    if len(linear_accel_world) > 0:
+        mean_accel_world = np.mean(linear_accel_world, axis=0)
+        mean_accel_body = np.mean(accel_data, axis=0)
+        
+        # Debug: Check what the quaternion is doing
+        print(f"\nDebug info:")
+        print(f"  Mean body accel: {mean_accel_body}")
+        print(f"  Mean world accel (after rotation): {mean_accel_world}")
+        print(f"  Quaternion used: {quaternions[0]}")
+        
+        # Check: Rotate body accel with quaternion and see result
+        test_body = mean_accel_body
+        test_quat = quaternions[0]
+        q_conj = np.array([test_quat[0], -test_quat[1], -test_quat[2], -test_quat[3]])
+        v_q = np.array([0.0, test_body[0], test_body[1], test_body[2]])
+        temp = quaternion_multiply(q_conj, v_q)
+        rotated = quaternion_multiply(temp, test_quat)[1:]
+        print(f"  Rotated body accel: {rotated}")
+        print(f"  Expected gravity in world: [0, 0, 9.81]")
+        print(f"  Difference: {rotated - np.array([0, 0, 9.81])}")
+
     # Return the latest quaternion for visualization
     latest_quaternion = quaternions[-1] if len(quaternions) > 0 else np.array([1.0, 0.0, 0.0, 0.0])
 
@@ -489,7 +690,7 @@ def detect_movement(imu_samples_with_timestamps, current_time, initial_quaternio
     # Print linear acceleration if one axis has a value greater than 2
     #print(f"Linear acceleration world greater than 3: {np.any(np.abs(linear_accel_world) > 3)}")
 
-    up_direction = get_up_direction(linear_accel_world)
+    direction = get_direction(linear_accel_world, current_time)
     
     # Return the latest acceleration for visualization
     latest_accel_body = accel_data[-1] if len(accel_data) > 0 else np.array([0.0, 0.0, 0.0])

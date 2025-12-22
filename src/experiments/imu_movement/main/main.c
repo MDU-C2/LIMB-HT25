@@ -15,8 +15,8 @@ void app_main(void)
     
     // Initialize IMU with default config
     imu_config_t config = IMU_CONFIG_DEFAULT();
-    config.sda_pin = 7;
-    config.scl_pin = 6;
+    config.sda_pin = 5;
+    config.scl_pin = 4;
     
     printf("Initializing IMU: SDA=%d, SCL=%d, addr=0x%02X\n", 
            config.sda_pin, config.scl_pin, config.sensor_addr);
