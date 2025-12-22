@@ -268,57 +268,49 @@ bool servo_update(ServoHandle handle, float dt_seconds,
   float current_velocity_dps = ctx->current_velocity_dps;
   portEXIT_CRITICAL(&ctx->spinlock);
 
-  float error_deg = target_angle.degree - current_angle.degree;
-  float distance_deg = fabsf(error_deg);
+  CalculateUpdatedVelocityArgs args = {
+      .current_angle = current_angle,
+      .target_angle = target_angle,
+      .deadband = (PotentiometerAngle){DEADBAND_DEG},
+      .current_velocity = (AngularVelocity){current_velocity_dps},
+      .max_acceleration = (AngularAcceleration){ctx->cfg.max_accel_dps2},
+      .max_velocity = (AngularVelocity){ctx->cfg.max_velocity_dps},
+      .dt_seconds = dt_seconds,
+  };
+  const AngularVelocity new_velocity = calculate_updated_velocity(&args);
 
-  if (distance_deg < DEADBAND_DEG) {
+  // NOTE: Normally checking equality of floats is imprecise, but in this case
+  // the literal value 0.F gets returned when within the deadband, so it should
+  // be fine checking against the same literal.
+  if (new_velocity.dps == 0.F) {
+    ctx->current_velocity_dps = 0.F;
     ESP_LOGI(TAG, "STOPPING!");
-    ESP_LOGI(TAG,
-             "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
-             ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
-             error_deg, ctx->current_velocity_dps);
+    ESP_LOGI(
+        TAG, "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
+        ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
+        target_angle.degree - current_angle.degree, ctx->current_velocity_dps);
     stop_motor(handle);
     return true;
   }
 
-  // Braking: max velocity from remaining distance (trapezoidal profile)
-  // v_max^2 = 2 * a * d  =>  v_max = sqrt(2 * a * d)
-  const float vmax_from_distance =
-      sqrtf(2.0F * ctx->cfg.max_accel_dps2 * distance_deg);
-  float target_velocity_dps =
-      fminf(ctx->cfg.max_velocity_dps, vmax_from_distance);
-
-  // FIXME: Make sure this is how to handle velocity direction.
-  if (error_deg < 0.F) {
-    target_velocity_dps = -target_velocity_dps;
-  }
-
-  // Velocity ramping (simplified with clamp)
-  float accel_limit = ctx->cfg.max_accel_dps2 * dt_seconds;
-  float velocity_delta = target_velocity_dps - current_velocity_dps;
-  current_velocity_dps += LIMB_CLAMP(velocity_delta, -accel_limit, accel_limit);
-
   // TODO(johan): Check if we want a minimum velocity.
   // Clamp to minimum velocity if moving
-  // bool is_moving = current_velocity_dps > 0.0F;
-  // if (is_moving) {
-  //   current_velocity_dps = MAX(current_velocity_dps,
-  //   ctx->cfg.min_velocity_dps);
-  // }
+  // new_velocity.dps = MAX(current_velocity_dps, ctx->cfg.min_velocity_dps);
 
-  apply_motor_velocity(handle, current_velocity_dps, dt_seconds);
+  apply_motor_velocity(handle, new_velocity.dps, dt_seconds);
 
   portENTER_CRITICAL(&ctx->spinlock);
-  ctx->current_velocity_dps = current_velocity_dps;
+  ctx->current_velocity_dps = new_velocity.dps;
   portEXIT_CRITICAL(&ctx->spinlock);
 
   static uint32_t log_counter = 0;
   if (++log_counter >= 10) {  // Log every 100 updates
     log_counter = 0;
-    ESP_LOGI(TAG,
-             "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
-             ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
-             error_deg, ctx->current_velocity_dps);
+    ESP_LOGI(
+        TAG, "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
+        ctx->target_angle_deg.degree, ctx->current_angle_deg.degree,
+        target_angle.degree - current_angle.degree, ctx->current_velocity_dps);
+    stop_motor(handle);
   }
 
   return false;
