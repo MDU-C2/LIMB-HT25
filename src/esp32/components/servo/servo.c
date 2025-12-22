@@ -195,14 +195,6 @@ static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
 }
 
 typedef struct {
-  float dps;
-} AngularVelocity;
-
-typedef struct {
-  float dps2;
-} AngularAcceleration;
-
-typedef struct {
   PotentiometerAngle current_angle;
   PotentiometerAngle target_angle;
   PotentiometerAngle deadband;

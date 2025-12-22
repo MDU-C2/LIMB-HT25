@@ -4,6 +4,14 @@
 #include <stdint.h>
 #include <sys/param.h>
 
+typedef struct {
+  float dps;
+} AngularVelocity;
+
+typedef struct {
+  float dps2;
+} AngularAcceleration;
+
 // Clamps a value to a range.
 #define LIMB_CLAMP(x, x_min, x_max) (MIN(MAX((x), (x_min)), (x_max)))
 
