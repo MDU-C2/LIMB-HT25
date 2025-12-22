@@ -42,6 +42,13 @@ class TestControlLayer(unittest.TestCase):
             self.control_layer.running.clear()
         self.control_layer.stop()
 
+        # Clear queues
+        while not self.input_queue.empty():
+            try:
+                self.input_queue.get_nowait()
+            except:
+                break
+
     def test_initialization(self):
         """Test that ControlLayer initializes correctly"""
         self.assertEqual(self.control_layer.control_rate, self.control_rate)
@@ -58,17 +65,21 @@ class TestControlLayer(unittest.TestCase):
     def test_get_latest_packet(self):
         """Test getting latest packet from queue"""
         # Create multiple packets
-        packet1 = DataPacket(sequence_id=1, timestamp=time.time() - 0.1)
-        packet2 = DataPacket(sequence_id=2, timestamp=time.time() - 0.05)
-        packet3 = DataPacket(sequence_id=3, timestamp=time.time())
-        
-        # Add packets to queue
-        self.input_queue.put(packet1)
-        self.input_queue.put(packet2)
-        self.input_queue.put(packet3)
-        
-        # Get latest packet (should drain queue and return newest)
-        latest = self.control_layer._get_latest_packet()
+        frozen_time = 1000.0
+
+        with patch("time.time", return_value=frozen_time):
+            packet1 = DataPacket(sequence_id=1, timestamp=frozen_time - 0.01)
+            packet2 = DataPacket(sequence_id=2, timestamp=frozen_time - 0.005)
+            packet3 = DataPacket(sequence_id=3, timestamp=frozen_time)
+            
+            # Add packets to queue
+            self.input_queue.put(packet1)
+            self.input_queue.put(packet2)
+            self.input_queue.put(packet3)
+            
+            # Get latest packet (should drain queue and return newest)
+            latest = self.control_layer._get_latest_packet()
+        #print(f"Latest packet: {latest}")
         
         # Verify latest packet is returned
         self.assertIsNotNone(latest)
@@ -79,17 +90,20 @@ class TestControlLayer(unittest.TestCase):
 
     def test_get_latest_packet_stale_packets(self):
         """Test that stale packets are dropped"""
-        # Create stale packet
-        stale_packet = DataPacket(sequence_id=1, timestamp=time.time() - 1.0)
-        stale_packet.update_age()
+        frozen_time = 1000.0
         
-        # Create fresh packet
-        fresh_packet = DataPacket(sequence_id=2, timestamp=time.time())
-        
-        self.input_queue.put(stale_packet)
-        self.input_queue.put(fresh_packet)
-        
-        latest = self.control_layer._get_latest_packet()
+        with patch("time.time", return_value=frozen_time):
+            # Create stale packet
+            stale_packet = DataPacket(sequence_id=1, timestamp=frozen_time - 0.2)
+            #stale_packet.update_age()
+            
+            # Create fresh packet
+            fresh_packet = DataPacket(sequence_id=2, timestamp=frozen_time)
+            
+            self.input_queue.put(stale_packet)
+            self.input_queue.put(fresh_packet)
+            
+            latest = self.control_layer._get_latest_packet()
         
         # Should return fresh packet
         self.assertIsNotNone(latest)
@@ -330,7 +344,10 @@ class TestControlLayer(unittest.TestCase):
         validated = self.control_layer._apply_safety_limits(commands, motor_state)
         
         # Should reject invalid commands
-        self.assertIsNone(validated) or self.assertNotIn("arm", validated)
+        if validated is None:
+            self.assertIsNone(validated)
+        else:       
+            self.assertNotIn("arm", validated)
 
     def test_send_commands(self):
         """Test sending commands via CAN"""

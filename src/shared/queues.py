@@ -35,3 +35,6 @@ class DataQueue:
 
     def full(self):
         return self._queue.full()
+
+    def size(self):
+        return self._queue.qsize()

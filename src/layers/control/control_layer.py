@@ -72,10 +72,10 @@ class ControlLayer(Process):
         """
         from shared.models.packet import DataPacket
 
+
         latest_packet = None
         max_age_ms = 100.0 # Max package age in ms
-
-        # Drain queue to get latest packet (drop old ones)
+        
         while not self.input_queue.empty():
             try:
                 packet = self.input_queue.get_nowait()
@@ -92,6 +92,7 @@ class ControlLayer(Process):
                 break # Queue empty or other error
 
         # TODO: Could add logging to track dropped packets.
+        if latest_packet is None: print(f"Latest packet is None")
         return latest_packet
 
     def _compute_commands(self, packet):

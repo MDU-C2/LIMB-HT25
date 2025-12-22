@@ -296,7 +296,7 @@ class ProcessingLayer(Process):
 
             return {
                 "class": int(predicted_class),
-                "probabilities": probabilities[0].cpu().numpy().tolist(),
+                "probabilities": probabilities[0].cpu().numpy(),
                 "confidence": float(confidence),
                 "timestamp": time.time()
             }
