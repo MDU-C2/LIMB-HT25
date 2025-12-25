@@ -2,6 +2,7 @@
 #include "adc_manager.h"
 
 #include <string.h>
+#include <sys/param.h>
 
 #include "esp_adc/adc_continuous.h"
 #include "esp_err.h"
@@ -23,8 +24,6 @@ static void adc_mgr_reset_global_values(void);
 static_assert(ADC_CHANNEL_0 == 0,
               "We assume that the channel enum values correspond to their IDs "
               "when doing array indexing.");
-
-#define LIMB_MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // Only one instance of the ADC manager can be running at the same time, so
 // globals it is.
@@ -65,8 +64,8 @@ esp_err_t adc_mgr_init(const AdcMgrConfig adc_mgr_config) {
       adc_mgr_config.channel_configs[0].sample_rate;
   for (int i = 1; i < adc_mgr_config.channel_configs_len; ++i) {
     largest_desired_sample_rate =
-        LIMB_MAX(adc_mgr_config.channel_configs[i].sample_rate,
-                 largest_desired_sample_rate);
+        MAX(adc_mgr_config.channel_configs[i].sample_rate,
+            largest_desired_sample_rate);
   }
 
   // If the requested sample rate is lower than the minimum supported sample
@@ -222,7 +221,8 @@ esp_err_t adc_mgr_deinit(void) {
 esp_err_t adc_mgr_read(AdcMgrReadResults *inout_results,
                        const uint32_t timeout_ms) {
   if (!s_inited || inout_results == NULL) {
-    ESP_LOGW(TAG, "Invalid arg to adc_mgr_read: inited=%d, inoutptr=%p", s_inited, inout_results);
+    ESP_LOGW(TAG, "Invalid arg to adc_mgr_read: inited=%d, inoutptr=%p",
+             s_inited, inout_results);
     return ESP_ERR_INVALID_ARG;
   }
 

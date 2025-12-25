@@ -9,12 +9,11 @@
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
 #include "imu.h"
+#include "limb_utils.h"
 #include "portmacro.h"
 #include "potentiometer.h"
 #include "servo.h"
 #include "soc/gpio_num.h"
-
-#define LIMB_ARR_LEN(x) (sizeof(x) / sizeof(*(x)))
 
 static const char* const TAG = "Shoulder module";
 
@@ -140,16 +139,6 @@ static const Potentiometer kLeftRightPotentiometer = {
     .min_joint_angle = {0},
     .max_joint_angle = {180},
 };
-
-static uint16_t average(const uint16_t* values, const uint16_t value_len) {
-  uint32_t sum = 0;
-
-  for (uint16_t i = 0; i < value_len; ++i) {
-    sum += values[i];
-  }
-
-  return sum / value_len;
-}
 
 static void can_rx_task([[maybe_unused]] void* arg) {
   uint32_t can_id = 0;
@@ -286,15 +275,15 @@ static void adc_read_task([[maybe_unused]] void* arg) {
     // Get the average of the potentiometer values.
     if (s_potentiometer_up_down_buffer->length > 0) {
       s_latest_potentiometer_up_down_value =
-          average(s_potentiometer_up_down_buffer->data,
-                  s_potentiometer_up_down_buffer->length);
+          limb_average16(s_potentiometer_up_down_buffer->data,
+                         s_potentiometer_up_down_buffer->length);
       s_potentiometer_up_down_buffer->length = 0;
     }
 
     if (s_potentiometer_left_right_buffer->length > 0) {
       s_latest_potentiometer_left_right_value =
-          average(s_potentiometer_left_right_buffer->data,
-                  s_potentiometer_left_right_buffer->length);
+          limb_average16(s_potentiometer_left_right_buffer->data,
+                         s_potentiometer_left_right_buffer->length);
       s_potentiometer_left_right_buffer->length = 0;
     }
 

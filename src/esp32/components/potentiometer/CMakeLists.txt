@@ -1,5 +1,2 @@
-idf_component_register(
-  SRCS
-  "src/potentiometer.c"
-  INCLUDE_DIRS
-  "include")
+idf_component_register(SRCS "src/potentiometer.c" REQUIRES limb_utils
+                       INCLUDE_DIRS "include")
