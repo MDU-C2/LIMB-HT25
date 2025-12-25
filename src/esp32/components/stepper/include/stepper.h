@@ -19,9 +19,9 @@ typedef struct {
     float gear_ratio;             // Gear reduction ratio (e.g., 10.0 for 10:1 reduction)
     
     // Motion limits (in degrees per second)
-    AngularVelocity max_velocity_dps;       // Maximum velocity (degrees/sec)
-    AngularVelocity min_velocity_dps;       // Minimum velocity (degrees/sec)
-    AngularAcceleration max_accel_dps2;         // Maximum acceleration (degrees/sec²)
+    AngularVelocity max_velocity;       // Maximum velocity (degrees/sec)
+    AngularVelocity min_velocity;       // Minimum velocity (degrees/sec)
+    AngularAcceleration max_accel;         // Maximum acceleration (degrees/sec²)
     
     // Position feedback
     adc_channel_t pot_adc_channel; // ADC channel for potentiometer (use -1 or value >= SOC_ADC_MAX_CHANNEL_NUM if not used)
@@ -48,19 +48,19 @@ const stepper_control_config_t *stepper_get_cfg(stepper_control_handle_t handle)
 void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len);
 
 // Set target angle (degrees)
-void stepper_set_target_angle_deg(stepper_control_handle_t handle, PotentiometerAngle angle_deg);
+void stepper_set_target_angle(stepper_control_handle_t handle, PotentiometerAngle angle_deg);
 
 // Set emergency stop state
 void stepper_set_estop(stepper_control_handle_t handle, bool active);
 
 // Get current angle from feedback (degrees)
-PotentiometerAngle stepper_get_current_angle_deg(stepper_control_handle_t handle);
+PotentiometerAngle stepper_get_current_angle(stepper_control_handle_t handle);
 
 // Get target angle (degrees)
-PotentiometerAngle stepper_get_target_angle_deg(stepper_control_handle_t handle);
+PotentiometerAngle stepper_get_target_angle(stepper_control_handle_t handle);
 
 // Get current velocity (degrees per second)
-AngularVelocity stepper_get_current_velocity_dps(stepper_control_handle_t handle);
+AngularVelocity stepper_get_current_velocity(stepper_control_handle_t handle);
 
 // Check if motor is moving
 bool stepper_is_moving(stepper_control_handle_t handle);

@@ -35,9 +35,9 @@ typedef struct {
     // Motion state
     bool estop_active;
     bool is_moving;
-    AngularVelocity current_veloctiy_dps;
-    PotentiometerAngle target_angle_deg;
-    PotentiometerAngle current_angle_deg;
+    AngularVelocity current_velocity;
+    PotentiometerAngle target_angle;
+    PotentiometerAngle current_angle;
     bool use_position_feedback;
 
     // Calculated parameters
@@ -67,7 +67,7 @@ static void stop_motor(stepper_control_handle_t handle)
     }
     portENTER_CRITICAL(&ctx->spinlock);
     ctx->is_moving = false;
-    ctx->current_veloctiy_dps = (AngularVelocity){0.0F};
+    ctx->current_velocity = (AngularVelocity){0.0F};
     portEXIT_CRITICAL(&ctx->spinlock);
 }
 
@@ -115,9 +115,9 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     // To get the steps per degree, we use: steps per revolution * gear ratio / 360 degrees
     // Maybe we can directly define the steps per second? Or do we need degree per seconds?
     ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio / 360.0f;
-    ctx.max_velocity_sps = cfg->max_velocity_dps.dps * ctx.steps_per_degree;
-    ctx.min_velocity_sps = cfg->min_velocity_dps.dps * ctx.steps_per_degree;
-    ctx.max_accel_sps2 = cfg->max_accel_dps2.dps2 * ctx.steps_per_degree;
+    ctx.max_velocity_sps = cfg->max_velocity.dps * ctx.steps_per_degree;
+    ctx.min_velocity_sps = cfg->min_velocity.dps * ctx.steps_per_degree;
+    ctx.max_accel_sps2 = cfg->max_accel.dps2 * ctx.steps_per_degree;
     ctx.min_velocity_sps = MIN(ctx.min_velocity_sps, 1.0f);
 
     // Configure GPIOS for STEP, DIR and ENABLE
@@ -171,9 +171,9 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
         uint16_t raw_adc = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
 
         PotentiometerAngle initial_angle = potentiometer_adc_to_angle(&ctx.cfg.potentiometer, raw_adc);
-        ctx.current_angle_deg = initial_angle;
+        ctx.current_angle = initial_angle;
         // Our target angle should be within the range of allowed angles, even if the current angle isn't.
-        ctx.target_angle_deg = clamp_potentiometer_angle(&ctx.cfg.potentiometer, ctx.current_angle_deg);
+        ctx.target_angle = clamp_potentiometer_angle(&ctx.cfg.potentiometer, ctx.current_angle);
         ctx.use_position_feedback = true;
         ctx.filt = initial_angle.degree; // Initialize filter state
         
@@ -181,15 +181,15 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
                  cfg->pot_adc_channel, raw_adc, initial_angle);
     } else {
         ctx.use_position_feedback = false;
-        ctx.current_angle_deg.degree = 0.0f;
-        ctx.target_angle_deg.degree = 0.0f;
+        ctx.current_angle.degree = 0.0f;
+        ctx.target_angle.degree = 0.0f;
         ESP_LOGI(TAG, "Position feedback disabled (no ADC channel)");
     }
     
     // Initialize motion state
     ctx.estop_active = false;
     ctx.is_moving = false;
-    ctx.current_veloctiy_dps = (AngularVelocity){0.0f};
+    ctx.current_velocity = (AngularVelocity){0.0f};
 
     ctx.is_initialized = true;
 
@@ -231,9 +231,9 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     // Take snapshot of shared state and update current angle from feedback
     portENTER_CRITICAL(&ctx->spinlock);
     bool estop = ctx->estop_active;
-    PotentiometerAngle target_angle = ctx->target_angle_deg;
-    float current_velocity_sps = ctx->current_veloctiy_dps.dps * ctx->steps_per_degree;
-    ctx->current_angle_deg = angle_deg;
+    PotentiometerAngle target_angle = ctx->target_angle;
+    float current_velocity_sps = ctx->current_velocity.dps * ctx->steps_per_degree;
+    ctx->current_angle = angle_deg;
     ctx->use_position_feedback = true;
     portEXIT_CRITICAL(&ctx->spinlock);
 
@@ -280,7 +280,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     // Update shared state
     portENTER_CRITICAL(&ctx->spinlock);
     ctx->is_moving = is_moving;
-    ctx->current_veloctiy_dps = (AngularVelocity){current_velocity_sps / ctx->steps_per_degree};
+    ctx->current_velocity = (AngularVelocity){current_velocity_sps / ctx->steps_per_degree};
     portEXIT_CRITICAL(&ctx->spinlock);
 
     // Logging (periodic, not every update)
@@ -295,13 +295,13 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
 
 // ------ Setters ------
 
-void stepper_set_target_angle_deg(stepper_control_handle_t handle, PotentiometerAngle angle_deg)
+void stepper_set_target_angle(stepper_control_handle_t handle, PotentiometerAngle angle)
 {
     motion_control_context_t *ctx = &s_contexts[handle];
 
-    angle_deg = clamp_potentiometer_angle(&ctx->cfg.potentiometer, angle_deg);
+    angle = clamp_potentiometer_angle(&ctx->cfg.potentiometer, angle);
     portENTER_CRITICAL(&ctx->spinlock);
-    ctx->target_angle_deg = angle_deg;
+    ctx->target_angle = angle;
     portEXIT_CRITICAL(&ctx->spinlock);
 }
 
@@ -319,32 +319,32 @@ void stepper_set_estop(stepper_control_handle_t handle, bool active)
 
 // ------ Getters ------
 
-PotentiometerAngle stepper_get_current_angle_deg(stepper_control_handle_t handle)
+PotentiometerAngle stepper_get_current_angle(stepper_control_handle_t handle)
 {
     const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
-    PotentiometerAngle angle = ctx->current_angle_deg;
+    PotentiometerAngle angle = ctx->current_angle;
     portEXIT_CRITICAL(&ctx->spinlock);
     return angle;
 }
 
-PotentiometerAngle stepper_get_target_angle_deg(stepper_control_handle_t handle)
+PotentiometerAngle stepper_get_target_angle(stepper_control_handle_t handle)
 {
     const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
-    PotentiometerAngle angle = ctx->target_angle_deg;
+    PotentiometerAngle angle = ctx->target_angle;
     portEXIT_CRITICAL(&ctx->spinlock);
     return angle;
 }
 
-AngularVelocity stepper_get_current_velocity_dps(stepper_control_handle_t handle)
+AngularVelocity stepper_get_current_velocity(stepper_control_handle_t handle)
 {
     const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
-    AngularVelocity velocity = ctx->current_veloctiy_dps;
+    AngularVelocity velocity = ctx->current_velocity;
     portEXIT_CRITICAL(&ctx->spinlock);
     return velocity;
 }
