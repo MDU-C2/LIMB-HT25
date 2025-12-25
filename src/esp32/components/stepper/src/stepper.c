@@ -23,16 +23,6 @@ static const char *TAG = "stepper";
 #define DEADBAND_DEG 0.5f       // Deadband in degrees (stop if error < this)
 #define MIN_FREQ_HZ 50          // Minimum LEDC frequency
 
-// The angular velocity in terms of steps per second.
-typedef struct {
-    float sps;
-} AngularStepVelocity;
-
-// The angular acceleration in terms of steps per second^2.
-typedef struct {
-    float sps2;
-} AngularStepAcceleration;
-
 // Control context
 typedef struct {
     stepper_control_config_t cfg;
@@ -53,9 +43,6 @@ typedef struct {
 
     // Calculated parameters
     float steps_per_degree;
-    AngularStepVelocity max_step_velocity; // steps per second
-    AngularStepVelocity min_step_velocity;
-    AngularStepAcceleration max_step_accel;
 
     // ADC filter state
     float filt;
@@ -125,15 +112,8 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     ctx.cfg = *cfg;
     ctx.spinlock = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
 
-    // Compute steps per degree and motion limits
     // We define the degrees per second and need to convert that into steps per second
-    // To get the steps per degree, we use: steps per revolution * gear ratio / 360 degrees
-    // Maybe we can directly define the steps per second? Or do we need degree per seconds?
     ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio / 360.0f;
-    ctx.max_step_velocity = (AngularStepVelocity){cfg->max_velocity.dps * ctx.steps_per_degree};
-    ctx.min_step_velocity = (AngularStepVelocity){cfg->min_velocity.dps * ctx.steps_per_degree};
-    ctx.max_step_accel = (AngularStepAcceleration){cfg->max_accel.dps2 * ctx.steps_per_degree};
-    ctx.min_step_velocity.sps = MIN(ctx.min_step_velocity.sps, 1.0F);
 
     // Configure GPIOS for STEP, DIR and ENABLE
     uint64_t pin_mask = (1ULL << cfg->step_gpio);
@@ -154,7 +134,8 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     if (cfg->enable_gpio != GPIO_NUM_NC) {gpio_set_level(cfg->enable_gpio, 0);} // active low on DRV8825
 
     // Configure LEDC timer
-    uint32_t init_freq_hz = MAX((uint32_t)ctx.min_step_velocity.sps, 50);
+    float min_step_velocity = MIN(cfg->min_velocity.dps * ctx.steps_per_degree, 1.0F);
+    uint32_t init_freq_hz = MAX((uint32_t)min_step_velocity, 50);
 
     ledc_timer_config_t timer_cfg = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
@@ -213,7 +194,8 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     *out_handle = handle;
     
     ESP_LOGI(TAG, "Stepper initialized: steps/deg=%.3f, max_vel=%.2f sps, max_accel=%.2f sps²", 
-             ctx.steps_per_degree, ctx.max_step_velocity, ctx.max_step_accel);
+             ctx.steps_per_degree, ctx.cfg.max_velocity.dps * ctx.steps_per_degree,
+             ctx.cfg.max_accel.dps2 * ctx.steps_per_degree);
     
     return ESP_OK;
 }
