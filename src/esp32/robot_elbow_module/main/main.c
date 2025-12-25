@@ -51,9 +51,9 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
     .enable_gpio = STEPPER_ELBOW_ENABLE_PIN,
     .steps_per_rev = 200,
     .gear_ratio = 1.0F,
-    .max_velocity_dps = 90.0F,
-    .min_velocity_dps = 1.0F,
-    .max_accel_dps2 = 100.0F,
+    .max_velocity_dps = {90.0F},
+    .min_velocity_dps = {1.0F},
+    .max_accel_dps2 = {100.0F},
     .pot_adc_channel = ADC_ELBOW_CHANNEL,
     .pwm_channel = PWM_ELBOW_CHANNEL,
     .potentiometer = (Potentiometer) {
@@ -74,9 +74,9 @@ const stepper_control_config_t s_upper_arm_rotation_stepper_cfg = {
     .enable_gpio = STEPPER_UPPER_ARM_ROTATION_ENABLE_PIN,
     .steps_per_rev = 200,
     .gear_ratio = 1.0F,
-    .max_velocity_dps = 90.0F,
-    .min_velocity_dps = 1.0F,
-    .max_accel_dps2 = 100.0F,
+    .max_velocity_dps = {90.0F},
+    .min_velocity_dps = {1.0F},
+    .max_accel_dps2 = {100.0F},
     .pot_adc_channel = ADC_UPPER_ARM_ROTATION_CHANNEL,
     .pwm_channel = PWM_UPPER_ARM_ROTATION_CHANNEL,
     .potentiometer = (Potentiometer) {
@@ -208,7 +208,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
                 PotentiometerAngle target_pot_angle = stepper_get_target_angle_deg(s_elbow_stepper_handle);
                 JointAngle current_angle = to_joint_angle(&elbow_stepper_cfg->potentiometer, current_pot_angle);
                 JointAngle target_angle = to_joint_angle(&elbow_stepper_cfg->potentiometer, target_pot_angle);
-                float velocity = stepper_get_current_velocity_dps(s_elbow_stepper_handle);
+                AngularVelocity velocity = stepper_get_current_velocity_dps(s_elbow_stepper_handle);
                 bool moving = stepper_is_moving(s_elbow_stepper_handle);
             
                 // Send status over CAN
@@ -221,7 +221,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
             
                 // Also log locally
                 ESP_LOGI(TAG, "Stepper elbow - Current(pot): %.2f°, Target(pot): %.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: %.2f°/s, Moving: %s",
-                         current_pot_angle.degree, target_pot_angle.degree, current_angle.degree, target_angle.degree, velocity, moving ? "Yes" : "No");
+                         current_pot_angle.degree, target_pot_angle.degree, current_angle.degree, target_angle.degree, velocity.dps, moving ? "Yes" : "No");
             }
             {
                 // FIXME: The actual angle that gets returned is extremely delayed. When changing the potentiometer, it takes a long time for the current angle to update to the actual proper value. The filtering is probably the culprit.
@@ -229,7 +229,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
                 PotentiometerAngle target_pot_angle = stepper_get_target_angle_deg(s_upper_arm_rotation_stepper_handle);
                 JointAngle current_angle = to_joint_angle(&upper_arm_rotation_stepper_cfg->potentiometer, current_pot_angle);
                 JointAngle target_angle = to_joint_angle(&upper_arm_rotation_stepper_cfg->potentiometer, target_pot_angle);
-                float velocity = stepper_get_current_velocity_dps(s_upper_arm_rotation_stepper_handle);
+                AngularVelocity velocity = stepper_get_current_velocity_dps(s_upper_arm_rotation_stepper_handle);
                 bool moving = stepper_is_moving(s_upper_arm_rotation_stepper_handle);
             
                 // Send status over CAN
@@ -242,7 +242,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
             
                 // Also log locally
                 ESP_LOGI(TAG, "Stepper upper arm rotation- Current(pot): %.2f°, Target(pot): %.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: %.2f°/s, Moving: %s",
-                         current_pot_angle.degree, target_pot_angle.degree, current_angle.degree, target_angle.degree, velocity, moving ? "Yes" : "No");
+                         current_pot_angle.degree, target_pot_angle.degree, current_angle.degree, target_angle.degree, velocity.dps, moving ? "Yes" : "No");
             }
         }
         

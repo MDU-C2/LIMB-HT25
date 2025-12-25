@@ -35,7 +35,7 @@ typedef struct {
     // Motion state
     bool estop_active;
     bool is_moving;
-    float current_veloctiy_dps;
+    AngularVelocity current_veloctiy_dps;
     PotentiometerAngle target_angle_deg;
     PotentiometerAngle current_angle_deg;
     bool use_position_feedback;
@@ -67,7 +67,7 @@ static void stop_motor(stepper_control_handle_t handle)
     }
     portENTER_CRITICAL(&ctx->spinlock);
     ctx->is_moving = false;
-    ctx->current_veloctiy_dps = 0.0f;
+    ctx->current_veloctiy_dps = (AngularVelocity){0.0F};
     portEXIT_CRITICAL(&ctx->spinlock);
 }
 
@@ -115,9 +115,9 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     // To get the steps per degree, we use: steps per revolution * gear ratio / 360 degrees
     // Maybe we can directly define the steps per second? Or do we need degree per seconds?
     ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio / 360.0f;
-    ctx.max_velocity_sps = cfg->max_velocity_dps * ctx.steps_per_degree;
-    ctx.min_velocity_sps = cfg->min_velocity_dps * ctx.steps_per_degree;
-    ctx.max_accel_sps2 = cfg->max_accel_dps2 * ctx.steps_per_degree;
+    ctx.max_velocity_sps = cfg->max_velocity_dps.dps * ctx.steps_per_degree;
+    ctx.min_velocity_sps = cfg->min_velocity_dps.dps * ctx.steps_per_degree;
+    ctx.max_accel_sps2 = cfg->max_accel_dps2.dps2 * ctx.steps_per_degree;
     ctx.min_velocity_sps = MIN(ctx.min_velocity_sps, 1.0f);
 
     // Configure GPIOS for STEP, DIR and ENABLE
@@ -189,7 +189,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     // Initialize motion state
     ctx.estop_active = false;
     ctx.is_moving = false;
-    ctx.current_veloctiy_dps = 0.0f;
+    ctx.current_veloctiy_dps = (AngularVelocity){0.0f};
 
     ctx.is_initialized = true;
 
@@ -232,7 +232,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     portENTER_CRITICAL(&ctx->spinlock);
     bool estop = ctx->estop_active;
     PotentiometerAngle target_angle = ctx->target_angle_deg;
-    float current_velocity_sps = ctx->current_veloctiy_dps * ctx->steps_per_degree;
+    float current_velocity_sps = ctx->current_veloctiy_dps.dps * ctx->steps_per_degree;
     ctx->current_angle_deg = angle_deg;
     ctx->use_position_feedback = true;
     portEXIT_CRITICAL(&ctx->spinlock);
@@ -280,7 +280,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
     // Update shared state
     portENTER_CRITICAL(&ctx->spinlock);
     ctx->is_moving = is_moving;
-    ctx->current_veloctiy_dps = current_velocity_sps / ctx->steps_per_degree;
+    ctx->current_veloctiy_dps = (AngularVelocity){current_velocity_sps / ctx->steps_per_degree};
     portEXIT_CRITICAL(&ctx->spinlock);
 
     // Logging (periodic, not every update)
@@ -339,12 +339,12 @@ PotentiometerAngle stepper_get_target_angle_deg(stepper_control_handle_t handle)
     return angle;
 }
 
-float stepper_get_current_velocity_dps(stepper_control_handle_t handle)
+AngularVelocity stepper_get_current_velocity_dps(stepper_control_handle_t handle)
 {
     const motion_control_context_t *ctx = &s_contexts[handle];
 
     portENTER_CRITICAL(&ctx->spinlock);
-    float velocity = ctx->current_veloctiy_dps;
+    AngularVelocity velocity = ctx->current_veloctiy_dps;
     portEXIT_CRITICAL(&ctx->spinlock);
     return velocity;
 }

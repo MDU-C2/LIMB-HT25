@@ -4,6 +4,7 @@
 #include "driver/gpio.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
+#include "limb_utils.h"
 #include "potentiometer.h"
 
 // Stepper motor control configuration
@@ -18,9 +19,9 @@ typedef struct {
     float gear_ratio;             // Gear reduction ratio (e.g., 10.0 for 10:1 reduction)
     
     // Motion limits (in degrees per second)
-    float max_velocity_dps;       // Maximum velocity (degrees/sec)
-    float min_velocity_dps;       // Minimum velocity (degrees/sec)
-    float max_accel_dps2;         // Maximum acceleration (degrees/sec²)
+    AngularVelocity max_velocity_dps;       // Maximum velocity (degrees/sec)
+    AngularVelocity min_velocity_dps;       // Minimum velocity (degrees/sec)
+    AngularAcceleration max_accel_dps2;         // Maximum acceleration (degrees/sec²)
     
     // Position feedback
     adc_channel_t pot_adc_channel; // ADC channel for potentiometer (use -1 or value >= SOC_ADC_MAX_CHANNEL_NUM if not used)
@@ -59,7 +60,7 @@ PotentiometerAngle stepper_get_current_angle_deg(stepper_control_handle_t handle
 PotentiometerAngle stepper_get_target_angle_deg(stepper_control_handle_t handle);
 
 // Get current velocity (degrees per second)
-float stepper_get_current_velocity_dps(stepper_control_handle_t handle);
+AngularVelocity stepper_get_current_velocity_dps(stepper_control_handle_t handle);
 
 // Check if motor is moving
 bool stepper_is_moving(stepper_control_handle_t handle);
