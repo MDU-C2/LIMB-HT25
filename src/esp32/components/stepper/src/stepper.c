@@ -45,8 +45,7 @@ typedef struct {
     // Calculated parameters
     float steps_per_degree;
 
-    // ADC filter state
-    float filt;
+    uint16_t latest_approximated_adc_value;
 
     bool is_initialized;
 } motion_control_context_t;
@@ -166,13 +165,13 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     if (latest_potentiometer_values_len > 0) {
         // Use initial ADC value to set intial angle (averaged for stability).
         uint16_t raw_adc = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
+        ctx.latest_approximated_adc_value = raw_adc;
 
         PotentiometerAngle initial_angle = potentiometer_adc_to_angle(&ctx.cfg.potentiometer, raw_adc);
         ctx.current_angle = initial_angle;
         // Our target angle should be within the range of allowed angles, even if the current angle isn't.
         ctx.target_angle = clamp_potentiometer_angle(&ctx.cfg.potentiometer, ctx.current_angle);
         ctx.use_position_feedback = true;
-        ctx.filt = initial_angle.degree; // Initialize filter state
         
         ESP_LOGI(TAG, "Potentiometer initialized: ADC channel=%d, raw=%u, angle=%.2f deg", 
                  cfg->pot_adc_channel, raw_adc, initial_angle);
@@ -222,9 +221,8 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms, const uint1
     if (latest_potentiometer_values_len == 0) return;
 
     // Read & filter pot
-    uint16_t raw = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
-    ctx->filt = ctx->filt + ALPHA * ((float)raw - ctx->filt);
-    PotentiometerAngle angle_deg = potentiometer_adc_to_angle(&ctx->cfg.potentiometer, (uint16_t)(ctx->filt + 0.5f));
+    ctx->latest_approximated_adc_value = moving_average16(ctx->latest_approximated_adc_value, latest_potentiometer_values, latest_potentiometer_values_len);
+    PotentiometerAngle angle_deg = potentiometer_adc_to_angle(&ctx->cfg.potentiometer, ctx->latest_approximated_adc_value);
 
     // Take snapshot of shared state and update current angle from feedback
     portENTER_CRITICAL(&ctx->spinlock);
