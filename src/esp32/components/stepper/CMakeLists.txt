@@ -9,5 +9,6 @@ idf_component_register(
   esp_driver_gpio
   esp_driver_ledc
   limb_utils
+  motor_ramping
   INCLUDE_DIRS
   "include")
