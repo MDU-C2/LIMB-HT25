@@ -1,14 +1,12 @@
 #include "servo.h"
 
-#include <math.h>
-
 #include "driver/ledc.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "freertos/idf_additions.h"
 #include "hal/ledc_types.h"
 #include "limb_utils.h"
+#include "motor_ramping.h"
 #include "portmacro.h"
 #include "potentiometer.h"
 
@@ -194,58 +192,6 @@ static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
   servo_move_to_degree(handle, (PotentiometerAngle){new_angle});
 }
 
-typedef struct {
-  PotentiometerAngle current_angle;
-  PotentiometerAngle target_angle;
-  PotentiometerAngle deadband;
-  AngularVelocity current_velocity;
-  AngularAcceleration max_acceleration;
-  AngularVelocity max_velocity;
-  uint32_t ms_until_next_period;
-} CalculateUpdatedVelocityArgs;
-
-static AngularVelocity calculate_updated_velocity(
-    const CalculateUpdatedVelocityArgs *args) {
-  const PotentiometerAngle distance_to_target = {args->target_angle.degree -
-                                                 args->current_angle.degree};
-  const PotentiometerAngle abs_distance_to_target = {
-      fabsf(distance_to_target.degree)};
-
-  // The maximum velocity allowed until next period.
-  const AngularVelocity abs_max_velocity_delta = {
-      args->max_acceleration.dps2 * (float)args->ms_until_next_period / 1000.F};
-
-  // If we're within the deadband and the current velocity is within the allowed
-  // acceleration limit, we want to stop entirely.
-  const bool within_deadband =
-      abs_distance_to_target.degree < args->deadband.degree;
-  const bool slow_enough =
-      fabsf(args->current_velocity.dps) <= abs_max_velocity_delta.dps;
-
-  if (within_deadband && slow_enough) {
-    return (AngularVelocity){0};
-  }
-
-  // Braking: max velocity from remaining distance (trapezoidal profile)
-  // v_max^2 = 2 * a * d  =>  v_max = sqrt(2 * a * d)
-  const AngularVelocity vmax_from_distance = {sqrtf(
-      2.0F * args->max_acceleration.dps2 * abs_distance_to_target.degree)};
-  const AngularVelocity abs_target_velocity = {
-      fminf(args->max_velocity.dps, vmax_from_distance.dps)};
-  const AngularVelocity target_velocity = {distance_to_target.degree < 0.F
-                                               ? -abs_target_velocity.dps
-                                               : abs_target_velocity.dps};
-
-  // Velocity ramping (simplified with clamp)
-  const AngularVelocity velocity_delta = {target_velocity.dps -
-                                          args->current_velocity.dps};
-  const AngularVelocity new_velocity = {args->current_velocity.dps +
-                                        LIMB_CLAMP(velocity_delta.dps,
-                                                   -abs_max_velocity_delta.dps,
-                                                   abs_max_velocity_delta.dps)};
-  return new_velocity;
-}
-
 bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                   const uint16_t *potentiometer_values,
                   uint16_t potentiometer_values_len) {
@@ -262,16 +208,16 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
   const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &ctx->cfg.potentiometer, potentiometer_adc_value);
 
-  CalculateUpdatedVelocityArgs args = {
+  MotorRampingArgs args = {
       .current_angle = current_angle,
       .target_angle = ctx->target_angle,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_angular_velocity,
       .max_acceleration = ctx->cfg.max_angular_acceleration,
       .max_velocity = ctx->cfg.max_angular_velocity,
-      .ms_until_next_period = ms_until_next_period,
+      .timestep_ms = ms_until_next_period,
   };
-  const AngularVelocity new_velocity = calculate_updated_velocity(&args);
+  const AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);
 
   // Update the current state.
   portENTER_CRITICAL(&ctx->spinlock);

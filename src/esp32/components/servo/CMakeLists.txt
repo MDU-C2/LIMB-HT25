@@ -6,4 +6,5 @@ idf_component_register(
   REQUIRES
   driver
   limb_utils
-  potentiometer)
+  potentiometer
+  motor_ramping)
