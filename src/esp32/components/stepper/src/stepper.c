@@ -20,7 +20,8 @@ static const char *TAG = "stepper";
 
 // Control constants
 #define ALPHA 0.1f              // Low-pass filter coefficient (0.0-1.0)
-#define DEADBAND_DEG 0.5f       // Deadband in degrees (stop if error < this)
+// NOTE: Without microstepping, our step size is 1.8 degrees, so the deadband should probably be at least as large.
+#define DEADBAND_DEG 3.6f       // Deadband in degrees (stop if error < this)
 #define MIN_FREQ_HZ 50          // Minimum LEDC frequency
 
 // Control context
