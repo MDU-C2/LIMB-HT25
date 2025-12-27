@@ -22,8 +22,7 @@ typedef struct {
 
   bool is_moving;
 
-  // ADC filter state.
-  float filt;
+  uint32_t latest_approximated_adc_value;
 } ServoContext;
 
 enum {
@@ -101,6 +100,7 @@ esp_err_t servo_init(const ServoConfig *servo_config,
       .cfg = *servo_config,
       .current_angle = current_angle,
       .target_angle = servo_config->initial_angle,
+      .latest_approximated_adc_value = current_pot_adc_value,
   };
 
   *out_handle = servo_config->ledc_channel;
@@ -202,11 +202,11 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 
   ServoContext *ctx = servo_get_context(handle);
 
-  uint16_t potentiometer_adc_value =
-      limb_average16(potentiometer_values, potentiometer_values_len);
-  ctx->filt = ctx->filt + ALPHA * ((float)potentiometer_adc_value - ctx->filt);
+  ctx->latest_approximated_adc_value = moving_average16(
+      ctx->latest_approximated_adc_value, potentiometer_values,
+      potentiometer_values_len);
   const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
-      &ctx->cfg.potentiometer, potentiometer_adc_value);
+      &ctx->cfg.potentiometer, ctx->latest_approximated_adc_value);
 
   MotorRampingArgs args = {
       .current_angle = current_angle,
