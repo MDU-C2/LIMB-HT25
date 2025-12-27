@@ -22,7 +22,9 @@ static const char *TAG = "stepper";
 #define ALPHA 0.1f              // Low-pass filter coefficient (0.0-1.0)
 // NOTE: Without microstepping, our step size is 1.8 degrees, so the deadband should probably be at least as large.
 #define DEADBAND_DEG 3.6f       // Deadband in degrees (stop if error < this)
-#define MIN_FREQ_HZ 50          // Minimum LEDC frequency
+// The LEDC library doesn't like setting a frequency lower than 5
+// (calling ledc_find_suitable_duty_resolution with lower frequencies returned 0).
+#define MIN_FREQ_HZ 5          // Minimum LEDC frequency
 
 // Control context
 typedef struct {
@@ -83,12 +85,10 @@ static void apply_motor_velocity(stepper_control_handle_t handle, AngularVelocit
         gpio_set_level(ctx->cfg.dir_gpio, (velocity.dps > 0.0F) ? 1 : 0);
     }
 
-    // FIXME: What about if we get an sps of 0? Does ledc_set_freq support setting the freq_hz to 0?
-    // Otherwise we can probably either clamp it to at least 1, or stop the motor completely if it's less than 1.
     float velocity_sps = roundf(velocity.dps * ctx->steps_per_degree);
     
     // Clamp frequency
-    uint32_t freq_hz = MAX((uint32_t)velocity_sps, MIN_FREQ_HZ);
+    uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), MIN_FREQ_HZ);
     
     // Update frequency and duty
     ledc_set_freq(LEDC_LOW_SPEED_MODE, ctx->ledc_timer, freq_hz);
@@ -115,6 +115,12 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     // We define the degrees per second and need to convert that into steps per second
     ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio / 360.0f;
 
+    const float min_allowed_velocity = (float)MIN_FREQ_HZ / ctx.steps_per_degree;
+    if (cfg->max_velocity.dps < min_allowed_velocity) {
+      ESP_LOGE(TAG, "max_velocity must be at least %f dps", min_allowed_velocity);
+      return ESP_ERR_INVALID_ARG;
+    }
+
     // Configure GPIOS for STEP, DIR and ENABLE
     uint64_t pin_mask = (1ULL << cfg->step_gpio);
     if (cfg->dir_gpio != GPIO_NUM_NC) {pin_mask |= (1ULL << cfg->dir_gpio);}
@@ -134,12 +140,14 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     if (cfg->enable_gpio != GPIO_NUM_NC) {gpio_set_level(cfg->enable_gpio, 0);} // active low on DRV8825
 
     // Configure LEDC timer
-    float min_step_velocity = MIN(cfg->min_velocity.dps * ctx.steps_per_degree, 1.0F);
-    uint32_t init_freq_hz = MAX((uint32_t)min_step_velocity, 50);
+    // Start off at lowest possible speed.
+    const uint32_t init_freq_hz = MIN_FREQ_HZ;
 
     ledc_timer_config_t timer_cfg = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
-        .duty_resolution = LEDC_TIMER_13_BIT,
+        // For some reason, the LEDC library doesn't like setting a duty
+        // resolution below 14 bits if the frequency is at its minimum of 5 Hz.
+        .duty_resolution = LEDC_TIMER_14_BIT,
         .timer_num = LEDC_TIMER_0,
         .freq_hz = init_freq_hz,
         .clk_cfg = LEDC_USE_APB_CLK,
@@ -149,7 +157,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     // Configure LEDC channel for STEP output
     ctx.ledc_timer = LEDC_TIMER_0;
     ctx.ledc_channel = cfg->pwm_channel;
-    ctx.duty_50_percent = (1 << (13 - 1)); // 50% duty for 13 bit resolution
+    ctx.duty_50_percent = (1 << (timer_cfg.duty_resolution - 1)); // 50% duty for set duty resolution
     
     ledc_channel_config_t channel_cfg = {
         .gpio_num = cfg->step_gpio,
