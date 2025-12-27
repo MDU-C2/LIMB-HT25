@@ -214,11 +214,11 @@ esp_err_t stepper_deinit(stepper_control_handle_t handle)
     return ESP_OK;
 }
 
-void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len) 
+void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len) 
 {
     motion_control_context_t *ctx = &s_contexts[handle];
 
-    if (dt_seconds <= 0.0f || latest_potentiometer_values_len == 0) return;
+    if (latest_potentiometer_values_len == 0) return;
 
     // Read & filter pot
     uint16_t raw = limb_average16(latest_potentiometer_values, latest_potentiometer_values_len);
@@ -246,7 +246,7 @@ void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uin
         .current_velocity = ctx->current_velocity,
         .max_acceleration = ctx->cfg.max_accel,
         .max_velocity = ctx->cfg.max_velocity,
-        .timestep_ms = dt_seconds,
+        .timestep_ms = dt_ms,
     };
     AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);
 

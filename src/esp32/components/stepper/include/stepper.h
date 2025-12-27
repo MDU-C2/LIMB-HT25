@@ -45,7 +45,7 @@ const stepper_control_config_t *stepper_get_cfg(stepper_control_handle_t handle)
 
 // Update stepper control loop (call periodically, e.g., every 10ms)
 // dt_seconds: time delta since last update
-void stepper_update(stepper_control_handle_t handle, float dt_seconds, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len);
+void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms, const uint16_t *latest_potentiometer_values, uint16_t latest_potentiometer_values_len);
 
 // Set target angle (degrees)
 void stepper_set_target_angle(stepper_control_handle_t handle, PotentiometerAngle angle_deg);

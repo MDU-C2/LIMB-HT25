@@ -140,11 +140,10 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
     const TickType_t period_ms = pdMS_TO_TICKS(10); // 10ms = 100Hz update rate
     
     while (1) {
-        // FIXME: This should probably be checked instead of just assumed.
-        const float dt_seconds = 0.01F; // 10ms in seconds
+        const uint16_t dt_ms = 10; // 10ms in seconds
 
         adc_mgr_read(&s_adc_mgr_read_results, 0);
-        stepper_update(s_elbow_stepper_handle, dt_seconds, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
+        stepper_update(s_elbow_stepper_handle, dt_ms, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
         s_adc_mgr_elbow_buffer->length = 0;
         
         // Send status over CAN and log
