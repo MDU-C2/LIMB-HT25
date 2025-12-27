@@ -253,7 +253,6 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
              args.target_angle.degree, ctx->current_angle.degree,
              args.target_angle.degree - ctx->current_angle.degree,
              ctx->current_angular_velocity);
-    stop_motor(handle);
   }
 
   return false;
