@@ -271,11 +271,6 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms, const uint1
         return;
     }
 
-    // Clamp to minimum velocity if moving
-    new_velocity.dps = MAX(new_velocity.dps, ctx->cfg.min_velocity.dps);
-    // FIXME: Limit speed to always one step per second. This is done in init_stepper to min_step_velocity.
-    new_velocity.dps = MAX(new_velocity.dps, 1.F / ctx->steps_per_degree);
-
     // Apply motor velocity (handles enable/disable, frequency, duty)
     apply_motor_velocity(handle, new_velocity);
 
