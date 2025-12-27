@@ -30,18 +30,12 @@ enum {
     STEPPER_ELBOW_STEP_PIN = GPIO_NUM_6,
     STEPPER_ELBOW_DIR_PIN = GPIO_NUM_7,
     STEPPER_ELBOW_ENABLE_PIN = GPIO_NUM_8,
-    STEPPER_UPPER_ARM_ROTATION_STEP_PIN = GPIO_NUM_9,
-    STEPPER_UPPER_ARM_ROTATION_DIR_PIN = GPIO_NUM_10,
-    // GPIO 18/19 are used by the USB functionality.
-    STEPPER_UPPER_ARM_ROTATION_ENABLE_PIN = GPIO_NUM_20,
 
     // ADC channels
     ADC_ELBOW_CHANNEL = ADC_CHANNEL_0, // GPIO 0
-    ADC_UPPER_ARM_ROTATION_CHANNEL = ADC_CHANNEL_1, // GPIO 1
 
     // PWM channels
     PWM_ELBOW_CHANNEL = LEDC_CHANNEL_0,
-    PWM_UPPER_ARM_ROTATION_CHANNEL = LEDC_CHANNEL_1,
 };
 
 // Stepper configurations
@@ -68,39 +62,12 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
     },
 };
 
-const stepper_control_config_t s_upper_arm_rotation_stepper_cfg = {
-    .step_gpio = STEPPER_UPPER_ARM_ROTATION_STEP_PIN,
-    .dir_gpio = STEPPER_UPPER_ARM_ROTATION_DIR_PIN,
-    .enable_gpio = STEPPER_UPPER_ARM_ROTATION_ENABLE_PIN,
-    .steps_per_rev = 200,
-    .gear_ratio = 1.0F,
-    .max_velocity = {90.0F},
-    .min_velocity = {1.0F},
-    .max_accel = {100.0F},
-    .pot_adc_channel = ADC_UPPER_ARM_ROTATION_CHANNEL,
-    .pwm_channel = PWM_UPPER_ARM_ROTATION_CHANNEL,
-    .potentiometer = (Potentiometer) {
-        .degrees_of_motion = {285.F},
-        // TODO(Johan): Figure out which values to use through measurements.
-        .min_adc_value = 0,
-        .max_adc_value = 4095,
-        .min_joint_angle = {-90.F},
-        .max_joint_angle = {90.F},
-        .min_joint_angle_as_potentiometer_angle = {(285.F / 2.F) - 90.F},
-        .max_joint_angle_as_potentiometer_angle = {(285.F / 2.F) + 90.F}
-    },
-};
-
 // ADC manager configuration.
 const AdcMgrChannelConfig s_adc_mgr_channel_configs[] = {
     {
         .channel = ADC_ELBOW_CHANNEL,
         .sample_rate = 1000,
     },
-    {
-        .channel = ADC_UPPER_ARM_ROTATION_CHANNEL,
-        .sample_rate = 1000,
-    }
 };
 
 const AdcMgrConfig s_adc_mgr_config = {
@@ -116,7 +83,6 @@ enum {
 };
 
 uint16_t s_adc_elbow_channel_underlying_buffer[ADC_STEPPERS_UNDERLYING_BUF_SIZE] = {0};
-uint16_t s_adc_upper_arm_rotation_channel_underlying_buffer[ADC_STEPPERS_UNDERLYING_BUF_SIZE] = {0};
 
 AdcMgrReadResults s_adc_mgr_read_results = {
     .channel_buffers = {
@@ -124,24 +90,17 @@ AdcMgrReadResults s_adc_mgr_read_results = {
             .data = s_adc_elbow_channel_underlying_buffer,
             .capacity = LIMB_ARR_LEN(s_adc_elbow_channel_underlying_buffer)
         },
-        [ADC_UPPER_ARM_ROTATION_CHANNEL] = {
-            .data = s_adc_upper_arm_rotation_channel_underlying_buffer,
-            .capacity = LIMB_ARR_LEN(s_adc_upper_arm_rotation_channel_underlying_buffer)
-        }
     }
 };
 
 AdcMgrChannelBuffer *s_adc_mgr_elbow_buffer = &s_adc_mgr_read_results.channel_buffers[ADC_ELBOW_CHANNEL];
-AdcMgrChannelBuffer *s_adc_mgr_upper_arm_rotation_buffer = &s_adc_mgr_read_results.channel_buffers[ADC_UPPER_ARM_ROTATION_CHANNEL];
 
 stepper_control_handle_t s_elbow_stepper_handle = {0};
-stepper_control_handle_t s_upper_arm_rotation_stepper_handle = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 // CAN RX task commented out - no CAN hardware
 void can_rx_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t* elbow_stepper_config = stepper_get_cfg(s_elbow_stepper_handle);
-    const stepper_control_config_t* upper_arm_rotation_stepper_config = stepper_get_cfg(s_upper_arm_rotation_stepper_handle);
 
     uint8_t msg_rx[CAN_MSG_SIZE]; 
     uint8_t rx_len = CAN_MSG_SIZE;
@@ -153,10 +112,6 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
                 JointAngle target_angle = {*(float*)msg_rx};
                 stepper_set_target_angle(s_elbow_stepper_handle, to_potentiometer_angle(&elbow_stepper_config->potentiometer, target_angle));
                 ESP_LOGI(TAG, "Received command: elbow target angle = %f degrees", target_angle.degree);
-            } else if (rx_id == CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION) {
-                JointAngle target_angle = {*(float*)msg_rx};
-                stepper_set_target_angle(s_upper_arm_rotation_stepper_handle, to_potentiometer_angle(&upper_arm_rotation_stepper_config->potentiometer, target_angle));
-                ESP_LOGI(TAG, "Received command: upper arm rotation target angle = %f degrees", target_angle.degree);
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -180,7 +135,6 @@ void imu_task([[maybe_unused]] void *pvParameter) {
 
 void stepper_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t* elbow_stepper_cfg = stepper_get_cfg(s_elbow_stepper_handle);
-    const stepper_control_config_t* upper_arm_rotation_stepper_cfg = stepper_get_cfg(s_upper_arm_rotation_stepper_handle);
 
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t period_ms = pdMS_TO_TICKS(10); // 10ms = 100Hz update rate
@@ -191,9 +145,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
 
         adc_mgr_read(&s_adc_mgr_read_results, 0);
         stepper_update(s_elbow_stepper_handle, dt_seconds, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
-        stepper_update(s_upper_arm_rotation_stepper_handle, dt_seconds, s_adc_mgr_upper_arm_rotation_buffer->data, s_adc_mgr_upper_arm_rotation_buffer->length);
         s_adc_mgr_elbow_buffer->length = 0;
-        s_adc_mgr_upper_arm_rotation_buffer->length = 0;
         
         // Send status over CAN and log
         static uint32_t status_counter = 0;
@@ -202,48 +154,24 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
         };
         if (++status_counter >= ITERATIONS_PER_LOGGING) { // Every 100ms
             status_counter = 0;
-            {
-                // FIXME: The actual angle that gets returned is extremely delayed. When changing the potentiometer, it takes a long time for the current angle to update to the actual proper value. The filtering is probably the culprit.
-                PotentiometerAngle current_pot_angle = stepper_get_current_angle(s_elbow_stepper_handle);
-                PotentiometerAngle target_pot_angle = stepper_get_target_angle(s_elbow_stepper_handle);
-                JointAngle current_angle = to_joint_angle(&elbow_stepper_cfg->potentiometer, current_pot_angle);
-                JointAngle target_angle = to_joint_angle(&elbow_stepper_cfg->potentiometer, target_pot_angle);
-                AngularVelocity velocity = stepper_get_current_velocity(s_elbow_stepper_handle);
-                bool moving = stepper_is_moving(s_elbow_stepper_handle);
-            
-                // Send status over CAN
-                uint8_t can_data[CAN_MSG_SIZE] = {0};
-                *(float*)can_data = current_angle.degree;
-                esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER, can_data, sizeof(current_angle.degree));
-                if (err != ESP_OK) {
-                    ESP_LOGW(TAG, "Error sending elbow status over CAN: %s", esp_err_to_name(err));
-                }
-            
-                // Also log locally
-                ESP_LOGI(TAG, "Stepper elbow - Current(pot): %.2f°, Target(pot): %.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: %.2f°/s, Moving: %s",
-                         current_pot_angle.degree, target_pot_angle.degree, current_angle.degree, target_angle.degree, velocity.dps, moving ? "Yes" : "No");
+            PotentiometerAngle current_pot_angle = stepper_get_current_angle(s_elbow_stepper_handle);
+            PotentiometerAngle target_pot_angle = stepper_get_target_angle(s_elbow_stepper_handle);
+            JointAngle current_angle = to_joint_angle(&elbow_stepper_cfg->potentiometer, current_pot_angle);
+            JointAngle target_angle = to_joint_angle(&elbow_stepper_cfg->potentiometer, target_pot_angle);
+            AngularVelocity velocity = stepper_get_current_velocity(s_elbow_stepper_handle);
+            bool moving = stepper_is_moving(s_elbow_stepper_handle);
+        
+            // Send status over CAN
+            uint8_t can_data[CAN_MSG_SIZE] = {0};
+            *(float*)can_data = current_angle.degree;
+            esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER, can_data, sizeof(current_angle.degree));
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "Error sending elbow status over CAN: %s", esp_err_to_name(err));
             }
-            {
-                // FIXME: The actual angle that gets returned is extremely delayed. When changing the potentiometer, it takes a long time for the current angle to update to the actual proper value. The filtering is probably the culprit.
-                PotentiometerAngle current_pot_angle = stepper_get_current_angle(s_upper_arm_rotation_stepper_handle);
-                PotentiometerAngle target_pot_angle = stepper_get_target_angle(s_upper_arm_rotation_stepper_handle);
-                JointAngle current_angle = to_joint_angle(&upper_arm_rotation_stepper_cfg->potentiometer, current_pot_angle);
-                JointAngle target_angle = to_joint_angle(&upper_arm_rotation_stepper_cfg->potentiometer, target_pot_angle);
-                AngularVelocity velocity = stepper_get_current_velocity(s_upper_arm_rotation_stepper_handle);
-                bool moving = stepper_is_moving(s_upper_arm_rotation_stepper_handle);
-            
-                // Send status over CAN
-                uint8_t can_data[CAN_MSG_SIZE] = {0};
-                *(float*)can_data = current_angle.degree;
-                esp_err_t err = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER, can_data, sizeof(current_angle.degree));
-                if (err != ESP_OK) {
-                    ESP_LOGW(TAG, "Error sending upper arm rotation status over CAN: %s", esp_err_to_name(err));
-                }
-            
-                // Also log locally
-                ESP_LOGI(TAG, "Stepper upper arm rotation- Current(pot): %.2f°, Target(pot): %.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: %.2f°/s, Moving: %s",
-                         current_pot_angle.degree, target_pot_angle.degree, current_angle.degree, target_angle.degree, velocity.dps, moving ? "Yes" : "No");
-            }
+        
+            // Also log locally
+            ESP_LOGI(TAG, "Stepper elbow - Current(pot): %.2f°, Target(pot): %.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: %.2f°/s, Moving: %s",
+                     current_pot_angle.degree, target_pot_angle.degree, current_angle.degree, target_angle.degree, velocity.dps, moving ? "Yes" : "No");
         }
         
         vTaskDelayUntil(&last_wake_time, period_ms);
@@ -253,7 +181,6 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
 // Test task to cycle through different target angles
 void stepper_test_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t *elbow_cfg = stepper_get_cfg(s_elbow_stepper_handle);
-    const stepper_control_config_t *upper_arm_rotation_cfg = stepper_get_cfg(s_upper_arm_rotation_stepper_handle);
 
     // Wait a bit for system to initialize
     vTaskDelay(pdMS_TO_TICKS(2000));
@@ -269,12 +196,11 @@ void stepper_test_task([[maybe_unused]] void *pvParameter) {
         // Set new target angle
         float target = test_angles[angle_index];
         stepper_set_target_angle(s_elbow_stepper_handle, to_potentiometer_angle(&elbow_cfg->potentiometer, (JointAngle){target}));
-        stepper_set_target_angle(s_upper_arm_rotation_stepper_handle, to_potentiometer_angle(&upper_arm_rotation_cfg->potentiometer, (JointAngle){target}));
         ESP_LOGI(TAG, ">>> Setting target angle to %.1f°", target);
         
         // Wait for both steppers to reach target (or timeout after 5 seconds)
         TickType_t start_time = xTaskGetTickCount();
-        while ((stepper_is_moving(s_elbow_stepper_handle) || stepper_is_moving(s_upper_arm_rotation_stepper_handle)) && (xTaskGetTickCount() - start_time < pdMS_TO_TICKS(5000))) {
+        while ((stepper_is_moving(s_elbow_stepper_handle)) && (xTaskGetTickCount() - start_time < pdMS_TO_TICKS(5000))) {
             vTaskDelay(pdMS_TO_TICKS(100));
         }
         
@@ -320,12 +246,6 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to initialize elbow stepper");
     }
     s_adc_mgr_elbow_buffer->length = 0;
-    if (stepper_init(&s_upper_arm_rotation_stepper_cfg, s_adc_mgr_upper_arm_rotation_buffer->data, s_adc_mgr_upper_arm_rotation_buffer->length, &s_upper_arm_rotation_stepper_handle) == ESP_OK) {
-        ESP_LOGI(TAG, "Upper arm rotation stepper initialized");
-    } else {
-        ESP_LOGE(TAG, "Failed to initialize upper arm rotation stepper");
-    }
-    s_adc_mgr_upper_arm_rotation_buffer->length = 0;
     
     // Create FreeRTOS tasks
     enum {
