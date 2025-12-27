@@ -234,6 +234,7 @@ void app_main(void) {
         ESP_LOGI(TAG, "ADC manager initialized");
     } else {
         ESP_LOGE(TAG, "Failed to initialize ADC manager");
+        return;
     }
 
     // Wait for a bit to get initial results.
@@ -244,6 +245,7 @@ void app_main(void) {
         ESP_LOGI(TAG, "Elbow stepper initialized");
     } else {
         ESP_LOGE(TAG, "Failed to initialize elbow stepper");
+        return;
     }
     s_adc_mgr_elbow_buffer->length = 0;
     
