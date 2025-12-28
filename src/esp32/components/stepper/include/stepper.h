@@ -12,12 +12,27 @@ typedef enum {
     STEPPER_DIR_REVERSE,
 } StepperDirection;
 
+typedef enum {
+  MICROSTEP_NONE = 0,
+  MICROSTEP_1_1 = 1,
+  MICROSTEP_1_2 = 2,
+  MICROSTEP_1_4 = 4,
+  MICROSTEP_1_8 = 8,
+  MICROSTEP_1_16 = 16,
+  MICROSTEP_1_32 = 32,
+} MicrosteppingMode;
+
 // Stepper motor control configuration
 typedef struct {
     // GPIO pins
     gpio_num_t step_gpio;        // STEP pin (required)
     gpio_num_t dir_gpio;         // DIR pin (GPIO_NUM_NC if not used)
     gpio_num_t enable_gpio;      // ENABLE pin (GPIO_NUM_NC if not used)
+    gpio_num_t microstep_m0_gpio;
+    gpio_num_t microstep_m1_gpio;
+    gpio_num_t microstep_m2_gpio;
+
+    MicrosteppingMode microstepping_mode;
     
     // Motor parameters
     uint16_t steps_per_rev;       // Steps per motor revolution (e.g., 200 for 1.8° stepper)

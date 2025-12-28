@@ -12,6 +12,7 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "hal/ledc_types.h"
+#include "soc/gpio_num.h"
 #include "soc/soc_caps.h"
 #include "sys/param.h"
 #include "motor_ramping.h"
@@ -93,8 +94,11 @@ static void apply_motor_velocity(stepper_control_handle_t handle, AngularVelocit
         gpio_set_level(ctx->cfg.dir_gpio, direction);
     }
 
-    float velocity_sps = roundf(velocity.dps * ctx->steps_per_degree);
-    
+    // If we don't have microstepping enabled, we want the value to b, 1 so we do full
+    // steps.
+    int microstepping_factor = MAX(ctx->cfg.microstepping_mode, 1);
+    float velocity_sps = roundf(velocity.dps * ctx->steps_per_degree * microstepping_factor);
+
     // Clamp frequency
     uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), MIN_FREQ_HZ);
     
@@ -133,6 +137,27 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     uint64_t pin_mask = (1ULL << cfg->step_gpio);
     if (cfg->dir_gpio != GPIO_NUM_NC) {pin_mask |= (1ULL << cfg->dir_gpio);}
     if (cfg->enable_gpio != GPIO_NUM_NC) {pin_mask |= (1ULL << cfg->enable_gpio);}
+    if (cfg->microstepping_mode != MICROSTEP_NONE) {
+        if (cfg->microstep_m0_gpio == GPIO_NUM_NC) {
+            ESP_LOGE(TAG, "Microstepping is enabled, but microstep_m0_gpio isn't enabled");
+            return ESP_ERR_INVALID_ARG;
+        } else {
+            pin_mask |= (1ULL << cfg->microstep_m0_gpio);
+        }
+        if (cfg->microstep_m1_gpio == GPIO_NUM_NC) {
+            ESP_LOGE(TAG, "Microstepping is enabled, but microstep_m1_gpio isn't enabled");
+            return ESP_ERR_INVALID_ARG;
+        } else {
+            pin_mask |= (1ULL << cfg->microstep_m1_gpio);
+        }
+        if (cfg->microstep_m2_gpio == GPIO_NUM_NC) {
+            ESP_LOGE(TAG, "Microstepping is enabled, but microstep_m2_gpio isn't enabled");
+            return ESP_ERR_INVALID_ARG;
+        } else {
+            pin_mask |= (1ULL << cfg->microstep_m2_gpio);
+        }
+    }
+
     gpio_config_t io_conf = {
         .pin_bit_mask = pin_mask,
         .mode = GPIO_MODE_OUTPUT,
@@ -146,6 +171,54 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
     gpio_set_level(cfg->step_gpio, 0);
     if (cfg->dir_gpio != GPIO_NUM_NC) {gpio_set_level(cfg->dir_gpio, 0);}
     if (cfg->enable_gpio != GPIO_NUM_NC) {gpio_set_level(cfg->enable_gpio, 0);} // active low on DRV8825
+
+    // Set up microstepping.
+    switch (cfg->microstepping_mode) {
+        case MICROSTEP_NONE: {
+            // We don't need to do anything.
+            break;
+        }
+        case MICROSTEP_1_1: {
+            gpio_set_level(cfg->microstep_m0_gpio, 0);
+            gpio_set_level(cfg->microstep_m1_gpio, 0);
+            gpio_set_level(cfg->microstep_m2_gpio, 0);
+            break;
+        }
+        case MICROSTEP_1_2: {
+            gpio_set_level(cfg->microstep_m0_gpio, 1);
+            gpio_set_level(cfg->microstep_m1_gpio, 0);
+            gpio_set_level(cfg->microstep_m2_gpio, 0);
+            break;
+        }
+        case MICROSTEP_1_4: {
+            gpio_set_level(cfg->microstep_m0_gpio, 0);
+            gpio_set_level(cfg->microstep_m1_gpio, 1);
+            gpio_set_level(cfg->microstep_m2_gpio, 0);
+            break;
+        }
+        case MICROSTEP_1_8: {
+            gpio_set_level(cfg->microstep_m0_gpio, 1);
+            gpio_set_level(cfg->microstep_m1_gpio, 1);
+            gpio_set_level(cfg->microstep_m2_gpio, 0);
+            break;
+        }
+        case MICROSTEP_1_16: {
+            gpio_set_level(cfg->microstep_m0_gpio, 0);
+            gpio_set_level(cfg->microstep_m1_gpio, 0);
+            gpio_set_level(cfg->microstep_m2_gpio, 1);
+            break;
+        }
+        case MICROSTEP_1_32: {
+            gpio_set_level(cfg->microstep_m0_gpio, 1);
+            gpio_set_level(cfg->microstep_m1_gpio, 0);
+            gpio_set_level(cfg->microstep_m2_gpio, 1);
+            break;
+        }
+        default: {
+          ESP_LOGE(TAG, "You set the microstepping_mode to invalid value (%d)", cfg->microstepping_mode);
+          return ESP_ERR_INVALID_ARG;
+        }
+    }
 
     // Configure LEDC timer
     // Start off at lowest possible speed.
