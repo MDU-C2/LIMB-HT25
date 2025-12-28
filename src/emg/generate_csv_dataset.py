@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import os
 import glob
-from emg_processing_utils import extract_time_domain_features, create_sequences
+from .emg_processing_utils import extract_time_domain_features, create_sequences
 
 # CONSTANTS from data collection code
 WINDOWS_PER_CAPTURE = 80
@@ -73,16 +73,11 @@ def process_csv_file(csv_path, num_channels, seq_len):
     """
     # Load windows
     windows = load_csv_file(csv_path)
-
-    # TODO: Reshape based on actual channel configuration
-    # Option 1, if 8 channels: reshape to (80, 8, 50)
-    # Option 2, if 2 channels: reshape to (80, 2, 200)
-    # Option 3: if 1 channel: reshape to (80, 1, 400)
-
+    
     # Segment windows
     segmented = segment_windows(windows)
-    window_data = np.array([w[0] for w in segmented]) # Shape (80, 400)
-    labels = np.array([w[1] for w in segmented]) # Shape (80,)
+    window_data = np.array([w[0] for w in segmented]) # Shape (80, 400) = (num_windows, num_samples_per_window)
+    labels = np.array([w[1] for w in segmented]) # Shape (80,) = (num_windows,)
 
     # Extract time domain features for each window
     features = extract_time_domain_features(window_data, num_channels)
@@ -97,11 +92,14 @@ def process_csv_file(csv_path, num_channels, seq_len):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate EMG sequence dataset from CSV files.")
+    # Default path relative to script location
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_data_path = os.path.join(script_dir, "data", "raw_data")
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/raw_data",
-        help="Path to raw_data folder containing subject folders"
+        default=default_data_path,
+        help="Path to raw_data folder containing subject folders (default: relative to script location)"
     )
     parser.add_argument(
         "--channel",
@@ -112,7 +110,7 @@ def main():
     parser.add_argument(
         "--num-channels",
         type=int,
-        default=8,
+        default=1,
         help="Number of EMG channels (for reshaping 400 samples)"
     )
     parser.add_argument(
@@ -125,7 +123,7 @@ def main():
         "--subjects",
         type=str,
         nargs="+",
-        default=None,
+        default=["S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7"],
         help="List of subjects to process (default: all S0-S7)"
     )
     parser.add_argument(
@@ -137,18 +135,15 @@ def main():
     
     args = parser.parse_args()
 
-    # Determine subjects to process
-    if args.subjects is None:
-        subjects = [f"S{i}" for i in range(0, 8)]
-    else:
-        subjects = args.subjects
-
-    # Determine output filename
+    subjects = args.subjects
+    
+    # Resolve data path to absolute path for clarity
+    data_path = os.path.abspath(args.data_path)
+    print(f"Looking for data in: {data_path}")
+    
     if args.output is None:
         if args.channel is None:
-            output_filename = f"emg_sequences_ch{args.channel}.npz"
-        else:
-            output_filename = f"emg_sequences_all.npz"
+            output_filename = f"emg_sequences_ch{args.channel}.npz" if args.channel is not None else "emg_sequences_all.npz"
     else:
         output_filename = args.output
 
@@ -157,10 +152,10 @@ def main():
     all_sequences_y = []
 
     for subject_id in subjects:
-        subject_path = os.path.join(args.data_path, subject_id)
+        subject_path = os.path.join(data_path, subject_id)
         csv_files = glob.glob(os.path.join(subject_path, "*.csv"))
 
-        print(f"\nProcessing {subject_id}: {len(csv_files)} CSV files found")
+        print(f"\nProcessing {subject_id}: {len(csv_files)} CSV files found in {subject_path}")
 
         for csv_file in csv_files:
             X, y = process_csv_file(csv_file, args.num_channels, args.seq_len)
@@ -173,7 +168,11 @@ def main():
         X_final = np.vstack(all_sequences_X)
         y_final = np.concatenate(all_sequences_y)
 
-        output_path = os.path.join(os.path.dirname(__file__), output_filename)
+        # Save to data/processed_data directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        processed_data_dir = os.path.join(script_dir, "data", "processed_data")
+        os.makedirs(processed_data_dir, exist_ok=True)
+        output_path = os.path.join(processed_data_dir, output_filename)
         np.savez(output_path, X=X_final, y=y_final)
 
         print(f"\n{'='*70}")
