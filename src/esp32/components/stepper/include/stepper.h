@@ -7,6 +7,11 @@
 #include "limb_utils.h"
 #include "potentiometer.h"
 
+typedef enum {
+    STEPPER_DIR_NORMAL,
+    STEPPER_DIR_REVERSE,
+} StepperDirection;
+
 // Stepper motor control configuration
 typedef struct {
     // GPIO pins
@@ -17,6 +22,7 @@ typedef struct {
     // Motor parameters
     uint16_t steps_per_rev;       // Steps per motor revolution (e.g., 200 for 1.8° stepper)
     float gear_ratio;             // Gear reduction ratio (e.g., 10.0 for 10:1 reduction)
+    StepperDirection direction;   // If you want to reverse the direction or not.
     
     // Motion limits (in degrees per second)
     AngularVelocity max_velocity;       // Maximum velocity (degrees/sec)

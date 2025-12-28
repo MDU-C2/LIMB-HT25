@@ -43,6 +43,7 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
     .step_gpio = STEPPER_ELBOW_STEP_PIN,
     .dir_gpio = STEPPER_ELBOW_DIR_PIN,
     .enable_gpio = STEPPER_ELBOW_ENABLE_PIN,
+    .direction = STEPPER_DIR_NORMAL,
     .steps_per_rev = 200,
     .gear_ratio = 1.0F,
     .max_velocity = {90.0F},

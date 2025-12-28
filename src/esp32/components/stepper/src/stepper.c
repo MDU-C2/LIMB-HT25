@@ -82,7 +82,15 @@ static void apply_motor_velocity(stepper_control_handle_t handle, AngularVelocit
 
     // Direction control
     if (ctx->cfg.dir_gpio != GPIO_NUM_NC) {
-        gpio_set_level(ctx->cfg.dir_gpio, (velocity.dps > 0.0F) ? 1 : 0);
+
+        uint8_t direction = velocity.dps < 0.0F ? 1 : 0;
+
+        // Swap the direction if we're in reverse mode.
+        if (ctx->cfg.direction == STEPPER_DIR_REVERSE) {
+            direction = !direction;
+        }
+
+        gpio_set_level(ctx->cfg.dir_gpio, direction);
     }
 
     float velocity_sps = roundf(velocity.dps * ctx->steps_per_degree);
