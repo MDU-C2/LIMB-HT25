@@ -33,8 +33,6 @@ typedef struct {
     portMUX_TYPE spinlock;
 
     // LEDC config
-    ledc_timer_t ledc_timer;
-    ledc_channel_t ledc_channel;
     uint32_t duty_50_percent;
 
     // Motion state
@@ -61,8 +59,8 @@ static void stop_motor(stepper_control_handle_t handle)
 {
     motion_control_context_t *ctx = &s_contexts[handle];
 
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel, 0);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, 0);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
     if (ctx->cfg.enable_gpio != GPIO_NUM_NC) {
         gpio_set_level(ctx->cfg.enable_gpio, 1); // Disable (active low)
     }
@@ -103,9 +101,9 @@ static void apply_motor_velocity(stepper_control_handle_t handle, AngularVelocit
     uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), MIN_FREQ_HZ);
     
     // Update frequency and duty
-    ledc_set_freq(LEDC_LOW_SPEED_MODE, ctx->ledc_timer, freq_hz);
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel, ctx->duty_50_percent);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->ledc_channel);
+    ledc_set_freq(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_timer, freq_hz);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, ctx->duty_50_percent);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
 }
 
 // Initialization
@@ -229,22 +227,20 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg, const uint16_t *late
         // For some reason, the LEDC library doesn't like setting a duty
         // resolution below 14 bits if the frequency is at its minimum of 5 Hz.
         .duty_resolution = LEDC_TIMER_14_BIT,
-        .timer_num = LEDC_TIMER_0,
+        .timer_num = cfg->pwm_timer,
         .freq_hz = init_freq_hz,
         .clk_cfg = LEDC_USE_APB_CLK,
     };
     ESP_RETURN_ON_ERROR(ledc_timer_config(&timer_cfg), TAG, "Failed to configure LEDC timer");
 
     // Configure LEDC channel for STEP output
-    ctx.ledc_timer = LEDC_TIMER_0;
-    ctx.ledc_channel = cfg->pwm_channel;
     ctx.duty_50_percent = (1 << (timer_cfg.duty_resolution - 1)); // 50% duty for set duty resolution
     
     ledc_channel_config_t channel_cfg = {
         .gpio_num = cfg->step_gpio,
         .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = ctx.ledc_channel,
-        .timer_sel = ctx.ledc_timer,
+        .channel = cfg->pwm_channel,
+        .timer_sel = cfg->pwm_timer,
         .duty = 0, // IDLE (no pulses)
         .hpoint = 0,
     };

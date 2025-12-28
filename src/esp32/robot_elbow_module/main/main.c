@@ -35,8 +35,9 @@ enum {
     // ADC channels
     ADC_ELBOW_CHANNEL = ADC_CHANNEL_0, // GPIO 0
 
-    // PWM channels
+    // PWM timers and channels
     PWM_ELBOW_CHANNEL = LEDC_CHANNEL_0,
+    PWM_ELBOW_TIMER = LEDC_TIMER_0,
 };
 
 // Stepper configurations
@@ -59,6 +60,7 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
     .max_accel = {100.0F},
     .pot_adc_channel = ADC_ELBOW_CHANNEL,
     .pwm_channel = PWM_ELBOW_CHANNEL,
+    .pwm_timer = PWM_ELBOW_TIMER,
     .potentiometer = (Potentiometer) {
         .degrees_of_motion = {285.F},
         // TODO(Johan): Figure out which values to use through measurements.

@@ -48,9 +48,10 @@ typedef struct {
     adc_channel_t pot_adc_channel; // ADC channel for potentiometer (use -1 or value >= SOC_ADC_MAX_CHANNEL_NUM if not used)
     Potentiometer potentiometer; // The potentiometer configuration/calibration used with the stepper.
 
-    // The caller has to provide the PWM channel to use (since other
-    // components might use some of the channels).
+    // The caller has to provide the PWM channel and timer to use (since other
+    // components might also want to use PWM).
     ledc_channel_t pwm_channel;
+    ledc_timer_t pwm_timer;
 } stepper_control_config_t;
 
 typedef ledc_channel_t stepper_control_handle_t;
