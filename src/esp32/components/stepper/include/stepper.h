@@ -41,7 +41,6 @@ typedef struct {
     
     // Motion limits (in degrees per second)
     AngularVelocity max_velocity;       // Maximum velocity (degrees/sec)
-    AngularVelocity min_velocity;       // Minimum velocity (degrees/sec)
     AngularAcceleration max_accel;         // Maximum acceleration (degrees/sec²)
     
     // Position feedback

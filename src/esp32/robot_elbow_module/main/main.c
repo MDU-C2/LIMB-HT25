@@ -56,7 +56,6 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
     .steps_per_rev = 200,
     .gear_ratio = 1.0F,
     .max_velocity = {90.0F},
-    .min_velocity = {1.0F},
     .max_accel = {100.0F},
     .pot_adc_channel = ADC_ELBOW_CHANNEL,
     .pwm_channel = PWM_ELBOW_CHANNEL,
