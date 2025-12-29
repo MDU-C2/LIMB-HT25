@@ -33,11 +33,18 @@ class InputLayer(Process):
 
         # Store latest sensor values (from CAN)
         # Pressure: dictionary to accumulate individual finger values
-        # Keys: 'thumb', 'index', 'middle', 'ring', 'little'
+        # Keys: 'thumb', 'index', 'middle', 'ring', 'pinky'
         self.pressure_values = {}  # Dict[str, float] - individual finger pressure values
-        self.latest_pressure = None      # List[float] - 5 finger values [thumb, index, middle, ring, little]
+        self.latest_pressure = None      # List[float] - 5 finger values [thumb, index, middle, ring, pinky]
         self.latest_motor_state = None   # MotorState object
         self.latest_robot_imu = None     # Dict[str, np.ndarray] - {'data': [ax, ay, az, wx, wy, wz]}
+        
+        # Buffer for robot IMU data (gyro and accel come separately)
+        # Format: {source: {"gyro": [gx, gy, gz], "accel": [ax, ay, az]}}
+        self.robot_imu_buffer = {}  # Store latest gyro/accel by source (e.g., "robot_hand")
+        
+        # Track gripper state (from actuation commands we send)
+        self.gripper_state = {"open": True, "force": 0.0}
 
     def run(self):
         """Main process loop"""
@@ -62,62 +69,73 @@ class InputLayer(Process):
                         self.window_buffer.add_piezo(piezo_value, sample.timestamp)
 
             # Read CAN messages (non-blocking)
-            can_messages = self.can_interface.read() # Maybe read all? Is it a list or a dict?
+            can_messages = self.can_interface.read()
             for msg in can_messages: 
-                # TODO: EMG and IMU and other sensors have different sample rates, do we need to handle this somehow?
+                # Skip messages with errors
+                if not msg.parsed_data or "error" in msg.parsed_data:
+                    continue
+                
+                msg_type = msg.message_type
+                if not msg_type:
+                    continue
 
-                if msg.message_type == "IMU":  # IMU from robot
-                    # CAN parser returns: {'data': [ax, ay, az, wx, wy, wz]}
-                    if msg.parsed_data and "data" in msg.parsed_data:
-                        self.latest_robot_imu = {"data": msg.parsed_data["data"], "timestamp": msg.timestamp}
+                # Handle robot IMU messages (separate gyro and accel)
+                if msg_type.endswith("_imu_gyro") or msg_type.endswith("_imu_accel"):
+                    source = msg.parsed_data.get("source", "unknown")
+                    if source not in self.robot_imu_buffer:
+                        self.robot_imu_buffer[source] = {}
+                    
+                    if msg_type.endswith("_imu_gyro"):
+                        self.robot_imu_buffer[source]["gyro"] = msg.parsed_data["data"]
+                    elif msg_type.endswith("_imu_accel"):
+                        self.robot_imu_buffer[source]["accel"] = msg.parsed_data["data"]
+                    
+                    # Combine gyro + accel when both are available (for robot hand IMU)
+                    # Robot hand IMU is used for fusion, so prioritize that
+                    if source == "robot_hand" and "gyro" in self.robot_imu_buffer[source] and "accel" in self.robot_imu_buffer[source]:
+                        gyro = self.robot_imu_buffer[source]["gyro"]
+                        accel = self.robot_imu_buffer[source]["accel"]
+                        # Format: [ax, ay, az, wx, wy, wz] - accel first, then gyro
+                        combined = accel + gyro
+                        self.latest_robot_imu = {"data": combined, "timestamp": msg.timestamp}
 
-                elif msg.message_type.startswith("pressure_"):
-                    # Handle individual finger pressure messages
-                    # CAN parser returns: {'value': float, 'finger': 'thumb'|'index'|'middle'|'ring'|'little'}
-                    if msg.parsed_data and "value" in msg.parsed_data and "finger" in msg.parsed_data:
-                        finger_name = msg.parsed_data["finger"]
-                        pressure_value = msg.parsed_data["value"]
+                # Handle pressure sensor messages
+                elif msg_type.endswith("_pressure"):
+                    finger_name = msg.parsed_data.get("finger")
+                    pressure_value = msg.parsed_data.get("value")
+                    if finger_name and pressure_value is not None:
                         self.pressure_values[finger_name] = pressure_value
                         
                         # Update latest_pressure list when we have all 5 fingers
-                        # Order: [thumb, index, middle, ring, little]
-                        finger_order = ['thumb', 'index', 'middle', 'ring', 'little']
+                        # Order: [thumb, index, middle, ring, pinky]
+                        finger_order = ['thumb', 'index', 'middle', 'ring', 'pinky']
                         if all(f in self.pressure_values for f in finger_order):
                             self.latest_pressure = [self.pressure_values[f] for f in finger_order]
 
-                elif msg.message_type == "motor_status":
-                    # Store latest motor state
-                    # CAN parser returns: {'joint_positions': [j1, j2, j3, j4, j5]} # TODO: Clarify what joint correspond to what part of the arm
-                    if msg.parsed_data:
-                        from shared.models.packet import MotorState
-                        positions = msg.parsed_data.get("joint_positions", [])
-                        # Ensure we have 5 joint positions
-                        if len(positions) == 5:
-                            self.latest_motor_state = MotorState(
-                                joint_positions=np.array(positions),
-                                gripper_state={},  # Will be updated from gripper_status
-                                timestamp=msg.timestamp
-                            )
+                # Handle potentiometer messages (could be used for joint positions)
+                # Note: Potentiometers may not directly map to joint positions, but we can use them
+                # as a fallback if motor_status is not available
+                elif "potentiometer" in msg_type:
+                    # Potentiometers give position feedback for specific joints
+                    # We could potentially use these to reconstruct joint positions
+                    # For now, we'll skip them as they may not map directly to our 5-joint model
+                    pass
 
-                elif msg.message_type == "gripper_status":
-                    # Update gripper state in motor_state
-                    # CAN parser returns: {'state': int, 'force': float}
-                    if self.latest_motor_state and msg.parsed_data:
-                        self.latest_motor_state.gripper_state = {
-                            "open": msg.parsed_data.get("state", 0) == 1,
-                            "force": msg.parsed_data.get("force", 0.0)
-                        }
-                    elif msg.parsed_data:
-                        # If no motor_state exists yet, create one with default joint positions
-                        from shared.models.packet import MotorState
-                        self.latest_motor_state = MotorState(
-                            joint_positions=np.array([0.0] * 5),
-                            gripper_state={
-                                "open": msg.parsed_data.get("state", 0) == 1,
-                                "force": msg.parsed_data.get("force", 0.0)
-                            },
-                            timestamp=msg.timestamp
-                        )
+                # Note: motor_status and gripper_status messages no longer exist in the new CAN protocol
+                # Joint positions would need to come from potentiometers or be tracked internally
+                # Gripper state is tracked from commands we send (robot_hand_set_grip_state)
+                
+                # Update motor_state with gripper state (from our tracked state)
+                if self.latest_motor_state:
+                    self.latest_motor_state.gripper_state = self.gripper_state.copy()
+                else:
+                    # Create default motor state if it doesn't exist
+                    from shared.models.packet import MotorState
+                    self.latest_motor_state = MotorState(
+                        joint_positions=np.array([0.0] * 5),  # Default positions
+                        gripper_state=self.gripper_state.copy(),
+                        timestamp=time.time()
+                    )
 
             # Create packet (only when window buffer is full)
             if self.window_buffer.is_full():

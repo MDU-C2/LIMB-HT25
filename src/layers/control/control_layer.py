@@ -13,8 +13,8 @@ class ControlLayer(Process):
     Control layer: decision making, control signals.
     
     This layer computes arm commands based on processed sensor data and ML predictions.
-    Note: Gripper control is handled locally on ESP32, not in this layer.
-    We only receive gripper_status via CAN to monitor the current gripper state.
+    Note: Gripper control commands are sent via CAN (robot_hand_set_grip_state).
+    Gripper state is tracked internally from commands sent, as there is no status feedback message.
     """
 
     def __init__(self, input_queue: DataQueue, can_interface, control_rate, config: Optional[Dict] = None):
@@ -42,6 +42,9 @@ class ControlLayer(Process):
         self.state_entry_time = time.time()
         self.last_cls = None
         self.grip_command_sent = False
+        
+        # Track gripper state (since there's no status feedback message)
+        self.gripper_state = {"open": True, "force": 0.0}
         
         # Configurable parameters
         self.conf_threshold = config.get("conf_threshold", 0.5)  # LSTM confidence threshold
@@ -135,8 +138,8 @@ class ControlLayer(Process):
         This is where the control logic lives. It takes the processed packet (with ML predictions, sensor data, motor states)
         and decides what the actuators should do.
         
-        Note: Only arm commands are computed here. Gripper control is handled locally on ESP32,
-        and we only receive gripper_status via CAN to monitor the current gripper state.
+        Note: Arm commands are sent as separate actuation messages per joint.
+        Gripper commands are sent via robot_hand_set_grip_state message.
         """
         commands = {}
 
@@ -166,7 +169,7 @@ class ControlLayer(Process):
 
     def _send_commands(self, commands):
         """
-        Send the release command to ESP32 via CAN
+        Send commands to ESP32 via CAN
         """
         if not commands:
             return
@@ -177,15 +180,21 @@ class ControlLayer(Process):
             joint_positions = arm_cmd.get("joint_positions")
 
             if joint_positions:
-                encoded = self._encode_arm_command(joint_positions)
-                if encoded:
-                    can_id, data = encoded
-                    success = self.can_interface.send(can_id, data)
-                    if success:
-                        print(f"[Control Layer] Sent arm command: {joint_positions}")
+                # Encode and send each joint command separately
+                encoded_commands = self._encode_arm_command(joint_positions)
+                if encoded_commands:
+                    success_count = 0
+                    for can_id, data in encoded_commands:
+                        success = self.can_interface.send(can_id, data)
+                        if success:
+                            success_count += 1
+                        else:
+                            print(f"[Control Layer] Failed to send joint command (ID: 0x{can_id:X})")
+                    
+                    if success_count > 0:
+                        print(f"[Control Layer] Sent {success_count}/{len(encoded_commands)} arm joint commands")
                     else:
-                        print(f"[Control Layer] Failed to send arm command")
-
+                        print(f"[Control Layer] Failed to send all arm commands")
                 else:
                     print(f"[Control Layer] Failed to encode arm command")
 
@@ -201,6 +210,9 @@ class ControlLayer(Process):
                     can_id, data = encoded
                     success = self.can_interface.send(can_id, data)
                     if success:
+                        # Update tracked gripper state
+                        self.gripper_state["open"] = (action.lower() == "open")
+                        self.gripper_state["force"] = force
                         print(f"[Control Layer] Sent gripper command: {action} with force {force}")
                     else:
                         print(f"[Control Layer] Failed to send gripper command")
@@ -454,17 +466,31 @@ class ControlLayer(Process):
         return distance < placement_threshold
 
     def _check_stable_grip(self, gripper_state) -> bool:
-        """Check if the grip is stable. Called in Gripping state before transition to Carrying state."""
-
-        # Check if gripper state indicates stable grip, ESP32 processes data and sends back a flag.
-        if gripper_state:
-            # Format {"open": bool, "force": float, "stable": bool}
-            if gripper_state.get("stable"):
-                return True
-            else:
-                return False
-                
-        return False # Default to False if gripper state is not available
+        """
+        Check if the grip is stable. Called in Gripping state before transition to Carrying state.
+        
+        Since there's no gripper_status message in the new CAN protocol, we check:
+        - Gripper is closed (not open)
+        - Force is above a threshold
+        - Some time has passed since grip command was sent (allowing ESP32 to stabilize)
+        """
+        if not gripper_state:
+            return False
+        
+        # Check if gripper is closed and has sufficient force
+        is_closed = not gripper_state.get("open", True)
+        force = gripper_state.get("force", 0.0)
+        force_threshold = 0.3  # Minimum force to consider grip stable
+        
+        # Also check that some time has passed since grip command
+        # (allows ESP32 to process and stabilize)
+        time_since_grip = time.time() - self.state_entry_time
+        min_stabilization_time = 0.5  # seconds
+        
+        if is_closed and force >= force_threshold and time_since_grip >= min_stabilization_time:
+            return True
+        
+        return False
 
     def _get_movement_direction(self, movement_intention) -> Optional[str]:
         """Get the movement direction based on the intention from the user"""
@@ -661,25 +687,52 @@ class ControlLayer(Process):
         }
 
     def _encode_gripper_command(self, action: str, force: float) -> Tuple[int, bytes]:
-        """Encode the gripper command"""
-        # Convert actio string to byte: 0 = open, 1 = close
-        action_byte = 1 if action.lower() == "close" else 0
+        """Encode the gripper command using robot_hand_set_grip_state"""
+        # Convert action string to byte: 0 = open, 1 = close
+        state_byte = 1 if action.lower() == "close" else 0
 
         # Clamp force to valid range
         force = max(0.0, min(1.0, force))
 
-        # Use CANMessageParser to encode
-        result = self.can_parser.encode("gripper_command", {"action": action_byte, "force": force})
+        # Use CANMessageParser to encode with new message type
+        result = self.can_parser.encode("robot_hand_set_grip_state", {"state": state_byte, "force": force})
         return result
     
-    def _encode_arm_command(self, joint_positions: List[float]) -> Tuple[int, bytes]:
-        """Encode the arm command"""
+    def _encode_arm_command(self, joint_positions: List[float]) -> Optional[List[Tuple[int, bytes]]]:
+        """
+        Encode the arm command as separate actuation messages for each joint.
+        
+        Returns a list of (can_id, data) tuples, one for each joint.
+        Joint mapping:
+        - Joint 0: shoulder_up_down
+        - Joint 1: shoulder_left_right  
+        - Joint 2: elbow_up_down
+        - Joint 3: upper_arm_rotation
+        - Joint 4: lower_arm_rotation
+        """
         if not joint_positions or len(joint_positions) != 5:
             return None
 
-        # Use CANMessageParser to encode
-        result = self.can_parser.encode("arm_command", {"joint_positions": joint_positions})
-        return result
+        # Map joint indices to actuation message types
+        joint_to_actuation = {
+            0: "robot_shoulder_up_down_actuation",
+            1: "robot_shoulder_left_right_actuation",
+            2: "robot_elbow_up_down_actuation",
+            3: "robot_upper_arm_rotation_actuation",
+            4: "robot_lower_arm_rotation_actuation",
+        }
+
+        encoded_commands = []
+        for joint_idx, position in enumerate(joint_positions):
+            msg_type = joint_to_actuation.get(joint_idx)
+            if msg_type:
+                result = self.can_parser.encode(msg_type, {"value": position})
+                if result:
+                    encoded_commands.append(result)
+                else:
+                    print(f"[Control Layer] Failed to encode joint {joint_idx} command")
+        
+        return encoded_commands if encoded_commands else None
 
     def _send_release_command(self):
         """Send the release command via CAN"""
@@ -690,6 +743,9 @@ class ControlLayer(Process):
             success = self.can_interface.send(can_id, data)
             if success:
                 self.grip_command_sent = False
+                # Update tracked gripper state
+                self.gripper_state["open"] = True
+                self.gripper_state["force"] = 0.0
                 print(f"[Control Layer] Release command sent via CAN")
             else:
                 print(f"[Control Layer] Failed to send release command")

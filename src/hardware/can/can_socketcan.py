@@ -5,8 +5,6 @@ from typing import List, Optional
 from .can_interface import CANInterface, CANMessage
 from .can_message_parser import CANMessageParser
 
-# TODO: Add requirements file for python-can
-
 class SocketCANInterface(CANInterface):
     """
     CAN interface using Linux SocketCAN (for Jetson Orin).
@@ -82,8 +80,8 @@ class SocketCANInterface(CANInterface):
                 # Parse message based on its ID
                 parsed = self.message_parser.parse(can_msg)
                 # Store parsed data as attributes (using setattr for compatibility)
-                setattr(can_msg, 'message_type', parsed.get("type"))
-                setattr(can_msg, 'parsed_data', parsed.get("data"))
+                setattr(can_msg, 'message_type', parsed.get("message_type"))
+                setattr(can_msg, 'parsed_data', parsed.get("parsed_data"))
 
                 messages.append(can_msg)
                 self.rx_count += 1

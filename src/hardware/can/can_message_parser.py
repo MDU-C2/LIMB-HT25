@@ -1,3 +1,4 @@
+from re import M
 from .can_interface import CANMessage
 import struct
 from typing import Dict, Optional
@@ -7,119 +8,179 @@ class CANMessageParser:
     Parser for CAN messages.
     """
 
-    # TODO: Change these to the actual IDs that we are using
+    # CAN IDs matching can_driver.h CanMessageId enum exactly
     CAN_IDS = {
-        # Sensor messages (from ESP32 nodes)
-        0x100: {"type": "EMG", "format": "<2f"},        # 2 EMG channels (#TODO: float32? int16?)
-        0x101: {"type": "IMU", "format": "<6f"},         # IMU: [ax, ay, az, gx, gy, gz]
-        # Pressure sensors - one message per finger
-        0x102: {"type": "pressure_thumb", "format": "<f"},     # thumb pressure (float32)
-        0x103: {"type": "pressure_index", "format": "<f"},     # index finger pressure (float32)
-        0x104: {"type": "pressure_middle", "format": "<f"},    # middle finger pressure (float32)
-        0x105: {"type": "pressure_ring", "format": "<f"},      # ring finger pressure (float32)
-        0x106: {"type": "pressure_little", "format": "<f"},    # little/pinky finger pressure (float32)
-        #0x107: {"type": "potentiometer", "format": "<f"}, # potentiometer (float32)
-        
-        # Actuator messages (to ESP32 nodes)
-        0x200: {"type": "gripper_command", "format": "<Bf"},    # [action, force]
-        0x201: {"type": "arm_command", "format": "<5f"},        # [joint1, joint2, joint3, joint4, joint5]
-        0x202: {"type": "motor_command", "format": "<Bf"},      # Motor control
+        # Stop messages
+        0x120: {"type": "robot_shoulder_up_down_stop", "format": None},
+        0x121: {"type": "robot_shoulder_left_right_stop", "format": None},
+        0x140: {"type": "robot_elbow_up_down_stop", "format": None},
+        0x141: {"type": "robot_upper_arm_rotation_stop", "format": None},
+        0x160: {"type": "robot_lower_arm_rotation_stop", "format": None},
+        0x161: {"type": "robot_fingers_stop", "format": None},
+        0x162: {"type": "robot_thumb_stop", "format": None},
+        0x163: {"type": "robot_index_stop", "format": None},
+        0x164: {"type": "robot_middle_stop", "format": None},
+        0x165: {"type": "robot_ring_stop", "format": None},
+        0x166: {"type": "robot_pinky_stop", "format": None},
 
-        # Status messages 
-        0x300: {"type": "motor_status", "format": "<5f"},    # [positions]
-        0x301: {"type": "gripper_status", "format": "<Bf"},    # [state, force]
+        # Actuation messages
+        0x220: {"type": "robot_shoulder_up_down_actuation", "format": "<f"},  # float32: position/velocity
+        0x221: {"type": "robot_shoulder_left_right_actuation", "format": "<f"},
+        0x240: {"type": "robot_elbow_up_down_actuation", "format": "<f"},
+        0x241: {"type": "robot_upper_arm_rotation_actuation", "format": "<f"},
+        0x260: {"type": "robot_lower_arm_rotation_actuation", "format": "<f"},
+        0x261: {"type": "robot_thumb_actuation", "format": "<f"},
+        0x262: {"type": "robot_index_actuation", "format": "<f"},
+        0x263: {"type": "robot_middle_actuation", "format": "<f"},
+        0x264: {"type": "robot_ring_actuation", "format": "<f"},
+        0x265: {"type": "robot_pinky_actuation", "format": "<f"},
+        0x266: {"type": "robot_hand_set_grip_state", "format": "<Bf"},  # [state (uint8), force (float32)]
+
+        # Potentiometer messages
+        0x4A0: {"type": "robot_elbow_up_down_potentiometer", "format": "<f"},
+        0x4A1: {"type": "robot_upper_arm_rotation_potentiometer", "format": "<f"},
+        0x4A2: {"type": "robot_shoulder_up_down_potentiometer", "format": "<f"},
+        0x4A3: {"type": "robot_shoulder_left_right_potentiometer", "format": "<f"},
+
+        # IMU messages (robot)
+        0x5A0: {"type": "robot_shoulder_imu_gyro", "format": "<3f"},  # [gx, gy, gz]
+        0x5A1: {"type": "robot_shoulder_imu_accel", "format": "<3f"},  # [ax, ay, az]
+        0x5A2: {"type": "robot_elbow_imu_gyro", "format": "<3f"},
+        0x5A3: {"type": "robot_elbow_imu_accel", "format": "<3f"},
+        0x5A4: {"type": "robot_hand_imu_gyro", "format": "<3f"},
+        0x5A5: {"type": "robot_hand_imu_accel", "format": "<3f"},
+
+        # Pressure sensor messages
+        0x7A0: {"type": "robot_thumb_pressure", "format": "<f"},
+        0x7A1: {"type": "robot_index_pressure", "format": "<f"},
+        0x7A2: {"type": "robot_middle_pressure", "format": "<f"},
+        0x7A3: {"type": "robot_ring_pressure", "format": "<f"},
+        0x7A4: {"type": "robot_pinky_pressure", "format": "<f"},
+
+        # Human EMG message
+        0x3C0: {"type": "human_upper_arm_emg", "format": "<2f"},  # 2 EMG channels
+
+        # Human IMU messages
+        0x5C0: {"type": "human_upper_arm_imu_gyro", "format": "<3f"},  # [gx, gy, gz]
+        0x5C1: {"type": "human_upper_arm_imu_accel", "format": "<3f"},  # [ax, ay, az]
     }
 
     def parse(self, message: CANMessage) -> CANMessage:
         """Parse a CAN message based on its ID."""
         can_id = message.can_id
 
-        # Check ig we know this CAN ID:
+        # Check if we know this CAN ID
         if can_id not in self.CAN_IDS:
             return {
-                "type": "unknown",
-                "data": {"raw": message.data.hex(), "can_id": can_id}
+                "message_type": "unknown",
+                "parsed_data": {"raw": message.data.hex(), "can_id": can_id}
             }
+
         msg_info = self.CAN_IDS[can_id]
         msg_type = msg_info["type"]
         fmt = msg_info.get("format")
 
         try:
             if fmt and len(message.data) > 0:
-
                 expected_size = struct.calcsize(fmt)
                 if len(message.data) != expected_size:
                     return {
-                        "type": msg_type,
-                        "data": {"error": f"Data too short: got {len(message.data)} bytes, expected {expected_size}", "raw": message.data.hex()}
+                        "message_type": msg_type,
+                        "parsed_data": {
+                            "error": f"Data size mismatch: got {len(message.data)} bytes, expected {expected_size}",
+                            "raw": message.data.hex()
+                        }
                     }
-                
                 parsed_data = struct.unpack(fmt, message.data[:expected_size])
                 data_dict = self._format_parsed_data(msg_type, parsed_data)
-
             else:
+                # No format specified, (e.g. stop messages) - return raw data
                 data_dict = {"raw": message.data.hex()}
 
             return {
-                "type": msg_type,
-                "data": data_dict
+                "message_type": msg_type,
+                "parsed_data":data_dict
             }
-
         except struct.error as e:
             return {
-                'type': msg_type,
-                'data': {'error': f'Parse error: {e}', 'raw': message.data.hex()}
+                "message_type": msg_type,
+                "parsed_data": {"error": f"Parse error {e}", "raw": message.data.hex()}
             }
 
     def _format_parsed_data(self, msg_type, parsed) -> Dict:
         """Format parsed data into a meaningful dictionary."""
 
-        if msg_type == 'EMG':
+        # Human EMG
+        if msg_type == "human_upper_arm_emg":
             return {
-                'channels': list(parsed),  # [ch0, ch1, ch2, ch3] TODO: Adapt for the number of channels we use (2 I think)
-                'channel_count': len(parsed) 
+                "channels": list(parsed), # [ch0] for single channel, [ch0, ch1] for dual channel
+                "channel_count": len(parsed)
             }
         
-        elif msg_type == 'IMU':
+        # Human IMU
+        elif msg_type == "human_upper_arm_imu_gyro":
             return {
-                'data': list(parsed) # [ax, ay, az, wx, wy, wz]
+                "data": list(parsed), # [gx, gy, gz]
+                "type": "gyro"
+            }
+        elif msg_type == "human_upper_arm_imu_accel":
+            return {
+                "data": list(parsed), # [ax, ay, az]
+                "type": "accel"
             }
         
-        elif msg_type in ['pressure_thumb', 'pressure_index', 'pressure_middle', 'pressure_ring', 'pressure_little']:
-            # Extract finger name from message type (e.g., 'pressure_thumb' -> 'thumb')
-            finger_name = msg_type.replace('pressure_', '')
+        # Robot IMU
+        elif msg_type.endswith("_imu_gyro"):
             return {
-                "value": parsed[0],  # Single float value
-                "finger": finger_name  # 'thumb', 'index', 'middle', 'ring', or 'little'
+                "data": list(parsed), # [gx, gy, gz]
+                "type": "gyro",
+                "source": msg_type.replace("_imu_gyro", "")
+            }
+
+        elif msg_type.endswith("_imu_accel"):
+            return {
+                "data": list(parsed), # [ax, ay, az]
+                "type": "accel",
+                "source": msg_type.replace("_imu_accel", "")
+            }
+
+        # Pressure sensors
+        elif msg_type.endswith("_pressure"):
+            finger_name = msg_type.replace("robot_", "").replace("_pressure", "")
+            return {
+                "value": parsed[0], # single float value
+                "finger": finger_name # thumb, index, middle, ring, pinky
             }
         
-        #elif msg_type == 'potentiometer':
-        #    return {'value': parsed[0]}
-        
-        elif msg_type == 'gripper_command':
+        # Potentiometer messages
+        elif "potentiometer" in msg_type:
             return {
-                'action': parsed[0],  # 0=open, 1=close, 2=set_force TODO: Change this I suppose...
-                'force': parsed[1]
+                "value": parsed[0], # single float value
+                "source": msg_type.replace("robot_", "").replace("_potentiometer", "")
             }
+
+        # Actuation messages
+        elif "actuation" in msg_type:
+            if msg_type == "robot_hand_set_grip_state":
+                return {
+                    "state": parsed[0], # uint8, 0 = open, 1 = close
+                    "force": parsed[1] # float32 value between 0.0 and 1.0
+                }
+            else:
+                return {
+                    "value": parsed[0], # single float value
+                    "source": msg_type.replace("robot_", "").replace("_actuation", "")
+                }
         
-        elif msg_type == 'arm_command':
+        # Stop messages (no data, just acknowledgement)
+        elif "stop" in msg_type:
             return {
-                'joint_positions': list(parsed)
-            }
-        
-        elif msg_type == 'motor_status':
-            return {
-                'joint_positions': list(parsed)
-            }
-        
-        elif msg_type == 'gripper_status':
-            return {
-                'state': parsed[0],
-                'force': parsed[1]
+                "acknowledged": True,
+                "actuator": msg_type.replace("robot_", "").replace("_stop", "")
             }
         
         else:
-            return {'values': list(parsed)}
+            return {"values": list(parsed)}
 
     def encode(self, msg_type: str, data: Dict) -> Optional[tuple]:
         """Encode data dict into CAN message format."""
@@ -132,18 +193,24 @@ class CANMessageParser:
         
         if can_id is None:
             return None
-        
+
         fmt = self.CAN_IDS[can_id].get("format")
         if not fmt:
-            return None
+            return (can_id, b"") # Stop messages or messages without format
         
         try:
-            if msg_type == "gripper_command":
-                values = (data["action"], data["force"])
-            elif msg_type == "arm_command":
-                values = tuple(data["joint_positions"])
-            elif msg_type == "motor_command":
-                values = (data["motor_id"], data["value"])
+            if msg_type == "robot_hand_set_grip_state":
+                values = (data["state"], data["force"])
+            elif "actuation" in msg_type:
+                values = (data["value"],)
+            elif "pressure" in msg_type:
+                values = (data["value"],)
+            elif "potentiometer" in msg_type:
+                values = (data["value"],)
+            elif msg_type.endswith("_imu_gyro") or msg_type.endswith("_imu_accel"):
+                values = tuple(data["data"])
+            elif msg_type == "human_upper_arm_emg":
+                values = tuple(data["channels"])
             else:
                 return None
 
@@ -153,5 +220,4 @@ class CANMessageParser:
         except (KeyError, struct.error) as e:
             print(f"Encode error for {msg_type}: {e}")
             return None
-        
         
