@@ -1,0 +1,126 @@
+# LIMB-HT25 System Configuration File
+# This file configures all layers and hardware interfaces for the robotic control system
+
+# Hardware interfaces configuration
+hardware:
+  can:
+    interface: "can0"
+    bitrate: 1000000  # bps
+  ble:
+    device_name: "LIMBServer"
+    scan_timeout: 10.0  # seconds
+
+# Input layer configuration
+input_layer:
+  window_size: 100  # Number of samples per window
+  sample_rate: 100.0  # Hz
+
+# Processing layer configuration
+processing_layer:
+  # ML model paths
+  model:
+    path: null  # Path to LSTM model checkpoint (.pth file)
+    scaler_path: null  # Path to StandardScaler pickle file
+    config:
+      input_dim: 12  # Input dimension for LSTM
+      hidden_dim: 32  # Hidden dimension for LSTM
+  
+  # EMG signal processing
+  emg:
+    fs: 1000.0  # Sampling frequency in Hz
+    lowcut: 20.0  # Lower cutoff frequency in Hz
+    highcut: 450.0  # Upper cutoff frequency in Hz
+    notch_freq: 50.0  # Notch frequency in Hz (for power line noise)
+  
+  # Feature extraction parameters
+  features:
+    window_size_ms: 200.0  # Window size in milliseconds
+    overlap_ms: 100.0  # Overlap in milliseconds
+  
+  # LSTM sequence parameters
+  lstm:
+    seq_length: 10  # Number of windows in the sequence
+    num_classes: 2  # Number of classes for classification
+  
+  # IMU movement intention detection
+  imu_intention:
+    accel_threshold: 0.3  # Minimum acceleration to detect movement (m/s²)
+    gravity_removal: true  # Remove gravity from acceleration
+    velocity_threshold: 0.2  # Velocity threshold in m/s
+    direction_timeout: 4.0  # Timeout before allowing new direction detection (seconds)
+    # Stillness detection thresholds
+    accel_still_thresh: 0.5  # m/s²
+    gyro_still_thresh: 0.1  # rad/s
+    deadband_thresh: 0.15  # m/s²
+    velocity_decay: 0.95  # Decay factor per sample
+    gravity_ema_alpha: 0.05  # EMA smoothing for gravity vector
+    madgwick_beta: 0.05  # Madgwick filter gain
+    bias_update_duration: 0.5  # seconds
+  
+  # IMU+Vision fusion parameters
+  fusion:
+    # Complementary filter
+    complementary_filter:
+      alpha: 0.98  # Trust factor for orientation fusion
+      alpha_position: 0.95  # Trust factor for position fusion
+    
+    # Extended Kalman Filter
+    ekf:
+      process_noise:
+        pos: 1.0  # Position process noise (mm²)
+        vel: 10.0  # Velocity process noise (mm²/s²)
+        orient: 0.01  # Orientation process noise (rad²)
+        angvel: 0.1  # Angular velocity process noise (rad²/s²)
+      measurement_noise:
+        vision_pos: 25.0  # Vision position measurement noise (mm²)
+        vision_orient: 0.01  # Vision orientation measurement noise (rad²)
+        imu_orient: 0.005  # IMU orientation measurement noise (rad²)
+
+# Control layer configuration
+control_layer:
+  control_rate: 100.0  # Control loop frequency in Hz
+  conf_threshold: 0.5  # LSTM confidence threshold for grip intention
+  
+  # State machine thresholds
+  thresholds:
+    hand_cup_distance: 0.2  # Maximum distance for hand-cup approach (meters)
+    placement_distance: 0.1  # Maximum distance for valid placement (meters)
+  
+  # Motor primitives
+  motor_primitives:
+    step_size: 0.05  # Step size per movement command (meters)
+  
+  # Workspace limits (in meters)
+  workspace_limits:
+    x: [-0.5, 0.5]  # X-axis limits
+    y: [-0.5, 0.5]  # Y-axis limits
+    z: [0.0, 0.8]  # Z-axis limits (height)
+  
+  # Joint limits (in radians)
+  joint_limits:
+    - [-3.14, 3.14]  # Joint 1: ±180 degrees
+    - [-1.57, 1.57]  # Joint 2: ±90 degrees
+    - [-3.14, 3.14]  # Joint 3: ±180 degrees
+    - [-1.57, 1.57]  # Joint 4: ±90 degrees
+    - [-3.14, 3.14]  # Joint 5: ±180 degrees
+
+# Vision system configuration
+vision:
+  model_path: null  # Path to object detection model (if None, uses default)
+  apriltag_family: "TAG36H11"  # AprilTag family (TAG36H11, TAG25H9, TAG16H5)
+  confidence_threshold: 0.5  # Minimum confidence for object detections
+  spatial_threshold: 5000  # Maximum depth threshold in mm
+  tag_size: 0.05  # Physical size of AprilTag in meters
+  enable_visualization: false  # Whether to show visualization windows
+  apriltag_quad_decimate: 1.5  # AprilTag quad decimation factor
+  apriltag_quad_sigma: 1.0  # AprilTag quad sigma
+  apriltag_refine_edges: true  # Whether to refine AprilTag edges
+  apriltag_max_hamming: 1  # Maximum Hamming distance for AprilTag detection
+
+# Queue configuration
+queues:
+  input_to_processing:
+    max_size: 5  # Maximum queue size
+  processing_to_control:
+    max_size: 5  # Maximum queue size
+

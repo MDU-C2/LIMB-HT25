@@ -17,7 +17,7 @@ class ControlLayer(Process):
     We only receive gripper_status via CAN to monitor the current gripper state.
     """
 
-    def __init__(self, input_queue: DataQueue, can_interface, control_rate):
+    def __init__(self, input_queue: DataQueue, can_interface, control_rate, config: Optional[Dict] = None):
         super().__init__(name="ControlLayer")
         self.input_queue = input_queue
         self.can_interface = can_interface
@@ -26,6 +26,15 @@ class ControlLayer(Process):
         self.running = Event()
         self.can_parser = CANMessageParser()
 
+        # Load config or use defaults
+        if config is None:
+            config = {}
+        
+        thresholds_config = config.get("thresholds", {})
+        motor_primitives_config = config.get("motor_primitives", {})
+        workspace_limits_config = config.get("workspace_limits", {})
+        joint_limits_config = config.get("joint_limits", [])
+
         # State machine
         self.STATES = {"Waiting": "Waiting for LSTM grip intention", "Gripping": "Cup gripped, waiting for stable grip + move intention", "Carrying": "Handling motors based on human IMU"}
         self.current_state = "Waiting"
@@ -33,7 +42,32 @@ class ControlLayer(Process):
         self.state_entry_time = time.time()
         self.last_cls = None
         self.grip_command_sent = False
-        self.conf_threshold = 0.5 # LSTM confidence threshold
+        
+        # Configurable parameters
+        self.conf_threshold = config.get("conf_threshold", 0.5)  # LSTM confidence threshold
+        self.hand_cup_distance_threshold = thresholds_config.get("hand_cup_distance", 0.2)  # meters
+        self.placement_distance_threshold = thresholds_config.get("placement_distance", 0.1)  # meters
+        self.motor_step_size = motor_primitives_config.get("step_size", 0.05)  # meters
+        
+        # Workspace limits (in meters)
+        self.workspace_limits = {
+            "x": workspace_limits_config.get("x", [-0.5, 0.5]),
+            "y": workspace_limits_config.get("y", [-0.5, 0.5]),
+            "z": workspace_limits_config.get("z", [0.0, 0.8])
+        }
+        
+        # Joint limits (in radians)
+        if joint_limits_config:
+            self.joint_limits = joint_limits_config
+        else:
+            # Default joint limits
+            self.joint_limits = [
+                (-3.14, 3.14),  # Joint 1: ±180 degrees
+                (-1.57, 1.57),  # Joint 2: ±90 degrees
+                (-3.14, 3.14),  # Joint 3: ±180 degrees
+                (-1.57, 1.57),  # Joint 4: ±90 degrees
+                (-3.14, 3.14),  # Joint 5: ±180 degrees
+            ]
 
     def run(self):
         """Main process loop - runs at control rate (Hz)"""
@@ -344,7 +378,7 @@ class ControlLayer(Process):
         if not vision_data:
             return False
 
-        threshold = 0.2 # 20 cm
+        threshold = self.hand_cup_distance_threshold
 
         cup_position = None
         cup_detection = vision_data.get("cup_detections", [])
@@ -414,7 +448,7 @@ class ControlLayer(Process):
         if not isinstance(cup_position, np.ndarray):
             cup_position = np.array(cup_position)
 
-        placement_threshold = 0.1
+        placement_threshold = self.placement_distance_threshold
         distance = np.linalg.norm(cup_position - target_position)
 
         return distance < placement_threshold
@@ -468,7 +502,7 @@ class ControlLayer(Process):
 
         # Define simple motor primitives (fixed offsets in meters)
         # These are simple movements - each direction has a fixed step size
-        step_size = 0.05 # 5 cm per movement step
+        step_size = self.motor_step_size
 
         # Scale by confidence if available?
         offset = np.array([0.0, 0.0, 0.0])
@@ -738,17 +772,8 @@ class ControlLayer(Process):
         if not joint_positions or len(joint_positions) != 5:
             return False
 
-        # Define joint limits in radians - TODO: Update with actual limits
-        
-        joint_limits = [
-            (-3.14, 3.14), # Joint 1: +- 180 degrees
-            (-1.57, 1.57), # Joint 2: +- 90 degrees
-            (-3.14, 3.14), # Joint 3: +- 180 degrees
-            (-1.57, 1.57), # Joint 4: +- 90 degrees
-            (-3.14, 3.14), # Joint 5: +- 180 degrees
-        ]
-
-        for i, (pos, (min_val, max_val)) in enumerate(zip(joint_positions, joint_limits)):
+        # Use configured joint limits
+        for i, (pos, (min_val, max_val)) in enumerate(zip(joint_positions, self.joint_limits)):
             if not (min_val <= pos <= max_val):
                 print(f"[Control Layer] Joint {i+1} position {pos} is out of range [{min_val}, {max_val}]")
                 return False
@@ -772,26 +797,19 @@ class ControlLayer(Process):
         if len(position) != 3:
             return False
 
-        # Define workspace limits (in meters) - TODO: Update with actual robot workspace limits
-        workspace_limits = {
-            "x": (-0.5, 0.5), # -50 cm to 50 cm
-            "y": (-0.5, 0.5), # -50 cm to 50 cm
-            "z": (0.0, 0.8), # 0 cm to 80 cm (above table)
-        }
-
         # Check positions is within workspace
         x, y, z = position[0], position[1], position[2]
 
-        if not (workspace_limits["x"][0] <= x <= workspace_limits["x"][1]):
-            print(f"[Control Layer] Target position X {x} is out of range [{workspace_limits['x'][0]}, {workspace_limits['x'][1]}]")
+        if not (self.workspace_limits["x"][0] <= x <= self.workspace_limits["x"][1]):
+            print(f"[Control Layer] Target position X {x} is out of range [{self.workspace_limits['x'][0]}, {self.workspace_limits['x'][1]}]")
             return False
         
-        if not (workspace_limits["y"][0] <= y <= workspace_limits["y"][1]):
-            print(f"[Control Layer] Target position Y {y} is out of range [{workspace_limits['y'][0]}, {workspace_limits['y'][1]}]")
+        if not (self.workspace_limits["y"][0] <= y <= self.workspace_limits["y"][1]):
+            print(f"[Control Layer] Target position Y {y} is out of range [{self.workspace_limits['y'][0]}, {self.workspace_limits['y'][1]}]")
             return False
         
-        if not (workspace_limits["z"][0] <= z <= workspace_limits["z"][1]):
-            print(f"[Control Layer] Target position Z {z} is out of range [{workspace_limits['z'][0]}, {workspace_limits['z'][1]}]")
+        if not (self.workspace_limits["z"][0] <= z <= self.workspace_limits["z"][1]):
+            print(f"[Control Layer] Target position Z {z} is out of range [{self.workspace_limits['z'][0]}, {self.workspace_limits['z'][1]}]")
             return False
         
         return True

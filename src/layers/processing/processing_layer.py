@@ -13,8 +13,10 @@ from shared.queues import DataQueue
 from shared.models.packet import DataPacket
 from .emg_utils import preprocess_emg_signal, extract_time_domain_features
 from emg.models import get_simple_lstm
+from .imu_utils import normalize_quaternion, quaternion_multiply, quaternion_conjugate, madgwick_update
 from data_fusion.complementary_filter import ComplementaryFilter
 from data_fusion.ekf_filter import ExtendedKalmanFilter
+
 
 
 class ProcessingLayer(Process):
@@ -71,9 +73,34 @@ class ProcessingLayer(Process):
         self.seq_length = seq_length
         self.num_classes = num_classes
 
-        # IMU movement intention parameters
-        self.imu_accel_threshold = imu_accel_threshold
-        self.imu_gravity_removal = imu_gravity_removal
+        # IMU movement intention state variables
+        self.imu_gravity_removal_method = "madgwick"
+        self.imu_velocity_threshold = 0.2 # m/s
+        self.imu_direction_timeout = 4.0 # seconds
+        
+        # Velocity tracking state
+        self.imu_velocity = np.array([0.0, 0.0, 0.0])  # [vx, vy, vz] in m/s
+        self.imu_last_timestamp = None
+        
+        # Stillness detection parameters
+        self.GRAVITY = 9.81  # m/s²
+        self.ACCEL_STILL_THRESH = 0.5  # m/s²
+        self.GYRO_STILL_THRESH = 0.1  # rad/s
+        self.DEADBAND_THRESH = 0.15  # m/s²
+        self.VELOCITY_DECAY = 0.95  # Decay factor per sample
+        self.GRAVITY_EMA_ALPHA = 0.05  # EMA smoothing for gravity vector
+        
+        # Madgwick filter state (for 'madgwick' method)
+        self.imu_q_ws = None  # Quaternion [w, x, y, z] (world to sensor)
+        self.imu_q_ws_initialized = False
+        self.imu_madgwick_beta = 0.05  # Madgwick filter gain
+        self.imu_gyro_bias = np.array([0.0, 0.0, 0.0])
+        self.imu_still_time_for_bias = 0.0
+        self.imu_bias_update_duration = 0.5  # seconds
+        
+        # Direction detection state
+        self.imu_last_direction = None
+        self.imu_last_direction_time = None
 
         # Feature buffer for creating sequences (stores recent vectors)
         self.feature_buffer = deque(maxlen=seq_length)
@@ -309,90 +336,216 @@ class ProcessingLayer(Process):
 
     def _process_imu_intention(self, human_data) -> Optional[dict]:
         """
-        Process IMU data to detect high_level movement intentions
-
-
+        Process IMU data to detect high-level movement intentions using velocity-based detection.
+        
         Steps:
         1. Extract accelerometer and gyroscope data from IMU window
-        2. Remove gravity (if enabled)
-        3. Calculate mean acceleration in each axis
-        4. Determine dominant direction based on thresholds
-        5. Return movement intention with condifence
+        2. Compute time step (dt) from timestamps
+        3. Initialize Madgwick filter quaternion when device is still
+        4. Update gyro bias when device is still
+        5. Update Madgwick filter to estimate orientation
+        6. Remove gravity from acceleration using rotation matrix
+        7. Detect stillness and reset velocity if still
+        8. Integrate linear acceleration to get velocity (with deadband and decay)
+        9. Determine dominant direction based on velocity (with timeout to prevent rapid switching)
+        10. Return movement intention with confidence
+        
+        Returns:
+            dict with keys:
+                - direction: str ("forward", "backward", "left", "right", "up", "down", "none")
+                - confidence: float - confidence in direction detection (0.0 to 1.0)
+                - is_still: bool - whether device is currently still
+                - timestamp: float - current timestamp
         """
         try:
-            # Step 1: Extract accelerometer and gyroscope data from IMU window
-            imu_data = human_data.imu # Shape: (window_size, 6) - [ax, ay, az, gx, gy, gz]
+            imu_data = human_data.imu
             if imu_data is None or imu_data.size == 0:
                 return None
+
             # Extract accel and gyro data
-            accel_data = imu_data[:, :3] # Shape: (window_size, 3) - [ax, ay, az]
-            gyro_data = imu_data[:, 3:] # Shape: (window_size, 3) - [gx, gy, gz]
+            accel_data = imu_data[:, :3]
+            gyro_data = imu_data[:, 3:]
 
-            # Step 2: Remove gravity (if enabled)
-            # Simple approach: subtract mean of accel data
-            if self.imu_gravity_removal:
-                accel_mean_removed = accel_data - np.mean(accel_data, axis=0, keepdims=True)
-                linear_accel = accel_mean_removed
+            # Use mean values for processing 
+            accel_raw = np.mean(accel_data, axis=0)
+            gyro_raw = np.mean(gyro_data, axis=0)
+
+            current_timestamp = time.time()
+            if self.imu_last_timestamp is not None:
+                dt = current_timestamp - self.imu_last_timestamp
+                dt = min(max(dt, 0.0), 0.1)
             else:
-                linear_accel = accel_data
+                dt = 0.01
+            self.imu_last_timestamp = current_timestamp
 
-            mean_accel = np.mean(linear_accel, axis=0) # Shape (3,) - [ax_mean, ay_mean, az_mean]
+            # Remove gravity using Madgwick filter
+            if not self.imu_q_ws_initialized:
+                accel_mag_init = np.linalg.norm(accel_raw)
+                gyro_mag_init = np.linalg.norm(gyro_raw)
+                accel_diff_init = abs(accel_mag_init - self.GRAVITY)
 
-            # Step 3: Calculate magnitude of mean acceleration
-            accel_magnitude = np.linalg.norm(mean_accel)
+                is_still_init = (accel_diff_init < self.ACCEL_STILL_THRESH and gyro_mag_init < self.GYRO_STILL_THRESH)
 
-            # Step 4: Determine dominant direction
+                if is_still_init and accel_mag_init > 0.1:
+                    # Initialize quaternion from gravity vector
+                    g_s_normalized = accel_raw / accel_mag_init
+                    g_w_normalized = np.array([0.0, 0.0, 1.0])
+                    
+                    # Find rotation that aligns g_s to g_w using Rodrigues' rotation formula
+                    v = np.cross(g_s_normalized, g_w_normalized)
+                    s = np.linalg.norm(v)
+                    c = np.dot(g_s_normalized, g_w_normalized)
+                    
+                    if s < 1e-6:
+                        # Already aligned or opposite
+                        if c > 0:
+                            self.imu_q_ws = np.array([1.0, 0.0, 0.0, 0.0])  # Identity
+                        else:
+                            # 180 degree rotation - choose arbitrary perpendicular axis
+                            self.imu_q_ws = np.array([0.0, 1.0, 0.0, 0.0])
+                    else:
+                        # Rodrigues' rotation formula to rotation matrix
+                        vx = np.array([
+                            [0, -v[2], v[1]],
+                            [v[2], 0, -v[0]],
+                            [-v[1], v[0], 0]
+                        ])
+                        R = np.eye(3) + vx + vx @ vx * (1 - c) / (s**2)
+                        
+                        # Convert rotation matrix to quaternion
+                        trace = np.trace(R)
+                        if trace > 0:
+                            s_q = np.sqrt(trace + 1.0) * 2
+                            w = 0.25 * s_q
+                            x = (R[2, 1] - R[1, 2]) / s_q
+                            y = (R[0, 2] - R[2, 0]) / s_q
+                            z = (R[1, 0] - R[0, 1]) / s_q
+                            self.imu_q_ws = normalize_quaternion(np.array([w, x, y, z]))
+                        else:
+                            # Fallback to identity
+                            self.imu_q_ws = np.array([1.0, 0.0, 0.0, 0.0])
+                    self.imu_q_ws_initialized = True
+
+            # Update gyro bias when still
+            accel_mag_check = np.linalg.norm(accel_raw)
+            gyro_mag_check = np.linalg.norm(gyro_raw)
+            accel_diff_check = abs(accel_mag_check - self.GRAVITY)
+
+            is_still_for_bias = (accel_diff_check < self.ACCEL_STILL_THRESH and gyro_mag_check < self.GYRO_STILL_THRESH)
+            if is_still_for_bias:
+                self.imu_still_time_for_bias += dt
+                if self.imu_still_time_for_bias >= self.imu_bias_update_duration:
+                    BIAS_EMA_ALPHA = 0.02
+                    self.imu_gyro_bias = (1 - BIAS_EMA_ALPHA) * self.imu_gyro_bias + BIAS_EMA_ALPHA * gyro_raw
+            else:
+                self.imu_still_time_for_bias = 0.0
+
+            # Apply gyro bias correction
+            gyro_corrected = gyro_raw - self.imu_gyro_bias
+
+            # Update Madgwick filter
+            if self.imu_q_ws_initialized:
+                self.imu_q_ws = madgwick_update(self.imu_q_ws, accel_raw, gyro_corrected, dt, self.imu_madgwick_beta)
+
+                # Compute gravity in sensor frame using rotation matrix
+                w, x, y, z = self.imu_q_ws
+                R = np.array([
+                    [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
+                    [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+                    [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]
+                ])
+
+                # Gravity in world frame (Z up)
+                g_world = np.array([0.0, 0.0, self.GRAVITY])
+                # Rotate to sensor frame: g_sensor = R^T * g_world
+                g_sensor = R.T @ g_world
+
+                # Remove gravity from acceleration
+                linear_accel = accel_raw - g_sensor
+            else:
+                linear_accel = accel_raw - np.array([0.0, 0.0, self.GRAVITY])
+        
+            # Detect stillness reset velocity
+            a_lin_mag = np.linalg.norm(linear_accel)
+            gyro_mag = np.linalg.norm(gyro_raw)
+            
+            is_still = (a_lin_mag < self.ACCEL_STILL_THRESH and gyro_mag < self.GYRO_STILL_THRESH)
+            if is_still:
+                self.imu_velocity = np.array([0.0, 0.0, 0.0])
+            else:
+                if a_lin_mag < self.DEADBAND_THRESH:
+                    # Decay velocity when acceleration is small (reduces drift)
+                    self.imu_velocity *= self.VELOCITY_DECAY
+                else:
+                    self.imu_velocity += linear_accel * dt
+
             direction = "none"
             confidence = 0.0
-
-            if accel_magnitude < self.imu_accel_threshold:
-                # Movement to small to detect
-                direction = "none"
-                confidence = 0.0
-
-            else:
-                abs_accel = np.abd(mean_accel)
-                max_axis = np.argmax(abs_accel)
-                max_value = abs_accel[max_axis]
-
-                # Check if this axis dominates (at least 60% of total magnitude)
-                if max_value / accel_magnitude >= 0.6:
-                    # Determine direction based on sign and axis
-                    if max_axis == 0:
-                        direction = "forward" if mean_accel[0] > 0 else "backward"
-                    elif max_axis == 1:
-                        direction = "right" if mean_accel[1] > 0 else "left"
-                    elif max_axis == 2:
-                        direction = "up" if mean_accel[2] > 0 else "down"
-
-                    # Confidence is baed on how dominant the axis is and magnitude
-                    axis_dominance = max_value / accel_magnitude
-                    magnitude_factor = min(accel_magnitude / (self.imu_accel_threshold * 2), 1.0)
-                    confidence = axis_dominance * magnitude_factor
+            
+            # Check if enough time has passed since last direction detection
+            time_since_last = (current_timestamp - self.imu_last_direction_time 
+                            if self.imu_last_direction_time is not None else float("inf"))
+            can_detect_new = time_since_last >= self.imu_direction_timeout
+            
+            if can_detect_new:
+                # Find the axis with the largest absolute velocity
+                abs_velocities = np.abs(self.imu_velocity)
+                max_idx = np.argmax(abs_velocities)
+                max_vel_mag = abs_velocities[max_idx]
+                
+                if max_vel_mag > self.imu_velocity_threshold:
+                    # Determine direction based on dominant axis and sign
+                    if max_idx == 0:
+                        direction = "forward" if self.imu_velocity[0] < 0 else "backward"
+                    elif max_idx == 1:
+                        direction = "left" if self.imu_velocity[1] < 0 else "right"
+                    else:
+                        direction = "up" if self.imu_velocity[2] > 0 else "down"
+                    
+                    # Only update if direction changed
+                    if direction != self.imu_displayed_direction:
+                        self.imu_displayed_direction = direction
+                        self.imu_last_direction = direction
+                        self.imu_last_direction_time = current_timestamp
+                    
+                    # Calculate confidence based on velocity magnitude and dominance
+                    total_vel_mag = np.linalg.norm(self.imu_velocity)
+                    axis_dominance = max_vel_mag / total_vel_mag if total_vel_mag > 0 else 0.0
+                    mag_factor = min(max_vel_mag / (self.imu_velocity_threshold * 2), 1.0)
+                    confidence = axis_dominance * mag_factor
                 else:
-                    # Multiple axes active - less confident, but still detect primary direction
-                    if max_axis == 0:
-                        direction = "forward" if mean_accel[0] > 0 else "backward"
-                    elif max_axis == 1:
-                        direction = "right" if mean_accel[1] > 0 else "left"
-                    elif max_axis == 2:
-                        direction = "up" if mean_accel[2] > 0 else "down"
-
-                    # Lower confidence
-                    confidence = 0.5 * (max_value / accel_magnitude)
+                    # Below threshold
+                    self.imu_displayed_direction = None
+                    direction = "none"
+                    confidence = 0.0
+            else:
+                # During timeout, keep showing last displayed direction
+                if self.imu_displayed_direction is not None:
+                    direction = self.imu_displayed_direction
+                    # Recalculate confidence for display (lower during timeout)
+                    abs_velocities = np.abs(self.imu_velocity)
+                    max_idx = np.argmax(abs_velocities)
+                    max_vel_mag = abs_velocities[max_idx]
+                    total_vel_mag = np.linalg.norm(self.imu_velocity)
+                    if total_vel_mag > 0:
+                        axis_dominance = max_vel_mag / total_vel_mag
+                        mag_factor = min(max_vel_mag / (self.imu_velocity_threshold * 2), 1.0)
+                        confidence = axis_dominance * mag_factor * 0.5  # Lower confidence during timeout
+                else:
+                    direction = "none"
+                    confidence = 0.0
 
             return {
                 "direction": direction,
-                "acceleration": mean_accel.tolist(), # Shape (3,) - [ax_mean, ay_mean, az_mean]
-                "magnitude": float(accel_magnitude),
                 "confidence": float(confidence),
-                "timestamp": time.time()
+                "is_still": bool(is_still),
+                "timestamp": current_timestamp
             }
-
         except Exception as e:
             print(f"Error processing IMU intention: {e}")
+            import traceback
+            traceback.print_exc()
             return None
-
 
     def _process_imu_vision_fusion(self, packet) -> Optional[dict]:
         """
@@ -401,6 +554,13 @@ class ProcessingLayer(Process):
         Stage 1: Complementary filter for orientation (IMU)
         Stage 2: Extended Kalman Filter for position and velocity (IMU + Vision)
 
+            # Step 2: Calculate velocity
+            imu_velocity = np.zeros_like(imu_data_transposed)
+            for i in range(1, len(imu_data_transposed)):
+                dt = imu_data_transposed[i, 0] - imu_data_transposed[i-1, 0]
+                imu_velocity[i] = imu_data_transposed[i] - imu_data_transposed[i-1] / dt
+            
+            return imu_velocity
         Steps:
         1. Extract robot IMU data from packet
         2. Stage 1: Process IMU through complementary filter to get orientation

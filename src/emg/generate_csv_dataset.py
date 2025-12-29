@@ -77,7 +77,7 @@ def process_csv_file(csv_path, num_channels, seq_len):
     # Segment windows
     segmented = segment_windows(windows)
     window_data = np.array([w[0] for w in segmented]) # Shape (80, 400) = (num_windows, num_samples_per_window)
-    labels = np.array([w[1] for w in segmented]) # Shape (80,) = (num_windows,)
+    labels = np.array([w[1] for w in segmented]) # Shape (80,)
 
     # Extract time domain features for each window
     features = extract_time_domain_features(window_data, num_channels)
