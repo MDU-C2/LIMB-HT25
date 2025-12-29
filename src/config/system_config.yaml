@@ -15,6 +15,12 @@ input_layer:
   window_size: 100  # Number of samples per window
   sample_rate: 100.0  # Hz
 
+  potentiometer_mapping:
+    shoulder_up_down: 0
+    shoulder_left_right: 1
+    elbow_up_down: 2
+    upper_arm_rotation: 3
+
 # Processing layer configuration
 processing_layer:
   # ML model paths

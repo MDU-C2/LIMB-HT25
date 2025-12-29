@@ -7,6 +7,7 @@ from .packet_builder import PacketBuilder
 from shared.queues import DataQueue
 import time
 import numpy as np
+from typing import Dict, Optional
 
 # The difference between threading and multiprocessing:
 # Multiprocessing create separate OS processes, while threading creates separate threads within the same process.
@@ -19,7 +20,8 @@ class InputLayer(Process):
                     output_queue: DataQueue, 
                     window_size: int = 100, 
                     sample_rate: float = 100.0,
-                    vision_source = None):
+                    vision_source = None,
+                    config: Optional[Dict] = None):
 
         super().__init__(name="InputLayer")
         self.running = Event() # Event to signal the process to stop
@@ -45,6 +47,16 @@ class InputLayer(Process):
         
         # Track gripper state (from actuation commands we send)
         self.gripper_state = {"open": True, "force": 0.0}
+
+        # Potentiometer values for joint position feedback
+        self.potentiometer_values = {} # Dict[int, float] - joint index -> position
+        pot_mapping_config = config.get("potentiometer_mapping", {}) if config else {}
+        self.potentiometer_mapping = {
+            "shoulder_up_down": pot_mapping_config.get("shoulder_up_down", 0),
+            "shoulder_left_right": pot_mapping_config.get("shoulder_left_right", 1),
+            "elbow_up_down": pot_mapping_config.get("elbow_up_down", 2),
+            "upper_arm_rotation": pot_mapping_config.get("upper_arm_rotation", 3)
+        }
 
     def run(self):
         """Main process loop"""
@@ -119,7 +131,21 @@ class InputLayer(Process):
                     # Potentiometers give position feedback for specific joints
                     # Could potentially use these to reconstruct joint positions
                     # For now, skip them as they may not map directly to 5-joint model
-                    pass
+                    source = msg.parsed_data.get("source")
+                    value = msg.parsed_data.get("value")
+
+                    if source and value is not None:
+                        # Map potentiometer souce to joint index
+                        joint_idx = self.potentiometer_mapping.get(source)
+                        if joint_idx is not None:
+                            self.potentiometer_values[joint_idx] = value
+
+                            # Update motor_state with joint positions from potentiometers
+                            self._update_motor_state_from_potentiometer(msg.timestamp)
+
+                    # Update motor_state with gripper state (from tracked state)
+                    # This happens after processing all CAN messages
+                    self._update_motor_state_gripper()
                 
                 # Update motor_state with gripper state (from our tracked state)
                 if self.latest_motor_state:
@@ -158,5 +184,50 @@ class InputLayer(Process):
         self.running.clear() # Clear the event to signal the process to stop
         self.can_interface.stop() # Stop the CAN interface
         self.window_buffer.clear() # Clear the window buffer
+
+    def _update_motor_state_from_potentiometers(self, timestamp: float):
+        """Update motor_state with joint positions from potentiometer readings."""
+        from shared.models.packet import MotorState
         
+        # Create joint positions array (5 joints)
+        joint_positions = np.array([0.0] * 5)
+        
+        # Fill in positions from potentiometers
+        for joint_idx in range(5):
+            if joint_idx in self.potentiometer_values:
+                joint_positions[joint_idx] = self.potentiometer_values[joint_idx]
+            # Joint 4 has no potentiometer - keep last value or use 0.0
+            # Could also use forward kinematics from other joints if available
+        
+        # Update or create motor state
+        if self.latest_motor_state:
+            # Update existing motor state
+            self.latest_motor_state.joint_positions = joint_positions
+            self.latest_motor_state.timestamp = timestamp
+        else:
+            # Create new motor state
+            self.latest_motor_state = MotorState(
+                joint_positions=joint_positions,
+                gripper_state=self.gripper_state.copy(),
+                timestamp=timestamp
+            )
+    
+    def _update_motor_state_gripper(self):
+        """Update gripper state in motor_state."""
+        if self.latest_motor_state:
+            self.latest_motor_state.gripper_state = self.gripper_state.copy()
+        else:
+            # Create default motor state if it doesn't exist
+            from shared.models.packet import MotorState
+            joint_positions = np.array([0.0] * 5)
+            # Try to fill from potentiometers if available
+            for joint_idx in range(5):
+                if joint_idx in self.potentiometer_values:
+                    joint_positions[joint_idx] = self.potentiometer_values[joint_idx]
+            
+            self.latest_motor_state = MotorState(
+                joint_positions=joint_positions,
+                gripper_state=self.gripper_state.copy(),
+                timestamp=time.time()
+            )
 
