@@ -113,17 +113,13 @@ class InputLayer(Process):
                             self.latest_pressure = [self.pressure_values[f] for f in finger_order]
 
                 # Handle potentiometer messages (could be used for joint positions)
-                # Note: Potentiometers may not directly map to joint positions, but we can use them
+                # Note: Potentiometers may not directly map to joint positions, but can use them
                 # as a fallback if motor_status is not available
                 elif "potentiometer" in msg_type:
                     # Potentiometers give position feedback for specific joints
-                    # We could potentially use these to reconstruct joint positions
-                    # For now, we'll skip them as they may not map directly to our 5-joint model
+                    # Could potentially use these to reconstruct joint positions
+                    # For now, skip them as they may not map directly to 5-joint model
                     pass
-
-                # Note: motor_status and gripper_status messages no longer exist in the new CAN protocol
-                # Joint positions would need to come from potentiometers or be tracked internally
-                # Gripper state is tracked from commands we send (robot_hand_set_grip_state)
                 
                 # Update motor_state with gripper state (from our tracked state)
                 if self.latest_motor_state:

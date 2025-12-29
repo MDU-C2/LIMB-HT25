@@ -469,7 +469,7 @@ class ControlLayer(Process):
         """
         Check if the grip is stable. Called in Gripping state before transition to Carrying state.
         
-        Since there's no gripper_status message in the new CAN protocol, we check:
+        Since there's no gripper_status message in the CAN protocol, we check:
         - Gripper is closed (not open)
         - Force is above a threshold
         - Some time has passed since grip command was sent (allowing ESP32 to stabilize)
