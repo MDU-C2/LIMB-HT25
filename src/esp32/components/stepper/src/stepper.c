@@ -126,8 +126,14 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio / 360.0f;
 
   const float min_allowed_velocity = (float)MIN_FREQ_HZ / ctx.steps_per_degree;
-  if (cfg->max_velocity.dps < min_allowed_velocity) {
-    ESP_LOGE(TAG, "max_velocity must be at least %f dps", min_allowed_velocity);
+  if (cfg->max_velocity_negative.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_velocity_negative must be at least %f dps",
+             min_allowed_velocity);
+    return ESP_ERR_INVALID_ARG;
+  }
+  if (cfg->max_velocity_positive.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_velocity_positive must be at least %f dps",
+             min_allowed_velocity);
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -286,10 +292,12 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   *out_handle = handle;
 
   ESP_LOGI(TAG,
-           "Stepper initialized: steps/deg=%.3f, max_vel=%.2f sps, "
+           "Stepper initialized: steps/deg=%.3f, max_vel_pos=%.2f sps, "
+           "max_vel_neg=%.2f sps"
            "max_accel=%.2f sps²",
            ctx.steps_per_degree,
-           ctx.cfg.max_velocity.dps * ctx.steps_per_degree,
+           ctx.cfg.max_velocity_positive.dps * ctx.steps_per_degree,
+           ctx.cfg.max_velocity_negative.dps * ctx.steps_per_degree,
            ctx.cfg.max_accel.dps2 * ctx.steps_per_degree);
 
   return ESP_OK;
@@ -335,7 +343,8 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_velocity,
       .max_acceleration = ctx->cfg.max_accel,
-      .max_velocity = ctx->cfg.max_velocity,
+      .max_velocity_negative = ctx->cfg.max_velocity_negative,
+      .max_velocity_positive = ctx->cfg.max_velocity_positive,
       .timestep_ms = dt_ms,
   };
   AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);

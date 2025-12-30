@@ -31,11 +31,13 @@ AngularVelocity motor_ramping_trapezoidal(const MotorRampingArgs *args) {
   // v_max^2 = 2 * a * d  =>  v_max = sqrt(2 * a * d)
   const AngularVelocity vmax_from_distance = {sqrtf(
       2.0F * args->max_acceleration.dps2 * abs_distance_to_target.degree)};
-  const AngularVelocity abs_target_velocity = {
-      fminf(args->max_velocity.dps, vmax_from_distance.dps)};
-  const AngularVelocity target_velocity = {distance_to_target.degree < 0.F
-                                               ? -abs_target_velocity.dps
-                                               : abs_target_velocity.dps};
+  const AngularVelocity abs_target_velocity_negative = {
+      fminf(args->max_velocity_negative.dps, vmax_from_distance.dps)};
+  const AngularVelocity abs_target_velocity_positive = {
+      fminf(args->max_velocity_positive.dps, vmax_from_distance.dps)};
+  const AngularVelocity target_velocity = {
+      distance_to_target.degree < 0.F ? -abs_target_velocity_negative.dps
+                                      : abs_target_velocity_positive.dps};
 
   // Velocity ramping
   const AngularVelocity velocity_delta = {target_velocity.dps -

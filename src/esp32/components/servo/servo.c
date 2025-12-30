@@ -141,8 +141,8 @@ void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
     return;
   }
 
-  velocity.dps = LIMB_CLAMP(velocity.dps, -ctx->cfg.max_velocity.dps,
-                            ctx->cfg.max_velocity.dps);
+  velocity.dps = LIMB_CLAMP(velocity.dps, -ctx->cfg.max_velocity_negative.dps,
+                            ctx->cfg.max_velocity_positive.dps);
 
   velocity.dps *= ctx->cfg.gear_ratio;
   if (ctx->cfg.direction == SERVO_DIR_REVERSE) {
@@ -178,7 +178,8 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_angular_velocity,
       .max_acceleration = ctx->cfg.max_accel,
-      .max_velocity = ctx->cfg.max_velocity,
+      .max_velocity_negative = ctx->cfg.max_velocity_negative,
+      .max_velocity_positive = ctx->cfg.max_velocity_positive,
       .timestep_ms = ms_until_next_period,
   };
   const AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);

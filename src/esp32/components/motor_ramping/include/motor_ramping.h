@@ -11,7 +11,8 @@ typedef struct {
   PotentiometerAngle deadband;
   AngularVelocity current_velocity;
   AngularAcceleration max_acceleration;
-  AngularVelocity max_velocity;
+  AngularVelocity max_velocity_negative;
+  AngularVelocity max_velocity_positive;
   // The amount of time between updates to the motor state.
   uint32_t timestep_ms;
 } MotorRampingArgs;

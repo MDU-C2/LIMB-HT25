@@ -34,7 +34,9 @@ typedef struct {
   uint16_t max_capable_angular_velocity_pw_offset;
 
   // The maximum allowed velocity of the servo.
-  AngularVelocity max_velocity;
+  AngularVelocity max_velocity_positive;
+  // The maximum allowed velocity of the servo.
+  AngularVelocity max_velocity_negative;
   // The maximum allowed acceleration of the servo.
   AngularAcceleration max_accel;
 

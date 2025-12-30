@@ -56,12 +56,10 @@ static const ServoConfig kUpDownServoConfig = {
     .direction = SERVO_DIR_REVERSE,
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
-    // FIXME: Figure out what to set this to. With no load the servo maxes out
-    // at an offset of about 140-150, but it might be different with load.
     .max_capable_angular_velocity_pw_offset = 150,
-    // FIXME: Figure out good values for these.
     .gear_ratio = 15.F,
-    .max_velocity = {8.F},
+    .max_velocity_positive = {2.F},
+    .max_velocity_negative = {8.F},
     .max_accel = {8.F},
     .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
     .potentiometer =
@@ -69,7 +67,6 @@ static const ServoConfig kUpDownServoConfig = {
             .degrees_of_motion = {285.F},
             .min_adc_value = 20,
             .max_adc_value = 3087,
-            // FIXME: These need to be calibrated.
             // The red wire is ground and black is Vin.
             .min_potentiometer_angle = {170},
             .max_potentiometer_angle = {200},
@@ -89,8 +86,9 @@ static const ServoConfig kLeftRightServoConfig = {
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
     .gear_ratio = 15.F,
-    .max_velocity = {8.F},
-    .max_accel = {8.F},
+    .max_velocity_positive = {6.F},
+    .max_velocity_negative = {4.F},
+    .max_accel = {4.F},
     .pot_adc_channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
     .potentiometer =
         (Potentiometer){
@@ -117,8 +115,9 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .microstepping_mode = MICROSTEP_NONE,
     .direction = STEPPER_DIR_NORMAL,
     .gear_ratio = 15.F,
-    .max_velocity = {8.F},
-    .max_accel = {8.F},
+    .max_velocity_negative = {4.F},
+    .max_velocity_positive = {4.F},
+    .max_accel = {4.F},
     .pot_adc_channel = POTENTIOMETER_ROTATION_CHANNEL,
     .pwm_channel = LEDC_CHANNEL_2,
     .pwm_timer = LEDC_TIMER_1,
