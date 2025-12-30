@@ -71,6 +71,12 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 // Sets the target angle that `servo_update` aims for.
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);
 
+PotentiometerAngle servo_get_current_angle(ServoHandle handle);
+
+PotentiometerAngle servo_get_target_angle(ServoHandle handle);
+
+AngularVelocity servo_get_current_velocity(ServoHandle handle);
+
 // Apply the provided angular velocity.
 void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity);
 

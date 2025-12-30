@@ -213,3 +213,27 @@ void servo_apply_pulse_width_as_velocity(ServoHandle handle,
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
 }
+
+PotentiometerAngle servo_get_current_angle(ServoHandle handle) {
+  const ServoContext *ctx = servo_get_context(handle);
+  portENTER_CRITICAL(&ctx->spinlock);
+  PotentiometerAngle angle = ctx->target_angle;
+  portEXIT_CRITICAL(&ctx->spinlock);
+  return angle;
+}
+
+PotentiometerAngle servo_get_target_angle(ServoHandle handle) {
+  const ServoContext *ctx = servo_get_context(handle);
+  portENTER_CRITICAL(&ctx->spinlock);
+  PotentiometerAngle angle = ctx->target_angle;
+  portEXIT_CRITICAL(&ctx->spinlock);
+  return angle;
+}
+
+AngularVelocity servo_get_current_velocity(ServoHandle handle) {
+  const ServoContext *ctx = servo_get_context(handle);
+  portENTER_CRITICAL(&ctx->spinlock);
+  AngularVelocity velocity = ctx->current_angular_velocity;
+  portEXIT_CRITICAL(&ctx->spinlock);
+  return velocity;
+}
