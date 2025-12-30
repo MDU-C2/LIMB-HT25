@@ -110,7 +110,6 @@ uint16_t s_latest_potentiometer_adc_value;
 stepper_control_handle_t s_elbow_stepper_handle = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-// CAN RX task commented out - no CAN hardware
 void can_rx_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t* elbow_stepper_config = stepper_get_cfg(s_elbow_stepper_handle);
 
@@ -119,14 +118,28 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
     uint32_t rx_id = 0;
     
     while (1) {
-        if (can_receive(&rx_id, msg_rx, &rx_len, portMAX_DELAY) == ESP_OK) {
-            if (rx_id == CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION) {
-                JointAngle target_angle = {*(float*)msg_rx};
-                stepper_set_target_angle(s_elbow_stepper_handle, target_angle);
-                ESP_LOGI(TAG, "Received command: elbow target angle = %f degrees", target_angle.degree);
-            }
+        esp_err_t err = can_receive(&rx_id, msg_rx, &rx_len, portMAX_DELAY);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Error calling can_receive: %s", esp_err_to_name(err));
+            continue;
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+
+        switch (rx_id) {
+        case CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION: {
+            JointAngle target_angle = {*(float*)msg_rx};
+            stepper_set_target_angle(s_elbow_stepper_handle, target_angle);
+            ESP_LOGI(TAG, "Received command: elbow target angle = %f degrees", target_angle.degree);
+            break;
+        }
+        case CAN_ID_ROBOT_ELBOW_UP_DOWN_STOP: {
+            stepper_set_estop(s_elbow_stepper_handle, true);
+            ESP_LOGI(TAG, "Received stop command: 0x%x", rx_id);
+            break;
+        }
+        default: {
+            ESP_LOGW(TAG, "Received unknown CAN message: 0x%x", rx_id);
+        }
+        }
     }
 }
 
