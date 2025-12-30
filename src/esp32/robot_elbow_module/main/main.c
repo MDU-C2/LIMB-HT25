@@ -21,7 +21,6 @@ enum {
     CAN_TX_PIN = 5,
     CAN_RX_PIN = 4,
     CAN_BAUDRATE = 1000000,
-    CAN_MSG_SIZE = 8,
 
     // IMU pins.
     IMU_SDA_PIN = GPIO_NUM_2,
@@ -112,8 +111,8 @@ stepper_control_handle_t s_elbow_stepper_handle = {0};
 void can_rx_task([[maybe_unused]] void *pvParameter) {
     const stepper_control_config_t* elbow_stepper_config = stepper_get_cfg(s_elbow_stepper_handle);
 
-    uint8_t msg_rx[CAN_MSG_SIZE]; 
-    uint8_t rx_len = CAN_MSG_SIZE;
+    uint8_t msg_rx[CAN_MAX_MESSAGE_SIZE]; 
+    uint8_t rx_len = CAN_MAX_MESSAGE_SIZE;
     uint32_t rx_id = 0;
     
     while (1) {
@@ -169,9 +168,9 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
             JointAngle target_angle = to_joint_angle(&elbow_stepper_cfg->potentiometer, target_pot_angle);
             AngularVelocity velocity = stepper_get_current_velocity(s_elbow_stepper_handle);
             bool moving = stepper_is_moving(s_elbow_stepper_handle);
-        
+
             // Send status over CAN
-            uint8_t can_data[CAN_MSG_SIZE] = {0};
+            uint8_t can_data[CAN_MAX_MESSAGE_SIZE] = {0};
             *(float*)can_data = current_angle.degree;
             esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER, can_data, sizeof(current_angle.degree));
             if (err != ESP_OK) {
