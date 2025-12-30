@@ -55,12 +55,10 @@ const ServoConfig servo_config = {
             // FIXME: These need to be calibrated.
             .min_adc_value = 32,
             .max_adc_value = 1500,
-            .min_joint_angle_as_potentiometer_angle =
-                {HV2060_MIN_POTENTIOMETER_ANGLE},
-            .max_joint_angle_as_potentiometer_angle =
-                {HV2060_MAX_POTENTIOMETER_ANGLE},
-            .min_joint_angle = {0.F},
-            .max_joint_angle = {HV2060_POTENTIOMETER_ANGLE_RANGE},
+            .min_potentiometer_angle = {HV2060_MIN_POTENTIOMETER_ANGLE},
+            .max_potentiometer_angle = {HV2060_MAX_POTENTIOMETER_ANGLE},
+            .min_potentiometer_angle_as_joint_angle = {0.F},
+            .joint_angle_to_potentiometer_angle_ratio = 1.F,
         },
     .name = "hv2060",
 };
@@ -149,8 +147,7 @@ void app_main(void) {
                              s_servo_potentiometer_adc_channel_buffer->data,
                              s_servo_potentiometer_adc_channel_buffer->length);
     uint32_t average = 0;
-    for (int i = 0; i < s_servo_potentiometer_adc_channel_buffer->length;
-    ++i) {
+    for (int i = 0; i < s_servo_potentiometer_adc_channel_buffer->length; ++i) {
       average += s_servo_potentiometer_adc_channel_buffer->data[i];
     }
     average /= s_servo_potentiometer_adc_channel_buffer->length;

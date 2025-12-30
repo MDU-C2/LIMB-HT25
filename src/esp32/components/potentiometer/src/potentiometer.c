@@ -16,26 +16,28 @@ PotentiometerAngle potentiometer_adc_to_angle(
 JointAngle to_joint_angle(const Potentiometer *potentiometer,
                           PotentiometerAngle angle) {
   float degrees_from_min_joint_angle =
-      angle.degree -
-      potentiometer->min_joint_angle_as_potentiometer_angle.degree;
-  return (JointAngle){potentiometer->min_joint_angle.degree +
-                      degrees_from_min_joint_angle};
+      angle.degree - potentiometer->min_potentiometer_angle.degree;
+  return (JointAngle){
+      potentiometer->min_potentiometer_angle_as_joint_angle.degree +
+      (degrees_from_min_joint_angle /
+       potentiometer->joint_angle_to_potentiometer_angle_ratio)};
 }
 
 PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
                                           JointAngle angle) {
   float degrees_from_min_joint_angle =
-      angle.degree - potentiometer->min_joint_angle.degree;
+      angle.degree -
+      potentiometer->min_potentiometer_angle_as_joint_angle.degree;
 
   return (PotentiometerAngle){
-      potentiometer->min_joint_angle_as_potentiometer_angle.degree +
-      degrees_from_min_joint_angle};
+      potentiometer->min_potentiometer_angle.degree +
+      (degrees_from_min_joint_angle *
+       potentiometer->joint_angle_to_potentiometer_angle_ratio)};
 }
 
 PotentiometerAngle clamp_potentiometer_angle(const Potentiometer *potentiometer,
                                              PotentiometerAngle angle) {
   return (PotentiometerAngle){
-      LIMB_CLAMP(angle.degree,
-                 potentiometer->min_joint_angle_as_potentiometer_angle.degree,
-                 potentiometer->max_joint_angle_as_potentiometer_angle.degree)};
+      LIMB_CLAMP(angle.degree, potentiometer->min_potentiometer_angle.degree,
+                 potentiometer->max_potentiometer_angle.degree)};
 }

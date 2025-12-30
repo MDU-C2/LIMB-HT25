@@ -64,10 +64,12 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
         // TODO(Johan): Figure out which values to use through measurements.
         .min_adc_value = 0,
         .max_adc_value = 4095,
-        .min_joint_angle = {-90.F},
-        .max_joint_angle = {90.F},
-        .min_joint_angle_as_potentiometer_angle = {(285.F / 2.F) - 90.F},
-        .max_joint_angle_as_potentiometer_angle = {(285.F / 2.F) + 90.F}
+        .min_potentiometer_angle_as_joint_angle = {0.F},
+        // FIXME: This means a 90 degree range, but it doesn't look like it should be.
+        .min_potentiometer_angle = {143.F},
+        .max_potentiometer_angle = {233.F},
+        // FIXME: Make sure this is in the correct order (and that it's the correct values).
+        .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
     },
 };
 

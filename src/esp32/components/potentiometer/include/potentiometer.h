@@ -18,13 +18,16 @@ typedef struct {
   PotentiometerAngle degrees_of_motion;
 
   // The range of motion that the joint supports in its own frame of reference.
-  JointAngle min_joint_angle;
-  JointAngle max_joint_angle;
+  JointAngle min_potentiometer_angle_as_joint_angle;
 
   // The range of motion that the joint supports in values expressed by the
   // potentiometer.
-  PotentiometerAngle min_joint_angle_as_potentiometer_angle;
-  PotentiometerAngle max_joint_angle_as_potentiometer_angle;
+  PotentiometerAngle min_potentiometer_angle;
+  PotentiometerAngle max_potentiometer_angle;
+
+  // The ratio between 1 degree in the joint angle and the corresponding degree
+  // in potentiometer angle.
+  float joint_angle_to_potentiometer_angle_ratio;
 
   // In ideal conditions this should be [0, 2^bitwidth - 1]. However, in
   // practice we might be slightly off, so this should be set to the actual

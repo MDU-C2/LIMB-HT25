@@ -122,10 +122,10 @@ static const Potentiometer kUpDownPotentiometer = {
     // be measured on the actual robot.
     .min_adc_value = 0,
     .max_adc_value = 4095,
-    .min_joint_angle_as_potentiometer_angle = {(285.F / 2.F) - 90.F},
-    .max_joint_angle_as_potentiometer_angle = {(285.F / 2.F) + 90.F},
-    .min_joint_angle = {0},
-    .max_joint_angle = {180},
+    .min_potentiometer_angle = {(285.F / 2.F) - 90.F},
+    .max_potentiometer_angle = {(285.F / 2.F) + 90.F},
+    .min_potentiometer_angle_as_joint_angle = {0},
+    .joint_angle_to_potentiometer_angle_ratio = 1.F,
 };
 
 static const Potentiometer kLeftRightPotentiometer = {
@@ -134,10 +134,11 @@ static const Potentiometer kLeftRightPotentiometer = {
     // be measured on the actual robot.
     .min_adc_value = 0,
     .max_adc_value = 4095,
-    .min_joint_angle_as_potentiometer_angle = {(285.F / 2.F) - 90.F},
-    .max_joint_angle_as_potentiometer_angle = {(285.F / 2.F) + 90.F},
-    .min_joint_angle = {0},
-    .max_joint_angle = {180},
+    .min_potentiometer_angle = {(285.F / 2.F) - 90.F},
+    .max_potentiometer_angle = {(285.F / 2.F) + 90.F},
+    .min_potentiometer_angle_as_joint_angle = {0},
+    // FIXME: Make sure this is this is in the correct order (and that the values are correct).
+    .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
 };
 
 static void can_rx_task([[maybe_unused]] void* arg) {
