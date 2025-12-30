@@ -20,10 +20,6 @@ typedef struct {
   AngularVelocity current_angular_velocity;
   PotentiometerAngle target_angle;
   PotentiometerAngle current_angle;
-
-  bool is_moving;
-
-  uint32_t latest_approximated_adc_value;
 } ServoContext;
 
 enum {
@@ -53,8 +49,7 @@ static uint32_t us_to_duty(const ServoConfig *servo, uint16_t us) {
 }
 
 esp_err_t servo_init(const ServoConfig *servo_config,
-                     const uint16_t *latest_potentiometer_values,
-                     uint16_t latest_potentiometer_values_len,
+                     uint16_t latest_potentiometer_adc_value,
                      ServoHandle *out_handle) {
   // Configure LEDC timer (can be shared by all servos).
   const ledc_timer_config_t ledc_timer = {
@@ -92,15 +87,12 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_config), TAG,
                       "Couldn't configure ledc_channel");
 
-  const uint16_t current_pot_adc_value = limb_average16(
-      latest_potentiometer_values, latest_potentiometer_values_len);
   const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
-      &servo_config->potentiometer, current_pot_adc_value);
+      &servo_config->potentiometer, latest_potentiometer_adc_value);
 
   s_servo_contexts[servo_config->ledc_channel] = (ServoContext){
       .cfg = *servo_config,
       .current_angle = current_angle,
-      .latest_approximated_adc_value = current_pot_adc_value,
   };
 
   *out_handle = servo_config->ledc_channel;
@@ -166,20 +158,15 @@ void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
 }
 
 bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
-                  const uint16_t *potentiometer_values,
-                  uint16_t potentiometer_values_len) {
-  // TODO(johan): Should this work without the latest potentiometer position?
-  if (ms_until_next_period == 0 || potentiometer_values_len == 0) {
+                  uint16_t potentiometer_value) {
+  if (ms_until_next_period == 0) {
     return false;
   }
 
   ServoContext *ctx = servo_get_context(handle);
 
-  ctx->latest_approximated_adc_value =
-      moving_average16(ctx->latest_approximated_adc_value, potentiometer_values,
-                       potentiometer_values_len);
-  const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
-      &ctx->cfg.potentiometer, ctx->latest_approximated_adc_value);
+  const PotentiometerAngle current_angle =
+      potentiometer_adc_to_angle(&ctx->cfg.potentiometer, potentiometer_value);
 
   const MotorRampingArgs args = {
       .current_angle = current_angle,

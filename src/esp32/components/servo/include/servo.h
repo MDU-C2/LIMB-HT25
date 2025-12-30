@@ -59,16 +59,14 @@ typedef ledc_channel_t ServoHandle;
 
 // Initialize servos using provided configurations.
 esp_err_t servo_init(const ServoConfig *servo_config,
-                     const uint16_t *latest_potentiometer_values,
-                     uint16_t latest_potentiometer_values_len,
+                     uint16_t latest_potentiometer_adc_value,
                      ServoHandle *out_handle);
 
 // This function is meant to be called periodically. It determines how far it
 // should move the servo based on the distance to the target angle and the time
 // remaining until the next call to servo_update.
 bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
-                  const uint16_t *potentiometer_values,
-                  uint16_t potentiometer_values_len);
+                  uint16_t potentiometer_value);
 
 // Sets the target angle that `servo_update` aims for.
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);

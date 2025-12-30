@@ -7,6 +7,7 @@
 #include "freertos/projdefs.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
+#include "limb_utils.h"
 #include "potentiometer.h"
 #include "servo.h"
 
@@ -40,7 +41,8 @@ const ServoConfig servo_config = {
     .ledc_timer = LEDC_TIMER_0,
     // FIXME: This value assumes 7.4V, but it was measured with 7V.
     .max_capable_angular_velocity = {400.F},
-    // FIXME: The measured value I got here was 150. We cheat a bit to make sure we don't get stuck.
+    // FIXME: The measured value I got here was 150. We cheat a bit to make sure
+    // we don't get stuck.
     .max_capable_angular_velocity_pw_offset = 800,
     .min_capable_angular_velocity = {34.F},
     .min_capable_angular_velocity_pw_offset = 17,
@@ -94,15 +96,18 @@ AdcMgrChannelBuffer *s_servo_potentiometer_adc_channel_buffer =
 void app_main(void) {
   ESP_ERROR_CHECK(adc_mgr_init(adc_cfg));
   ESP_ERROR_CHECK(adc_mgr_read(&s_adc_read_results, 10));
+  uint16_t latest_potentiometer_adc_value =
+      limb_average16(s_servo_potentiometer_adc_channel_buffer->data,
+                     s_servo_potentiometer_adc_channel_buffer->length);
+  s_servo_potentiometer_adc_channel_buffer->length = 0;
 
   ServoHandle servo = 0;
   ESP_ERROR_CHECK(
-      servo_init(&servo_config, s_servo_potentiometer_adc_channel_buffer->data,
-                 s_servo_potentiometer_adc_channel_buffer->length, &servo));
-  s_servo_potentiometer_adc_channel_buffer->length = 0;
+      servo_init(&servo_config, latest_potentiometer_adc_value, &servo));
 
   JointAngle stops[] = {
-      {0}, {50},
+      {0},
+      {50},
   };
 
   int i = 0;
@@ -142,17 +147,16 @@ void app_main(void) {
     const uint16_t period_in_ms = 100;
     xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(period_in_ms));
     ESP_ERROR_CHECK(adc_mgr_read(&s_adc_read_results, 0));
-    bool done = servo_update(servo, period_in_ms,
-                             s_servo_potentiometer_adc_channel_buffer->data,
-                             s_servo_potentiometer_adc_channel_buffer->length);
-    uint32_t average = 0;
-    for (int i = 0; i < s_servo_potentiometer_adc_channel_buffer->length; ++i) {
-      average += s_servo_potentiometer_adc_channel_buffer->data[i];
-    }
-    average /= s_servo_potentiometer_adc_channel_buffer->length;
+
+    latest_potentiometer_adc_value =
+        moving_average16(latest_potentiometer_adc_value,
+                         s_servo_potentiometer_adc_channel_buffer->data,
+                         s_servo_potentiometer_adc_channel_buffer->length);
+    s_servo_potentiometer_adc_channel_buffer->length = 0;
+    bool done =
+        servo_update(servo, period_in_ms, latest_potentiometer_adc_value);
     // ESP_LOGI("test", "ADC value %u",
     //          average);
-    s_servo_potentiometer_adc_channel_buffer->length = 0;
     if (done) {
       i = (i + 1) % LIMB_ARR_LEN(stops);
       ESP_LOGI("test", "switching to joint angle %.2f", stops[i].degree);
