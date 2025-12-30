@@ -248,7 +248,8 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         JointAngle joint_angle = {*(float*)can_buf};
         ESP_LOGI(TAG, "Received upper arm rotation joint angle %f",
                  joint_angle.degree);
-        stepper_set_target_angle(s_left_right_servo_handle, joint_angle);
+        stepper_set_target_angle(s_upper_arm_rotation_stepper_handle,
+                                 joint_angle);
         break;
       }
       default: {
