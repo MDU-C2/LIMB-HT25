@@ -51,7 +51,7 @@ static const ServoConfig kUpDownServoConfig = {
     .pwm_channel = LEDC_CHANNEL_0,
     .name = "Shoulder up/down servo",
     // TODO(johan): These need to be changed after testing on actual arm.
-    .direction = SERVO_DIR_NORMAL,
+    .direction = SERVO_DIR_REVERSE,
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
     // FIXME: Figure out what to set this to. With no load the servo maxes out
@@ -65,7 +65,7 @@ static const ServoConfig kUpDownServoConfig = {
     .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
     .gear_ratio = 15.F,
-    .max_velocity = {10.F},
+    .max_velocity = {8.F},
     .max_accel = {8.F},
     .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
     .potentiometer =
@@ -74,8 +74,8 @@ static const ServoConfig kUpDownServoConfig = {
             .min_adc_value = 20,
             .max_adc_value = 3087,
             // FIXME: These need to be calibrated.
-            .min_potentiometer_angle = {40},
-            .max_potentiometer_angle = {70},
+            .min_potentiometer_angle = {170},
+            .max_potentiometer_angle = {200},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
         },
