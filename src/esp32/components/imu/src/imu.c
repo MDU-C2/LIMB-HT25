@@ -38,10 +38,10 @@ static bool s_imu_initialized = false;
 /**
  * @brief Read a sequence of bytes from LSM6DSO32 sensor registers
  */
-static esp_err_t imu_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
+static esp_err_t imu_register_read(uint8_t sensor_addr, uint8_t reg_addr, uint8_t *data, size_t len)
 {
     return i2c_master_write_read_device(s_imu_config.i2c_port,
-                                        s_imu_config.sensor_addr,
+                                        sensor_addr, 
                                         &reg_addr, 1,
                                         data, len,
                                         I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
@@ -50,11 +50,11 @@ static esp_err_t imu_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
 /**
  * @brief Write a byte to a LSM6DSO32 sensor register
  */
-static esp_err_t imu_register_write_byte(uint8_t reg_addr, uint8_t data)
+static esp_err_t imu_register_write_byte(uint8_t sensor_addr, uint8_t reg_addr, uint8_t data)
 {
     uint8_t write_buf[2] = {reg_addr, data};
     return i2c_master_write_to_device(s_imu_config.i2c_port,
-                                      s_imu_config.sensor_addr,
+                                      sensor_addr, 
                                       write_buf, sizeof(write_buf),
                                       I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
@@ -81,40 +81,6 @@ static esp_err_t i2c_master_init(void)
     return i2c_driver_install(s_imu_config.i2c_port, conf.mode, 0, 0, 0);
 }
 
-/**
- * @brief Configure LSM6DSO32 sensor registers
- */
-static esp_err_t lsm6dso32_configure(void)
-{
-    esp_err_t ret;
-
-    // Configure accelerometer
-    ret = imu_register_write_byte(LSM6DSO32_CTRL1_XL, s_imu_config.accel_odr);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure accelerometer");
-        return ret;
-    }
-
-    // Configure gyroscope
-    ret = imu_register_write_byte(LSM6DSO32_CTRL2_G, s_imu_config.gyro_odr);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure gyroscope");
-        return ret;
-    }
-
-    // Configure control register 3 (enable IF_INC for auto-increment)
-    ret = imu_register_write_byte(LSM6DSO32_CTRL3_C, 0x04);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure CTRL3_C");
-        return ret;
-    }
-
-    // Wait for sensor to stabilize
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    return ESP_OK;
-}
-
 esp_err_t imu_init(const imu_config_t *config)
 {
     if (config == NULL) {
@@ -127,42 +93,31 @@ esp_err_t imu_init(const imu_config_t *config)
         return ESP_OK;
     }
 
-    // Copy configuration
     s_imu_config = *config;
 
-    // Initialize I2C
     esp_err_t ret = i2c_master_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize I2C: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    // Verify sensor presence by reading WHO_AM_I register
     uint8_t who_am_i;
-    ret = imu_register_read(LSM6DSO32_WHO_AM_I_REG, &who_am_i, 1);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read WHO_AM_I register: %s", esp_err_to_name(ret));
-        i2c_driver_delete(s_imu_config.i2c_port);
-        return ret;
-    }
-
-    if (who_am_i != LSM6DSO32_WHO_AM_I_VALUE) {
-        ESP_LOGE(TAG, "Invalid WHO_AM_I value: 0x%02X (expected: 0x%02X)", 
-                 who_am_i, LSM6DSO32_WHO_AM_I_VALUE);
+    ret = imu_register_read(config->sensor_addr, LSM6DSO32_WHO_AM_I_REG, &who_am_i, 1);
+    if (ret != ESP_OK || who_am_i != LSM6DSO32_WHO_AM_I_VALUE) {
+        ESP_LOGE(TAG, "IMU principal (0x%02X) no encontrada o ID incorrecto", config->sensor_addr);
         i2c_driver_delete(s_imu_config.i2c_port);
         return ESP_ERR_NOT_FOUND;
     }
 
-    // Configure sensor
-    ret = lsm6dso32_configure();
+    ret = imu_configure_sensor(config->sensor_addr);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure sensor");
+        ESP_LOGE(TAG, "Failed to configure primary sensor");
         i2c_driver_delete(s_imu_config.i2c_port);
         return ret;
     }
 
     s_imu_initialized = true;
-    ESP_LOGI(TAG, "IMU initialized successfully");
+    ESP_LOGI(TAG, "IMU Service Hardware listo. Sensor 0x%02X activo.", config->sensor_addr);
     return ESP_OK;
 }
 
@@ -183,7 +138,7 @@ esp_err_t imu_deinit(void)
     return ESP_OK;
 }
 
-esp_err_t imu_read_data(imu_data_t *data)
+esp_err_t imu_read_data(uint8_t sensor_addr, imu_data_t *data)
 {
     if (data == NULL) {
         ESP_LOGE(TAG, "Data pointer cannot be NULL");
@@ -198,19 +153,12 @@ esp_err_t imu_read_data(imu_data_t *data)
     uint8_t raw_data[12]; // Gyro(6) + Accel(6) = 12 bytes
     esp_err_t ret;
 
-    // Read gyroscope data (6 bytes)
-    ret = imu_register_read(LSM6DSO32_OUTX_L_G, raw_data, 6);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read gyroscope data");
-        return ret;
-    }
-
-    // Read accelerometer data (6 bytes)
-    ret = imu_register_read(LSM6DSO32_OUTX_L_A, raw_data + 6, 6);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read accelerometer data");
-        return ret;
-    }
+    // Read 6 bytes gyro and 6 accel using sensor_addr
+    ret = imu_register_read(sensor_addr, LSM6DSO32_OUTX_L_G, raw_data, 6);
+    if (ret != ESP_OK) return ret;
+    
+    ret = imu_register_read(sensor_addr, LSM6DSO32_OUTX_L_A, raw_data + 6, 6);
+    if (ret != ESP_OK) return ret;
 
     // Convert gyroscope data (16-bit, ±250 dps range by default)
     data->gyro.x = (int16_t)((raw_data[1] << 8) | raw_data[0]);
@@ -224,18 +172,27 @@ esp_err_t imu_read_data(imu_data_t *data)
     return ESP_OK;
 }
 
-bool imu_is_present(void)
-{
-    if (!s_imu_initialized) {
-        return false;
-    }
+bool imu_is_present(uint8_t sensor_addr) {
+    if (!s_imu_initialized) return false;
 
     uint8_t who_am_i;
-    esp_err_t ret = imu_register_read(LSM6DSO32_WHO_AM_I_REG, &who_am_i, 1);
-    if (ret != ESP_OK) {
+    if (imu_register_read(sensor_addr, LSM6DSO32_WHO_AM_I_REG, &who_am_i, 1) != ESP_OK) {
         return false;
     }
-
     return (who_am_i == LSM6DSO32_WHO_AM_I_VALUE);
 }
 
+
+esp_err_t imu_configure_sensor(uint8_t sensor_addr)
+{
+    esp_err_t ret;
+    // configuring accel
+    ret = imu_register_write_byte(sensor_addr, LSM6DSO32_CTRL1_XL, s_imu_config.accel_odr);
+    if (ret != ESP_OK) return ret;
+
+    // configuring gyro
+    ret = imu_register_write_byte(sensor_addr, LSM6DSO32_CTRL2_G, s_imu_config.gyro_odr);
+    if (ret != ESP_OK) return ret;
+
+    return imu_register_write_byte(sensor_addr, LSM6DSO32_CTRL3_C, 0x04);
+}
