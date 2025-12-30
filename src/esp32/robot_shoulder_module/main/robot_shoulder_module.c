@@ -326,9 +326,14 @@ static void motors_update_task([[maybe_unused]] void* args) {
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
                                (uint8_t*)&joint_angle.degree,
                                sizeof(joint_angle.degree), 0);
+      static uint32_t can_errors_count = 0;
       if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error sending shoulder up/down angle over CAN: %s",
-                 esp_err_to_name(err));
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending shoulder up/down angle over CAN: %s, total "
+                   "error count: %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
       }
     }
 
@@ -359,9 +364,14 @@ static void motors_update_task([[maybe_unused]] void* args) {
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
                                (uint8_t*)&joint_angle.degree,
                                sizeof(joint_angle.degree), 0);
+      static uint32_t can_errors_count = 0;
       if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error sending shoulder left/right angle over CAN: %s",
-                 esp_err_to_name(err));
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending shoulder left/right angle over CAN: %s, "
+                   "total error count: %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
       }
     }
 
@@ -397,9 +407,14 @@ static void motors_update_task([[maybe_unused]] void* args) {
       esp_err_t err = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER,
                                (uint8_t*)&joint_angle.degree,
                                sizeof(joint_angle.degree), 0);
+      static uint32_t can_errors_count = 0;
       if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error sending upper arm rotation angle over CAN: %s",
-                 esp_err_to_name(err));
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending upper arm rotation angle over CAN: %s, total "
+                   "error count: %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
       }
     }
   }

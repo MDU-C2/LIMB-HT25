@@ -176,9 +176,13 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
       esp_err_t err =
           can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO, (uint8_t *)imu_can_msg_buf,
                    sizeof(imu_can_msg_buf), 0);
+      static int can_errors_count = 0;
       if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error sending IMU gyro over CAN: %s",
-                 esp_err_to_name(err));
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending IMU gyro over CAN: %s, total error count: %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
       }
     }
     {
@@ -188,9 +192,14 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
       esp_err_t err =
           can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL, (uint8_t *)imu_can_msg_buf,
                    sizeof(imu_can_msg_buf), 0);
+      static int can_errors_count = 0;
       if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error sending IMU accel over CAN: %s",
-                 esp_err_to_name(err));
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(
+              TAG,
+              "Error sending IMU accel over CAN: %s, total error count: %u",
+              esp_err_to_name(err), can_errors_count);
+        }
       }
     }
   }
@@ -219,9 +228,14 @@ static void stepper_task([[maybe_unused]] void *pvParameter) {
     esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER,
                              (uint8_t *)&current_angle.degree,
                              sizeof(current_angle.degree), 0);
+    static int can_errors_count = 0;
     if (err != ESP_OK) {
-      ESP_LOGW(TAG, "Error sending elbow status over CAN: %s",
-               esp_err_to_name(err));
+      if (can_errors_count++ % 100 == 0) {
+        ESP_LOGW(
+            TAG,
+            "Error sending elbow status over CAN: %s, total error count: %u",
+            esp_err_to_name(err), can_errors_count);
+      }
     }
 
     static uint32_t status_counter = 0;
