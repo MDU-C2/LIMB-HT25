@@ -202,9 +202,9 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 
   ServoContext *ctx = servo_get_context(handle);
 
-  ctx->latest_approximated_adc_value = moving_average16(
-      ctx->latest_approximated_adc_value, potentiometer_values,
-      potentiometer_values_len);
+  ctx->latest_approximated_adc_value =
+      moving_average16(ctx->latest_approximated_adc_value, potentiometer_values,
+                       potentiometer_values_len);
   const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &ctx->cfg.potentiometer, ctx->latest_approximated_adc_value);
 
