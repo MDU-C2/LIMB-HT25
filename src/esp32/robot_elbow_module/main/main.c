@@ -40,7 +40,7 @@ enum {
 };
 
 // Stepper configurations
-const stepper_control_config_t s_elbow_stepper_cfg = {
+static const stepper_control_config_t s_elbow_stepper_cfg = {
     .step_gpio = STEPPER_ELBOW_STEP_PIN,
     .dir_gpio = STEPPER_ELBOW_DIR_PIN,
     .enable_gpio = STEPPER_ELBOW_ENABLE_PIN,
@@ -75,14 +75,14 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
 };
 
 // ADC manager configuration.
-const AdcMgrChannelConfig s_adc_mgr_channel_configs[] = {
+static const AdcMgrChannelConfig s_adc_mgr_channel_configs[] = {
     {
         .channel = ADC_ELBOW_CHANNEL,
         .sample_rate = 1000,
     },
 };
 
-const AdcMgrConfig s_adc_mgr_config = {
+static const AdcMgrConfig s_adc_mgr_config = {
     .channel_configs = s_adc_mgr_channel_configs,
     .channel_configs_len = LIMB_ARR_LEN(s_adc_mgr_channel_configs),
     .ms_worth_of_buffer_size = 100,
@@ -95,26 +95,26 @@ enum {
   ADC_STEPPERS_UNDERLYING_BUF_SIZE = 1000,
 };
 
-uint16_t
+static uint16_t
     s_adc_elbow_channel_underlying_buffer[ADC_STEPPERS_UNDERLYING_BUF_SIZE] = {
         0};
 
-AdcMgrReadResults s_adc_mgr_read_results = {
+static AdcMgrReadResults s_adc_mgr_read_results = {
     .channel_buffers = {
         [ADC_ELBOW_CHANNEL] = {.data = s_adc_elbow_channel_underlying_buffer,
                                .capacity = LIMB_ARR_LEN(
                                    s_adc_elbow_channel_underlying_buffer)},
     }};
 
-AdcMgrChannelBuffer *s_adc_mgr_elbow_buffer =
+static AdcMgrChannelBuffer *s_adc_mgr_elbow_buffer =
     &s_adc_mgr_read_results.channel_buffers[ADC_ELBOW_CHANNEL];
 
-uint16_t s_latest_potentiometer_adc_value;
+static uint16_t s_latest_potentiometer_adc_value;
 
-stepper_control_handle_t s_elbow_stepper_handle = {0};
+static stepper_control_handle_t s_elbow_stepper_handle = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-void can_rx_task([[maybe_unused]] void *pvParameter) {
+static void can_rx_task([[maybe_unused]] void *pvParameter) {
   uint8_t msg_rx[CAN_MAX_MESSAGE_SIZE];
   uint8_t rx_len = CAN_MAX_MESSAGE_SIZE;
   uint32_t rx_id = 0;
@@ -146,7 +146,7 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
   }
 }
 
-void imu_task([[maybe_unused]] void *pvParameter) {
+static void imu_task([[maybe_unused]] void *pvParameter) {
   imu_data_t imu_data;  // (imu_vector_t) accel and (imu_vector_t) gyro
 
   // The buffer is used for the xyz values of both the gyro and the accel
@@ -194,7 +194,7 @@ void imu_task([[maybe_unused]] void *pvParameter) {
   }
 }
 
-void stepper_task([[maybe_unused]] void *pvParameter) {
+static void stepper_task([[maybe_unused]] void *pvParameter) {
   TickType_t last_wake_time = xTaskGetTickCount();
   const TickType_t period_ms = pdMS_TO_TICKS(10);  // 10ms = 100Hz update rate
 
@@ -253,7 +253,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
 }
 
 // Test task to cycle through different target angles
-void stepper_test_task([[maybe_unused]] void *pvParameter) {
+static void stepper_test_task([[maybe_unused]] void *pvParameter) {
   // Wait a bit for system to initialize
   vTaskDelay(pdMS_TO_TICKS(2000));
 
