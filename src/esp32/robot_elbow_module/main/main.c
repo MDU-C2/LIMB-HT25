@@ -361,27 +361,29 @@ void app_main(void) {
   // Create FreeRTOS tasks
   enum {
     TASK_STACK_DEPTH = 4096,
-    TASK_HIGH_PRIORITY = 5,
-    TASK_LOW_PRIORITY = 4,
+    TASK_STEPPER_UPDATE_PRIORITY = 6,
+    TASK_CAN_RX_PRIORITY = 5,
+    TASK_IMU_PRIORITY = 4,
+    TASK_STEPPER_TEST_PRIORITY = 3,
   };
 
   {
     BaseType_t err = xTaskCreate(can_rx_task, "can_rx", TASK_STACK_DEPTH, NULL,
-                                 TASK_HIGH_PRIORITY, NULL);
+                                 TASK_CAN_RX_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
       return;
     }
 
     err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
-                      TASK_HIGH_PRIORITY, NULL);
+                      TASK_IMU_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
       return;
     }
 
     err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL,
-                      TASK_HIGH_PRIORITY, NULL);
+                      TASK_STEPPER_UPDATE_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
       return;
@@ -390,7 +392,7 @@ void app_main(void) {
     // Lower priority than stepper_task.
     // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH,
     // NULL,
-    //                   TASK_LOW_PRIORITY, NULL);
+    //                   TASK_STEPPER_TEST_PRIORITY, NULL);
     // if (err != pdPASS) {
     //   ESP_LOGE(TAG, "Failed to create stepper_test task, err code: %d");
     //   return;
