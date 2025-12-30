@@ -9,4 +9,5 @@ idf_component_register(
   imu
   potentiometer
   servo
+  stepper
   limb_utils)

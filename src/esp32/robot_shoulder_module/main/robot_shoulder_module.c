@@ -12,6 +12,7 @@
 #include "potentiometer.h"
 #include "servo.h"
 #include "soc/gpio_num.h"
+#include "stepper.h"
 
 static const char* const TAG = "Shoulder module";
 
@@ -29,6 +30,15 @@ enum {
   SERVO_LEFT_RIGHT_GPIO = GPIO_NUM_2,
   // The channel number corresponds to the GPIO number.
   POTENTIOMETER_LEFT_RIGHT_CHANNEL = ADC_CHANNEL_3,
+  // The channel number corresponds to the GPIO number.
+  POTENTIOMETER_ROTATION_CHANNEL = ADC_CHANNEL_4,
+  STEPPER_UPPER_ARM_ROTATION_ENABLE_GPIO = GPIO_NUM_8,
+  STEPPER_UPPER_ARM_ROTATION_DIR_GPIO = GPIO_NUM_9,
+  STEPPER_UPPER_ARM_ROTATION_STEP_GPIO = GPIO_NUM_10,
+  // Microstepping pins.
+  STEPPER_UPPER_ARM_ROTATION_M0_GPIO = GPIO_NUM_18,
+  STEPPER_UPPER_ARM_ROTATION_M1_GPIO = GPIO_NUM_19,
+  STEPPER_UPPER_ARM_ROTATION_M2_GPIO = GPIO_NUM_20,
   CAN_TX_GPIO = GPIO_NUM_6,
   CAN_RX_GPIO = GPIO_NUM_7,
 };
@@ -108,6 +118,33 @@ static const ServoConfig kLeftRightServoConfig = {
         },
 };
 
+// FIXME: All these need to be configured properly.
+static const stepper_control_config_t kUpperArmRotationStepperConfig = {
+    .enable_gpio = STEPPER_UPPER_ARM_ROTATION_ENABLE_GPIO,
+    .dir_gpio = STEPPER_UPPER_ARM_ROTATION_DIR_GPIO,
+    .step_gpio = STEPPER_UPPER_ARM_ROTATION_STEP_GPIO,
+    .microstep_m0_gpio = STEPPER_UPPER_ARM_ROTATION_M0_GPIO,
+    .microstep_m1_gpio = STEPPER_UPPER_ARM_ROTATION_M1_GPIO,
+    .microstep_m2_gpio = STEPPER_UPPER_ARM_ROTATION_M2_GPIO,
+    .microstepping_mode = MICROSTEP_NONE,
+    .direction = STEPPER_DIR_NORMAL,
+    .gear_ratio = 1.F,
+    .max_velocity = {10.F},
+    .max_accel = {10.F},
+    .pot_adc_channel = POTENTIOMETER_ROTATION_CHANNEL,
+    .pwm_channel = LEDC_CHANNEL_2,
+    .pwm_timer = LEDC_TIMER_1,
+    .steps_per_rev = 200,
+    .potentiometer =
+        {
+            .min_adc_value = 6,
+            .max_adc_value = 3087,
+            .min_potentiometer_angle = {90},
+            .max_potentiometer_angle = {120},
+            .joint_angle_to_potentiometer_angle_ratio = 1.F,
+        },
+};
+
 static const AdcMgrChannelConfig kAdcMgrChannelConfigs[] = {
     (AdcMgrChannelConfig){
         .channel = POTENTIOMETER_UP_DOWN_CHANNEL,
@@ -115,6 +152,10 @@ static const AdcMgrChannelConfig kAdcMgrChannelConfigs[] = {
     },
     (AdcMgrChannelConfig){
         .channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
+        .sample_rate = 1000,
+    },
+    (AdcMgrChannelConfig){
+        .channel = POTENTIOMETER_ROTATION_CHANNEL,
         .sample_rate = 1000,
     },
 };
@@ -128,6 +169,7 @@ static const AdcMgrConfig kAdcMgrConfig = {
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 static uint16_t s_potentiometer_up_down_underlying_buffer[1024] = {0};
 static uint16_t s_potentiometer_left_right_underlying_buffer[1024] = {0};
+static uint16_t s_potentiometer_rotation_underlying_buffer[1024] = {0};
 
 static AdcMgrReadResults s_adc_read_results = {
     .channel_buffers =
@@ -144,6 +186,12 @@ static AdcMgrReadResults s_adc_read_results = {
                     .capacity = LIMB_ARR_LEN(
                         s_potentiometer_left_right_underlying_buffer),
                 },
+            [POTENTIOMETER_ROTATION_CHANNEL] =
+                {
+                    .data = s_potentiometer_rotation_underlying_buffer,
+                    .capacity = LIMB_ARR_LEN(
+                        s_potentiometer_rotation_underlying_buffer),
+                },
         },
 };
 
@@ -151,12 +199,16 @@ static AdcMgrChannelBuffer* s_potentiometer_up_down_buffer =
     &s_adc_read_results.channel_buffers[POTENTIOMETER_UP_DOWN_CHANNEL];
 static AdcMgrChannelBuffer* s_potentiometer_left_right_buffer =
     &s_adc_read_results.channel_buffers[POTENTIOMETER_LEFT_RIGHT_CHANNEL];
+static AdcMgrChannelBuffer* s_potentiometer_rotation_buffer =
+    &s_adc_read_results.channel_buffers[POTENTIOMETER_ROTATION_CHANNEL];
 
 static uint16_t s_latest_potentiometer_up_down_value = 0;
 static uint16_t s_latest_potentiometer_left_right_value = 0;
+static uint16_t s_latest_potentiometer_rotation_value = 0;
 
 static ServoHandle s_left_right_servo_handle;
 static ServoHandle s_up_down_servo_handle;
+static stepper_control_handle_t s_upper_arm_rotation_stepper_handle;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 static void can_rx_task([[maybe_unused]] void* arg) {
@@ -180,6 +232,10 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         servo_set_target_angle(s_left_right_servo_handle, (JointAngle){0});
         break;
       }
+      case CAN_ID_ROBOT_UPPER_ARM_ROTATION_STOP: {
+        stepper_set_estop(s_upper_arm_rotation_stepper_handle, true);
+        break;
+      }
       case CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION: {
         assert(can_buf_len == 4);
         JointAngle joint_angle = {*(float*)can_buf};
@@ -194,6 +250,18 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         servo_set_target_angle(s_left_right_servo_handle, joint_angle);
         break;
       }
+      case CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION: {
+        assert(can_buf_len == 4);
+        JointAngle joint_angle = {*(float*)can_buf};
+        ESP_LOGI(TAG, "Received upper arm rotation joint angle %f",
+                 joint_angle.degree);
+        // FIXME: stepper_set_target_angle should probably take a JointAngle
+        // instead.
+        PotentiometerAngle pot_angle = to_potentiometer_angle(
+            &kUpperArmRotationStepperConfig.potentiometer, joint_angle);
+        stepper_set_target_angle(s_left_right_servo_handle, pot_angle);
+        break;
+      }
       default: {
         ESP_LOGW(TAG, "Unknown CAN Message received: 0x%x", can_id);
         break;
@@ -204,7 +272,7 @@ static void can_rx_task([[maybe_unused]] void* arg) {
   vTaskDelete(NULL);
 }
 
-static void servos_update_task([[maybe_unused]] void* args) {
+static void motors_update_task([[maybe_unused]] void* args) {
   enum { PERIOD_MS = 10 };
 
   TickType_t current_tick = xTaskGetTickCount();
@@ -230,11 +298,19 @@ static void servos_update_task([[maybe_unused]] void* args) {
                          s_potentiometer_left_right_buffer->length);
     s_potentiometer_left_right_buffer->length = 0;
 
+    s_latest_potentiometer_rotation_value =
+        moving_average16(s_latest_potentiometer_rotation_value,
+                         s_potentiometer_rotation_buffer->data,
+                         s_potentiometer_rotation_buffer->length);
+    s_potentiometer_rotation_buffer->length = 0;
+
     // Update servos.
     servo_update(s_up_down_servo_handle, PERIOD_MS,
                  s_latest_potentiometer_up_down_value);
     servo_update(s_left_right_servo_handle, PERIOD_MS,
                  s_latest_potentiometer_left_right_value);
+    stepper_update(s_upper_arm_rotation_stepper_handle, PERIOD_MS,
+                   s_latest_potentiometer_rotation_value);
 
     // FIXME: Figure out how often we want to send the status updates.
     // Send up/down potentiometer status update.
@@ -275,6 +351,22 @@ static void servos_update_task([[maybe_unused]] void* args) {
                  esp_err_to_name(err));
       }
     }
+
+    // Send upper arm rotation potentiometer status update.
+    {
+      PotentiometerAngle potentiometer_angle = potentiometer_adc_to_angle(
+          &kUpperArmRotationStepperConfig.potentiometer,
+          s_latest_potentiometer_rotation_value);
+      JointAngle joint_angle = to_joint_angle(
+          &kUpperArmRotationStepperConfig.potentiometer, potentiometer_angle);
+      esp_err_t err = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER,
+                               (uint8_t*)&joint_angle.degree,
+                               sizeof(joint_angle.degree), 0);
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error sending upper arm rotation angle over CAN: %s",
+                 esp_err_to_name(err));
+      }
+    }
   }
 
   vTaskDelete(NULL);
@@ -306,7 +398,7 @@ void app_main(void) {
     }
   }
 
-  // Servo initialization.
+  // Servo and stepper initialization.
   {
     vTaskDelay(pdMS_TO_TICKS(10));
     esp_err_t err = adc_mgr_read(&s_adc_read_results, 0);
@@ -323,6 +415,10 @@ void app_main(void) {
         limb_average16(s_potentiometer_left_right_buffer->data,
                        s_potentiometer_left_right_buffer->length);
     s_potentiometer_left_right_buffer->length = 0;
+    s_latest_potentiometer_rotation_value =
+        limb_average16(s_potentiometer_rotation_buffer->data,
+                       s_potentiometer_rotation_buffer->length);
+    s_potentiometer_rotation_buffer->length = 0;
 
     err = servo_init(&kUpDownServoConfig, s_latest_potentiometer_up_down_value,
                      &s_up_down_servo_handle);
@@ -342,9 +438,20 @@ void app_main(void) {
                esp_err_to_name(err));
       return;
     }
+
+    err = stepper_init(&kUpperArmRotationStepperConfig,
+                       s_latest_potentiometer_rotation_value,
+                       &s_upper_arm_rotation_stepper_handle);
+    s_potentiometer_rotation_buffer->length = 0;
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG,
+               "Error calling stepper_init for upper arm rotation stepper: %s",
+               esp_err_to_name(err));
+      return;
+    }
   }
 
   xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
-  xTaskCreate(servos_update_task, "Servos update task", 1024 * 2 * 2, NULL, 6,
+  xTaskCreate(motors_update_task, "Motors update task", 1024 * 2 * 2, NULL, 6,
               NULL);
 }
