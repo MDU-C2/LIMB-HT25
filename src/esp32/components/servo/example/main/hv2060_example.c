@@ -37,6 +37,7 @@ const ServoConfig servo_config = {
     .gpio_pin = GPIO_NUM_1,
     .direction = SERVO_DIR_NORMAL,
     .ledc_channel = LEDC_CHANNEL_0,
+    .ledc_timer = LEDC_TIMER_0,
     // FIXME: This value assumes 7.4V, but it was measured with 7V.
     .max_capable_angular_velocity = {400.F},
     // FIXME: The measured value I got here was 150. We cheat a bit to make sure we don't get stuck.

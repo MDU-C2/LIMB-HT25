@@ -19,6 +19,8 @@ typedef struct {
   int gpio_pin;
   // LEDC channel used by the servo.
   ledc_channel_t ledc_channel;
+  // LEDC timer used by the servo.
+  ledc_timer_t ledc_timer;
 
   // The pulse width that stops the servo.
   uint16_t motionless_pw;

@@ -56,11 +56,11 @@ esp_err_t servo_init(const ServoConfig *servo_config,
                      const uint16_t *latest_potentiometer_values,
                      uint16_t latest_potentiometer_values_len,
                      ServoHandle *out_handle) {
-  // Configure LEDC timer (shared by all servos).
+  // Configure LEDC timer (can be shared by all servos).
   const ledc_timer_config_t ledc_timer = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
       .duty_resolution = LEDC_TIMER_13_BIT,
-      .timer_num = LEDC_TIMER_0,
+      .timer_num = servo_config->ledc_timer,
       .freq_hz = SERVO_FREQUENCY,
       .clk_cfg = LEDC_AUTO_CLK,
   };
@@ -85,7 +85,7 @@ esp_err_t servo_init(const ServoConfig *servo_config,
       .speed_mode = LEDC_LOW_SPEED_MODE,
       .channel = servo_config->ledc_channel,
       .intr_type = LEDC_INTR_DISABLE,
-      .timer_sel = LEDC_TIMER_0,
+      .timer_sel = servo_config->ledc_timer,
       .duty = us_to_duty(servo_config, servo_config->motionless_pw),
   };
 
