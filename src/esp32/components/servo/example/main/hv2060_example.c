@@ -19,42 +19,40 @@ enum {
       ((HV2060_MAX_PULSEWIDTH_US - HV2060_MIN_PULSEWIDTH_US) / 2) +
       HV2060_MIN_PULSEWIDTH_US,
 
-  INTERNAL_SERVO_POTENTIOMETER_DEGREES_OF_MOTION = 220,
-
   // NOTE: These should be measured at the maximum and minimum extents of
   // the motor actuations you want to support. These current values aren't
   // accurate.
-  HV2060_MIN_POTENTIOMETER_ANGLE = 56,
-  HV2060_MAX_POTENTIOMETER_ANGLE = 212,
+  HV2060_MIN_POTENTIOMETER_ANGLE = 20,
+  HV2060_MAX_POTENTIOMETER_ANGLE = 70,
   HV2060_MID_POTENTIOMETER_ANGLE =
       ((HV2060_MAX_POTENTIOMETER_ANGLE - HV2060_MIN_POTENTIOMETER_ANGLE) / 2) +
       HV2060_MIN_POTENTIOMETER_ANGLE,
   HV2060_POTENTIOMETER_ANGLE_RANGE =
       HV2060_MAX_POTENTIOMETER_ANGLE - HV2060_MIN_POTENTIOMETER_ANGLE,
 
-  SERVO_POT_ADC_CHANNEL = ADC_CHANNEL_1,
+  SERVO_POT_ADC_CHANNEL = ADC_CHANNEL_0,
 };
 
 const ServoConfig servo_config = {
-    .gpio_pin = GPIO_NUM_0,
+    .gpio_pin = GPIO_NUM_1,
     .direction = SERVO_DIR_NORMAL,
     .ledc_channel = LEDC_CHANNEL_0,
-
-    .min_angle = {HV2060_MIN_POTENTIOMETER_ANGLE},
-    .max_angle = {HV2060_MAX_POTENTIOMETER_ANGLE},
-    .min_pulse_us = HV2060_MIN_PULSEWIDTH_US,
-    .max_pulse_us = HV2060_MAX_PULSEWIDTH_US,
-    .initial_angle = {HV2060_MID_POTENTIOMETER_ANGLE},
-
-    .max_angular_velocity = {90.F},
-    .max_angular_acceleration = {100.F},
+    // FIXME: This value assumes 7.4V, but it was measured with 7V.
+    .max_capable_angular_velocity = {400.F},
+    // FIXME: The measured value I got here was 150. We cheat a bit to make sure we don't get stuck.
+    .max_capable_angular_velocity_pw_offset = 800,
+    .min_capable_angular_velocity = {34.F},
+    .min_capable_angular_velocity_pw_offset = 17,
+    .motionless_pw = 1500,
+    .max_angular_velocity = {60.F},
+    .max_angular_acceleration = {200.F},
     .pot_adc_channel = SERVO_POT_ADC_CHANNEL,
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
             // FIXME: These need to be calibrated.
-            .min_adc_value = 32,
-            .max_adc_value = 1500,
+            .min_adc_value = 6,
+            .max_adc_value = 3087,
             .min_potentiometer_angle = {HV2060_MIN_POTENTIOMETER_ANGLE},
             .max_potentiometer_angle = {HV2060_MAX_POTENTIOMETER_ANGLE},
             .min_potentiometer_angle_as_joint_angle = {0.F},
@@ -103,7 +101,7 @@ void app_main(void) {
   s_servo_potentiometer_adc_channel_buffer->length = 0;
 
   JointAngle stops[] = {
-      {0}, {30}, {60}, {90}, {130}, {155},
+      {0}, {50},
   };
 
   int i = 0;

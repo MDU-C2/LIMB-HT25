@@ -19,16 +19,24 @@ typedef struct {
   int gpio_pin;
   // LEDC channel used by the servo.
   ledc_channel_t ledc_channel;
-  // Minimum potentiometer angle that the servo should be able to actuate at.
-  PotentiometerAngle min_angle;
-  // Maximum potentiometer angle that the servo should be able to actuate at.
-  PotentiometerAngle max_angle;
-  // The pulse width that corresponds to min_angle.
-  uint32_t min_pulse_us;
-  // The pulse width that corresponds to max_angle.
-  uint32_t max_pulse_us;
-  // The angle the servo should be set to right after initialization.
-  PotentiometerAngle initial_angle;
+
+  // The pulse width that stops the servo.
+  uint16_t motionless_pw;
+
+  // The min and max speeds that the servo can actuate with.
+
+  // The maximum capable angular velocity.
+  AngularVelocity max_capable_angular_velocity;
+  // The pulse width offset from motionless_pw that corresponds to the
+  // max_capable_angular_velocity.
+  uint16_t max_capable_angular_velocity_pw_offset;
+  // The minimum capable angular velocity (the slowest it can actually move
+  // without being still).
+  AngularVelocity min_capable_angular_velocity;
+  // The pulse width offset from motionless_pw that corresponds to the
+  // min_capable_angular_velocity.
+  uint16_t min_capable_angular_velocity_pw_offset;
+
   // The maximum allowed velocity of the servo.
   AngularVelocity max_angular_velocity;
   // The maximum allowed acceleration of the servo.
@@ -60,11 +68,12 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                   const uint16_t *potentiometer_values,
                   uint16_t potentiometer_values_len);
 
+// Sets the target angle that `servo_update` aims for.
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);
 
-// Actuate servo to the specified degree.
-void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg);
+// Apply the provided angular velocity.
+void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity);
 
-// Move the servo to the specified pulse width. The value is clamped to the
-// servo's min and max pulse widths before being written.
-void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width);
+// Apply the velocity represented by the provided pulse width.
+void servo_apply_pulse_width_as_velocity(ServoHandle handle,
+                                         uint16_t pulse_width);
