@@ -149,6 +149,10 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
 void imu_task([[maybe_unused]] void *pvParameter) {
   imu_data_t imu_data;  // (imu_vector_t) accel and (imu_vector_t) gyro
 
+  // The buffer is used for the xyz values of both the gyro and the accel
+  // messages.
+  uint16_t imu_can_msg_buf[3] = {0};
+
   TickType_t current_tick = xTaskGetTickCount();
   while (1) {
     // Period of 100 Hz / 10 ms.
@@ -163,10 +167,30 @@ void imu_task([[maybe_unused]] void *pvParameter) {
       }
     }
 
-    // Log IMU data instead of sending over CAN (no CAN hardware)
-    ESP_LOGI(TAG, "IMU - Accel: X=%d, Y=%d, Z=%d | Gyro: X=%d, Y=%d, Z=%d",
-             imu_data.accel.x, imu_data.accel.y, imu_data.accel.z,
-             imu_data.gyro.x, imu_data.gyro.y, imu_data.gyro.z);
+    {
+      imu_can_msg_buf[0] = imu_data.gyro.x;
+      imu_can_msg_buf[1] = imu_data.gyro.y;
+      imu_can_msg_buf[2] = imu_data.gyro.z;
+      esp_err_t err =
+          can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO, (uint8_t *)imu_can_msg_buf,
+                   sizeof(imu_can_msg_buf), 0);
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error sending IMU gyro over CAN: %s",
+                 esp_err_to_name(err));
+      }
+    }
+    {
+      imu_can_msg_buf[0] = imu_data.accel.x;
+      imu_can_msg_buf[1] = imu_data.accel.y;
+      imu_can_msg_buf[2] = imu_data.accel.z;
+      esp_err_t err =
+          can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL, (uint8_t *)imu_can_msg_buf,
+                   sizeof(imu_can_msg_buf), 0);
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error sending IMU accel over CAN: %s",
+                 esp_err_to_name(err));
+      }
+    }
   }
 }
 
