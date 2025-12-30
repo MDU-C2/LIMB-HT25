@@ -64,6 +64,7 @@ static const ServoConfig kUpDownServoConfig = {
     // moving.
     .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
+    .gear_ratio = 1.F,
     .max_velocity = {60.F},
     .max_accel = {200.F},
     .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
@@ -91,7 +92,7 @@ static const ServoConfig kLeftRightServoConfig = {
     .max_capable_angular_velocity = {400},
     // FIXME: Figure out what to set this to. With no load the servo maxes out
     // at an offset of about 140-150, but it might be different with load.
-    .max_capable_angular_velocity_pw_offset = 800,
+    .max_capable_angular_velocity_pw_offset = 150,
     // FIXME: All of the below values need to be calibrated. Different servo (of
     // the same model) that might have slightly different characteristics, and
     // also different movement.
@@ -102,8 +103,9 @@ static const ServoConfig kLeftRightServoConfig = {
     // moving.
     .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
-    .max_velocity = {34.F},
-    .max_accel = {40.F},
+    .gear_ratio = 15.F,
+    .max_velocity = {8.F},
+    .max_accel = {8.F},
     .pot_adc_channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
     .potentiometer =
         (Potentiometer){

@@ -44,6 +44,11 @@ typedef struct {
   // The maximum allowed acceleration of the servo.
   AngularAcceleration max_accel;
 
+  // The ratio between the servo's rotation and the joint's rotation
+  // (i.e. 15 means the servo has to complete 15 turns for the joint to complete
+  // 1 turn).
+  float gear_ratio;
+
   // The ADC channel used for the servo's potentiometer.
   adc_channel_t pot_adc_channel;
   // The configuration/calibration of the servo's potentiometer.
