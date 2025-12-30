@@ -196,16 +196,6 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 
   servo_apply_velocity(handle, new_velocity);
 
-  static uint32_t log_counter = 0;
-  if (++log_counter >= 10) {  // Log every 100 updates
-    log_counter = 0;
-    ESP_LOGI(TAG,
-             "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f dps",
-             args.target_angle.degree, ctx->current_angle.degree,
-             args.target_angle.degree - ctx->current_angle.degree,
-             ctx->current_angular_velocity.dps);
-  }
-
   return ctx->current_angular_velocity.dps == 0.F;
 }
 

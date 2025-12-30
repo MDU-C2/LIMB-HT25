@@ -353,18 +353,6 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
   // the literal value 0.F gets returned when within the deadband, so it should
   // be fine checking against the same literal.
   if (new_velocity.dps == 0.F) {
-    static uint32_t log_counter = 0;
-    if (++log_counter >= 100) {  // Log every 100 updates
-      log_counter = 0;
-      ESP_LOGI(TAG, "STOPPING!");
-      ESP_LOGI(
-          TAG,
-          "Update: target=%.2f°, current=%.2f°, error=%.2f°, vel=%.1f sps, "
-          "moving=%d",
-          target_angle.degree, angle_deg.degree,
-          target_angle.degree - angle_deg.degree, current_velocity_sps,
-          ctx->is_moving);
-    }
     stop_motor(handle);
     return;
   }
