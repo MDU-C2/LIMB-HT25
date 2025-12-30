@@ -226,27 +226,43 @@ void stepper_test_task([[maybe_unused]] void *pvParameter) {
 
 void app_main(void) {
     ESP_LOGI(TAG, "Robot elbow module starting...");
-    
-    // Initialize hardware
-    CanMsgFilter can_filter = {
-        // We want to accept all messages that are sent with the elbow node as the recipient.
-        .id = CAN_RECIPIENT_ROBOT_ELBOW,
-        .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY, CAN_RECIPIENT_FILTER_EXACT, CAN_GENERIC_FILTER_ANY),
-    };
-    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, &can_filter);
-    ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
-    
-    imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
-    imu_cfg.sda_pin = IMU_SDA_PIN;
-    imu_cfg.scl_pin = IMU_SCL_PIN;
-    imu_init(&imu_cfg);
-    ESP_LOGI(TAG, "IMU initialized (SDA=10, SCL=9)");
 
-    if (adc_mgr_init(s_adc_mgr_config) == ESP_OK) {
+    // Initialize CAN.
+    {
+        CanMsgFilter can_filter = {
+            // We want to accept all messages that are sent with the elbow node as the recipient.
+            .id = CAN_RECIPIENT_ROBOT_ELBOW,
+            .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY, CAN_RECIPIENT_FILTER_EXACT, CAN_GENERIC_FILTER_ANY),
+        };
+        esp_err_t err = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, &can_filter);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize CAN driver: %s", esp_err_to_name(err));
+            return;
+        }
+        ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE);
+    }
+
+    // Initialize IMU.
+    {
+        imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
+        imu_cfg.sda_pin = IMU_SDA_PIN;
+        imu_cfg.scl_pin = IMU_SCL_PIN;
+        esp_err_t err = imu_init(&imu_cfg);
+        if (err) {
+            ESP_LOGE(TAG, "Failed to initialize IMU driver: %s", esp_err_to_name(err));
+            return;
+        }
+        ESP_LOGI(TAG, "IMU initialized (SDA=%d, SCL=%d)", imu_cfg.sda_pin, imu_cfg.scl_pin);
+    }
+
+    // Initialize ADC.
+    {
+        esp_err_t err = adc_mgr_init(s_adc_mgr_config);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize ADC manager: %s", esp_err_to_name(err));
+            return;
+        }
         ESP_LOGI(TAG, "ADC manager initialized");
-    } else {
-        ESP_LOGE(TAG, "Failed to initialize ADC manager");
-        return;
     }
 
     // Wait for a bit to get initial results.
@@ -254,12 +270,14 @@ void app_main(void) {
     adc_mgr_read(&s_adc_mgr_read_results, 0);
 
     s_latest_potentiometer_adc_value = limb_average16(s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
-    
-    if (stepper_init(&s_elbow_stepper_cfg, s_latest_potentiometer_adc_value, &s_elbow_stepper_handle) == ESP_OK) {
-        ESP_LOGI(TAG, "Elbow stepper initialized");
-    } else {
-        ESP_LOGE(TAG, "Failed to initialize elbow stepper");
-        return;
+
+    // Initialize stepper motor.
+    {
+        esp_err_t err = stepper_init(&s_elbow_stepper_cfg, s_latest_potentiometer_adc_value, &s_elbow_stepper_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize elbow stepper");
+            return;
+        }
     }
     s_adc_mgr_elbow_buffer->length = 0;
     
@@ -269,10 +287,32 @@ void app_main(void) {
         TASK_HIGH_PRIORITY = 5,
         TASK_LOW_PRIORITY = 4,
     };
-    xTaskCreate(can_rx_task, "can_rx", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
-    xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
-    xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
-    xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH, NULL, TASK_LOW_PRIORITY, NULL);  // Lower priority than stepper_task
+
+    {
+        BaseType_t err = xTaskCreate(can_rx_task, "can_rx", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
+        if (err != pdPASS) {
+          ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
+          return;
+        }
+
+        err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
+        if (err != pdPASS) {
+          ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
+          return;
+        }
+
+        err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
+        if (err != pdPASS) {
+          ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
+          return;
+        }
+
+        // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH, NULL, TASK_LOW_PRIORITY, NULL);  // Lower priority than stepper_task
+        // if (err != pdPASS) {
+        //   ESP_LOGE(TAG, "Failed to create stepper_test task, err code: %d");
+        //   return;
+        // }
+    }
 
     ESP_LOGI(TAG, "Tasks created, system running");
 }
