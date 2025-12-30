@@ -296,17 +296,26 @@ static void motors_update_task([[maybe_unused]] void* args) {
     // FIXME: Figure out how often we want to send the status updates.
     // Send up/down potentiometer status update.
     {
-      static int i = 0;
       PotentiometerAngle potentiometer_angle =
           potentiometer_adc_to_angle(&kUpDownServoConfig.potentiometer,
                                      s_latest_potentiometer_up_down_value);
       JointAngle joint_angle = to_joint_angle(&kUpDownServoConfig.potentiometer,
                                               potentiometer_angle);
-      if (++i == 100) {
-        ESP_LOGI(TAG, "Current up/down pot angle: %f",
-                 potentiometer_angle.degree);
-        ESP_LOGI(TAG, "Current up/down joint angle: %f", joint_angle.degree);
+      static int i = 0;
+      if (++i == 10) {
         i = 0;
+        PotentiometerAngle target_pot_angle =
+            servo_get_target_angle(s_up_down_servo_handle);
+        JointAngle target_joint_angle =
+            to_joint_angle(&kUpDownServoConfig.potentiometer, target_pot_angle);
+        AngularVelocity velocity =
+            servo_get_current_velocity(s_left_right_servo_handle);
+        ESP_LOGI(TAG,
+                 "up/down: adc=%u, curr pot=%.2f, target pot=%.2f, curr "
+                 "joint=%.2f, target joint=%.2f, velocity: %.2f",
+                 s_latest_potentiometer_up_down_value,
+                 potentiometer_angle.degree, target_pot_angle.degree,
+                 joint_angle.degree, target_joint_angle.degree, velocity.dps);
       }
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
                                (uint8_t*)&joint_angle.degree,
@@ -324,6 +333,22 @@ static void motors_update_task([[maybe_unused]] void* args) {
                                      s_latest_potentiometer_left_right_value);
       JointAngle joint_angle = to_joint_angle(
           &kLeftRightServoConfig.potentiometer, potentiometer_angle);
+      static int i = 0;
+      if (++i == 10) {
+        i = 0;
+        PotentiometerAngle target_pot_angle =
+            servo_get_target_angle(s_left_right_servo_handle);
+        JointAngle target_joint_angle = to_joint_angle(
+            &kLeftRightServoConfig.potentiometer, target_pot_angle);
+        AngularVelocity velocity =
+            servo_get_current_velocity(s_left_right_servo_handle);
+        ESP_LOGI(TAG,
+                 "left/right: adc=%u, curr pot=%.2f, target pot=%.2f, curr "
+                 "joint=%.2f, target joint=%.2f, velocity: %.2f",
+                 s_latest_potentiometer_left_right_value,
+                 potentiometer_angle.degree, target_pot_angle.degree,
+                 joint_angle.degree, target_joint_angle.degree, velocity.dps);
+      }
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
                                (uint8_t*)&joint_angle.degree,
                                sizeof(joint_angle.degree), 0);
@@ -340,6 +365,26 @@ static void motors_update_task([[maybe_unused]] void* args) {
           s_latest_potentiometer_rotation_value);
       JointAngle joint_angle = to_joint_angle(
           &kUpperArmRotationStepperConfig.potentiometer, potentiometer_angle);
+      static uint32_t i = 0;
+      if (++i >= 10) {  // Every 100ms
+        i = 0;
+        PotentiometerAngle target_pot_angle =
+            stepper_get_target_angle(s_upper_arm_rotation_stepper_handle);
+        JointAngle target_angle = to_joint_angle(
+            &kUpperArmRotationStepperConfig.potentiometer, target_pot_angle);
+        AngularVelocity velocity =
+            stepper_get_current_velocity(s_upper_arm_rotation_stepper_handle);
+        bool moving = stepper_is_moving(s_upper_arm_rotation_stepper_handle);
+
+        ESP_LOGI(TAG,
+                 "adc: %u, Stepper elbow - Current(pot): %.2f°, Target(pot): "
+                 "%.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: "
+                 "%.2f°/s, Moving: %s",
+                 s_latest_potentiometer_rotation_value,
+                 potentiometer_angle.degree, target_pot_angle.degree,
+                 joint_angle.degree, target_angle.degree, velocity.dps,
+                 moving ? "Yes" : "No");
+      }
       esp_err_t err = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER,
                                (uint8_t*)&joint_angle.degree,
                                sizeof(joint_angle.degree), 0);
