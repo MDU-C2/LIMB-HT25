@@ -32,12 +32,6 @@ typedef struct {
   // The pulse width offset from motionless_pw that corresponds to the
   // max_capable_angular_velocity.
   uint16_t max_capable_angular_velocity_pw_offset;
-  // The minimum capable angular velocity (the slowest it can actually move
-  // without being still).
-  AngularVelocity min_capable_angular_velocity;
-  // The pulse width offset from motionless_pw that corresponds to the
-  // min_capable_angular_velocity.
-  uint16_t min_capable_angular_velocity_pw_offset;
 
   // The maximum allowed velocity of the servo.
   AngularVelocity max_velocity;

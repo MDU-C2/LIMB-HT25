@@ -57,12 +57,6 @@ static const ServoConfig kUpDownServoConfig = {
     // FIXME: Figure out what to set this to. With no load the servo maxes out
     // at an offset of about 140-150, but it might be different with load.
     .max_capable_angular_velocity_pw_offset = 150,
-    // This velocity was roughly eyeballed when the servo was moving at its
-    // fastest pace with no load.
-    .min_capable_angular_velocity = {34.F},
-    // This is the lowest pulse width offset that results in the servo actually
-    // moving.
-    .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
     .gear_ratio = 15.F,
     .max_velocity = {8.F},
@@ -91,12 +85,6 @@ static const ServoConfig kLeftRightServoConfig = {
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
-    // This velocity was roughly eyeballed when the
-    // servo was moving at its fastest pace with no load.
-    .min_capable_angular_velocity = {34.F},
-    // This is the lowest pulse width offset that results in the servo actually
-    // moving.
-    .min_capable_angular_velocity_pw_offset = 17,
     .gear_ratio = 15.F,
     .max_velocity = {8.F},
     .max_accel = {8.F},
