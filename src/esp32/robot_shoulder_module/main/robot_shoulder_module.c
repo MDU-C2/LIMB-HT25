@@ -95,8 +95,6 @@ static const ServoConfig kLeftRightServoConfig = {
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_potentiometer_angle = {90},
-            .max_potentiometer_angle = {138},
             .min_adc_value = 10,
             .max_adc_value = 2922,
             // The red wire should be connected to ground and the black to Vin.
