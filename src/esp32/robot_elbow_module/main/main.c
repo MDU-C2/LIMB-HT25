@@ -209,11 +209,18 @@ void stepper_test_task([[maybe_unused]] void *pvParameter) {
         float target = test_angles[angle_index];
         stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){target});
         ESP_LOGI(TAG, ">>> Setting target angle to %.1f°", target);
-        
-        // Wait for both steppers to reach target (or timeout after 5 seconds)
+
         TickType_t start_time = xTaskGetTickCount();
-        while ((stepper_is_moving(s_elbow_stepper_handle)) && (xTaskGetTickCount() - start_time < pdMS_TO_TICKS(5000))) {
+
+        // Allow motor to start moving.
+        vTaskDelay(pdMS_TO_TICKS(500));
+
+        TickType_t ticks_since_start_time = xTaskGetTickCount() - start_time;
+
+        // Wait for stepper to reach target (or timeout after 5 seconds)
+        while (stepper_is_moving(s_elbow_stepper_handle) && (ticks_since_start_time < pdMS_TO_TICKS(15000))) {
             vTaskDelay(pdMS_TO_TICKS(100));
+            ticks_since_start_time = xTaskGetTickCount() - start_time;
         }
         
         // Hold at this position for 2 seconds
