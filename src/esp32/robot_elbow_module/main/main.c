@@ -115,9 +115,6 @@ stepper_control_handle_t s_elbow_stepper_handle = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 void can_rx_task([[maybe_unused]] void *pvParameter) {
-  const stepper_control_config_t *elbow_stepper_config =
-      stepper_get_cfg(s_elbow_stepper_handle);
-
   uint8_t msg_rx[CAN_MAX_MESSAGE_SIZE];
   uint8_t rx_len = CAN_MAX_MESSAGE_SIZE;
   uint32_t rx_id = 0;
@@ -164,9 +161,6 @@ void imu_task([[maybe_unused]] void *pvParameter) {
 }
 
 void stepper_task([[maybe_unused]] void *pvParameter) {
-  const stepper_control_config_t *elbow_stepper_cfg =
-      stepper_get_cfg(s_elbow_stepper_handle);
-
   TickType_t last_wake_time = xTaskGetTickCount();
   const TickType_t period_ms = pdMS_TO_TICKS(10);  // 10ms = 100Hz update rate
 
@@ -193,9 +187,9 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
       PotentiometerAngle target_pot_angle =
           stepper_get_target_angle(s_elbow_stepper_handle);
       JointAngle current_angle =
-          to_joint_angle(&elbow_stepper_cfg->potentiometer, current_pot_angle);
+          to_joint_angle(&s_elbow_stepper_cfg.potentiometer, current_pot_angle);
       JointAngle target_angle =
-          to_joint_angle(&elbow_stepper_cfg->potentiometer, target_pot_angle);
+          to_joint_angle(&s_elbow_stepper_cfg.potentiometer, target_pot_angle);
       AngularVelocity velocity =
           stepper_get_current_velocity(s_elbow_stepper_handle);
       bool moving = stepper_is_moving(s_elbow_stepper_handle);
@@ -226,9 +220,6 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
 
 // Test task to cycle through different target angles
 void stepper_test_task([[maybe_unused]] void *pvParameter) {
-  const stepper_control_config_t *elbow_cfg =
-      stepper_get_cfg(s_elbow_stepper_handle);
-
   // Wait a bit for system to initialize
   vTaskDelay(pdMS_TO_TICKS(2000));
 
