@@ -106,6 +106,8 @@ AdcMgrReadResults s_adc_mgr_read_results = {
 
 AdcMgrChannelBuffer *s_adc_mgr_elbow_buffer = &s_adc_mgr_read_results.channel_buffers[ADC_ELBOW_CHANNEL];
 
+uint16_t s_latest_potentiometer_adc_value;
+
 stepper_control_handle_t s_elbow_stepper_handle = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
@@ -154,8 +156,9 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
         const uint16_t dt_ms = 10; // 10ms in seconds
 
         adc_mgr_read(&s_adc_mgr_read_results, 0);
-        stepper_update(s_elbow_stepper_handle, dt_ms, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
+        s_latest_potentiometer_adc_value = moving_average16(s_latest_potentiometer_adc_value, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
         s_adc_mgr_elbow_buffer->length = 0;
+        stepper_update(s_elbow_stepper_handle, dt_ms, s_latest_potentiometer_adc_value);
         
         // Send status over CAN and log
         static uint32_t status_counter = 0;
@@ -250,8 +253,10 @@ void app_main(void) {
     // Wait for a bit to get initial results.
     vTaskDelay(pdMS_TO_TICKS(10));
     adc_mgr_read(&s_adc_mgr_read_results, 0);
+
+    s_latest_potentiometer_adc_value = limb_average16(s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length);
     
-    if (stepper_init(&s_elbow_stepper_cfg, s_adc_mgr_elbow_buffer->data, s_adc_mgr_elbow_buffer->length, &s_elbow_stepper_handle) == ESP_OK) {
+    if (stepper_init(&s_elbow_stepper_cfg, s_latest_potentiometer_adc_value, &s_elbow_stepper_handle) == ESP_OK) {
         ESP_LOGI(TAG, "Elbow stepper initialized");
     } else {
         ESP_LOGE(TAG, "Failed to initialize elbow stepper");

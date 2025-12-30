@@ -48,8 +48,6 @@ typedef struct {
   // Calculated parameters
   float steps_per_degree;
 
-  uint16_t latest_approximated_adc_value;
-
   bool is_initialized;
 } motion_control_context_t;
 
@@ -110,8 +108,7 @@ static void apply_motor_velocity(stepper_control_handle_t handle,
 // Initialization
 
 esp_err_t stepper_init(const stepper_control_config_t *cfg,
-                       const uint16_t *latest_potentiometer_values,
-                       uint16_t latest_potentiometer_values_len,
+                       uint16_t latest_potentiometer_adc_value,
                        stepper_control_handle_t *out_handle) {
   // Validate config
   if (!cfg) return ESP_ERR_INVALID_ARG;
@@ -264,37 +261,23 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_cfg), TAG,
                       "Failed to configure LEDC channel");
 
-  // ADC setup & filtered initial angle
-  if (latest_potentiometer_values_len > 0) {
-    // Use initial ADC value to set intial angle (averaged for stability).
-    uint16_t raw_adc = limb_average16(latest_potentiometer_values,
-                                      latest_potentiometer_values_len);
-    ctx.latest_approximated_adc_value = raw_adc;
+  PotentiometerAngle initial_angle = potentiometer_adc_to_angle(
+      &ctx.cfg.potentiometer, latest_potentiometer_adc_value);
+  ctx.current_angle = initial_angle;
+  // Our target angle should be within the range of allowed angles, even if
+  // the current angle isn't.
+  ctx.target_angle =
+      clamp_potentiometer_angle(&ctx.cfg.potentiometer, ctx.current_angle);
+  ctx.use_position_feedback = true;
 
-    PotentiometerAngle initial_angle =
-        potentiometer_adc_to_angle(&ctx.cfg.potentiometer, raw_adc);
-    ctx.current_angle = initial_angle;
-    // Our target angle should be within the range of allowed angles, even if
-    // the current angle isn't.
-    ctx.target_angle =
-        clamp_potentiometer_angle(&ctx.cfg.potentiometer, ctx.current_angle);
-    ctx.use_position_feedback = true;
-
-    ESP_LOGI(
-        TAG,
-        "Potentiometer initialized: ADC channel=%d, raw=%u, angle=%.2f deg",
-        cfg->pot_adc_channel, raw_adc, initial_angle);
-  } else {
-    ctx.use_position_feedback = false;
-    ctx.current_angle.degree = 0.0f;
-    ctx.target_angle.degree = 0.0f;
-    ESP_LOGI(TAG, "Position feedback disabled (no ADC channel)");
-  }
+  ESP_LOGI(TAG,
+           "Potentiometer initialized: ADC channel=%d, raw=%u, angle=%.2f deg",
+           cfg->pot_adc_channel, latest_potentiometer_adc_value, initial_angle);
 
   // Initialize motion state
   ctx.estop_active = false;
   ctx.is_moving = false;
-  ctx.current_velocity = (AngularVelocity){0.0f};
+  ctx.current_velocity = (AngularVelocity){0.0F};
 
   ctx.is_initialized = true;
 
@@ -326,18 +309,10 @@ esp_err_t stepper_deinit(stepper_control_handle_t handle) {
 }
 
 void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
-                    const uint16_t *latest_potentiometer_values,
-                    uint16_t latest_potentiometer_values_len) {
+                    uint16_t latest_potentiometer_adc_value) {
   motion_control_context_t *ctx = &s_contexts[handle];
-
-  if (latest_potentiometer_values_len == 0) return;
-
-  // Read & filter pot
-  ctx->latest_approximated_adc_value = moving_average16(
-      ctx->latest_approximated_adc_value, latest_potentiometer_values,
-      latest_potentiometer_values_len);
   PotentiometerAngle angle_deg = potentiometer_adc_to_angle(
-      &ctx->cfg.potentiometer, ctx->latest_approximated_adc_value);
+      &ctx->cfg.potentiometer, latest_potentiometer_adc_value);
 
   // Take snapshot of shared state and update current angle from feedback
   portENTER_CRITICAL(&ctx->spinlock);

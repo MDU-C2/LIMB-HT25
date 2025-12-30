@@ -72,8 +72,7 @@ typedef ledc_channel_t stepper_control_handle_t;
 
 // Initialize stepper motor controller
 esp_err_t stepper_init(const stepper_control_config_t *cfg,
-                       const uint16_t *latest_potentiometer_values,
-                       uint16_t latest_potentiometer_values_len,
+                       uint16_t latest_potentiometer_adc_value,
                        stepper_control_handle_t *out_handle);
 
 // Deinitialize stepper motor controller
@@ -86,8 +85,7 @@ const stepper_control_config_t *stepper_get_cfg(
 // Update stepper control loop (call periodically, e.g., every 10ms)
 // dt_ms: time delta between calls to the function.
 void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
-                    const uint16_t *latest_potentiometer_values,
-                    uint16_t latest_potentiometer_values_len);
+                    uint16_t latest_potentiometer_adc_value);
 
 // Set target angle (degrees)
 void stepper_set_target_angle(stepper_control_handle_t handle,
