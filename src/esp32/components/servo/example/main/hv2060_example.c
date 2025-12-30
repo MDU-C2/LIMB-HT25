@@ -37,8 +37,8 @@ enum {
 const ServoConfig servo_config = {
     .gpio_pin = GPIO_NUM_1,
     .direction = SERVO_DIR_NORMAL,
-    .ledc_channel = LEDC_CHANNEL_0,
-    .ledc_timer = LEDC_TIMER_0,
+    .pwm_channel = LEDC_CHANNEL_0,
+    .pwm_timer = LEDC_TIMER_0,
     // FIXME: This value assumes 7.4V, but it was measured with 7V.
     .max_capable_angular_velocity = {400.F},
     // FIXME: The measured value I got here was 150. We cheat a bit to make sure
@@ -47,8 +47,8 @@ const ServoConfig servo_config = {
     .min_capable_angular_velocity = {34.F},
     .min_capable_angular_velocity_pw_offset = 17,
     .motionless_pw = 1500,
-    .max_angular_velocity = {60.F},
-    .max_angular_acceleration = {200.F},
+    .max_velocity = {30.F},
+    .max_accel = {10.F},
     .pot_adc_channel = SERVO_POT_ADC_CHANNEL,
     .potentiometer =
         (Potentiometer){

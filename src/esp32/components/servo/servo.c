@@ -55,7 +55,7 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   const ledc_timer_config_t ledc_timer = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
       .duty_resolution = LEDC_TIMER_13_BIT,
-      .timer_num = servo_config->ledc_timer,
+      .timer_num = servo_config->pwm_timer,
       .freq_hz = SERVO_FREQUENCY,
       .clk_cfg = LEDC_AUTO_CLK,
   };
@@ -65,22 +65,22 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   ESP_LOGI(TAG, "Timer configured");
 
   ESP_LOGI(TAG, "Configuring %s on GPIO%d, Channel %d", servo_config->name,
-           servo_config->gpio_pin, servo_config->ledc_channel);
+           servo_config->gpio_pin, servo_config->pwm_channel);
 
-  if (s_channels_assigned[servo_config->ledc_channel]) {
+  if (s_channels_assigned[servo_config->pwm_channel]) {
     ESP_LOGE(
         TAG,
         "Configuring multiple servos using the same channel in servos_init!");
     return ESP_ERR_INVALID_ARG;
   }
-  s_channels_assigned[servo_config->ledc_channel] = true;
+  s_channels_assigned[servo_config->pwm_channel] = true;
 
   const ledc_channel_config_t channel_config = {
       .gpio_num = servo_config->gpio_pin,
       .speed_mode = LEDC_LOW_SPEED_MODE,
-      .channel = servo_config->ledc_channel,
+      .channel = servo_config->pwm_channel,
       .intr_type = LEDC_INTR_DISABLE,
-      .timer_sel = servo_config->ledc_timer,
+      .timer_sel = servo_config->pwm_timer,
       .duty = us_to_duty(servo_config, servo_config->motionless_pw),
   };
 
@@ -90,12 +90,12 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &servo_config->potentiometer, latest_potentiometer_adc_value);
 
-  s_servo_contexts[servo_config->ledc_channel] = (ServoContext){
+  s_servo_contexts[servo_config->pwm_channel] = (ServoContext){
       .cfg = *servo_config,
       .current_angle = current_angle,
   };
 
-  *out_handle = servo_config->ledc_channel;
+  *out_handle = servo_config->pwm_channel;
 
   ESP_LOGI(TAG, "All channels configured");
 
@@ -142,8 +142,8 @@ void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
     return;
   }
 
-  velocity.dps = LIMB_CLAMP(velocity.dps, -ctx->cfg.max_angular_velocity.dps,
-                            ctx->cfg.max_angular_velocity.dps);
+  velocity.dps = LIMB_CLAMP(velocity.dps, -ctx->cfg.max_velocity.dps,
+                            ctx->cfg.max_velocity.dps);
 
   // FIXME: The servo goes from 0dps directly to ~15dps at at a certain pulse
   // width. 0-15 pulse width range might not be linear.
@@ -152,7 +152,7 @@ void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
       ctx->cfg.max_capable_angular_velocity.dps,
       -ctx->cfg.max_capable_angular_velocity_pw_offset,
       ctx->cfg.max_capable_angular_velocity_pw_offset));
-  ESP_LOGE(TAG, "vel: %.2f, pw: %d", velocity.dps, pulse_width_offset);
+  // ESP_LOGE(TAG, "vel: %.2f, pw: %d", velocity.dps, pulse_width_offset);
   servo_apply_pulse_width_as_velocity(
       handle, ctx->cfg.motionless_pw + pulse_width_offset);
 }
@@ -173,8 +173,8 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
       .target_angle = ctx->target_angle,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_angular_velocity,
-      .max_acceleration = ctx->cfg.max_angular_acceleration,
-      .max_velocity = ctx->cfg.max_angular_velocity,
+      .max_acceleration = ctx->cfg.max_accel,
+      .max_velocity = ctx->cfg.max_velocity,
       .timestep_ms = ms_until_next_period,
   };
   const AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);
@@ -210,6 +210,6 @@ void servo_apply_pulse_width_as_velocity(ServoHandle handle,
   const uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
 
   ESP_LOGI(TAG, "pw: %u, duty: %u", pulse_width, duty);
-  ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel, duty);
-  ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel);
+  ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, duty);
+  ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
 }

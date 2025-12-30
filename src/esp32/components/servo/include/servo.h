@@ -18,9 +18,9 @@ typedef struct {
   // GPIO pin used for the PWM signal for the servo.
   int gpio_pin;
   // LEDC channel used by the servo.
-  ledc_channel_t ledc_channel;
+  ledc_channel_t pwm_channel;
   // LEDC timer used by the servo.
-  ledc_timer_t ledc_timer;
+  ledc_timer_t pwm_timer;
 
   // The pulse width that stops the servo.
   uint16_t motionless_pw;
@@ -40,9 +40,9 @@ typedef struct {
   uint16_t min_capable_angular_velocity_pw_offset;
 
   // The maximum allowed velocity of the servo.
-  AngularVelocity max_angular_velocity;
+  AngularVelocity max_velocity;
   // The maximum allowed acceleration of the servo.
-  AngularAcceleration max_angular_acceleration;
+  AngularAcceleration max_accel;
 
   // The ADC channel used for the servo's potentiometer.
   adc_channel_t pot_adc_channel;

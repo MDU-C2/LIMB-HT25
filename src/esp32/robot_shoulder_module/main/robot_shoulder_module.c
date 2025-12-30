@@ -47,8 +47,8 @@ enum {
 
 static const ServoConfig kUpDownServoConfig = {
     .gpio_pin = SERVO_UP_DOWN_GPIO,
-    .ledc_timer = LEDC_TIMER_0,
-    .ledc_channel = LEDC_CHANNEL_0,
+    .pwm_timer = LEDC_TIMER_0,
+    .pwm_channel = LEDC_CHANNEL_0,
     .name = "Shoulder up/down servo",
     // TODO(johan): These need to be changed after testing on actual arm.
     .direction = SERVO_DIR_NORMAL,
@@ -64,8 +64,8 @@ static const ServoConfig kUpDownServoConfig = {
     // moving.
     .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
-    .max_angular_velocity = {60.F},
-    .max_angular_acceleration = {200.F},
+    .max_velocity = {60.F},
+    .max_accel = {200.F},
     .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
     .potentiometer =
         (Potentiometer){
@@ -82,8 +82,8 @@ static const ServoConfig kUpDownServoConfig = {
 
 static const ServoConfig kLeftRightServoConfig = {
     .gpio_pin = SERVO_LEFT_RIGHT_GPIO,
-    .ledc_timer = LEDC_TIMER_0,
-    .ledc_channel = LEDC_CHANNEL_1,
+    .pwm_timer = LEDC_TIMER_0,
+    .pwm_channel = LEDC_CHANNEL_1,
     .name = "Shoulder left/right servo",
     // TODO(johan): These need to be changed after testing on actual arm.
     .direction = SERVO_DIR_NORMAL,
@@ -102,8 +102,8 @@ static const ServoConfig kLeftRightServoConfig = {
     // moving.
     .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
-    .max_angular_velocity = {34.F},
-    .max_angular_acceleration = {40.F},
+    .max_velocity = {34.F},
+    .max_accel = {40.F},
     .pot_adc_channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
     .potentiometer =
         (Potentiometer){
