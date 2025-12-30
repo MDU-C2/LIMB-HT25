@@ -315,7 +315,7 @@ static void motors_update_task([[maybe_unused]] void* args) {
         JointAngle target_joint_angle =
             to_joint_angle(&kUpDownServoConfig.potentiometer, target_pot_angle);
         AngularVelocity velocity =
-            servo_get_current_velocity(s_left_right_servo_handle);
+            servo_get_current_velocity(s_up_down_servo_handle);
         ESP_LOGI(TAG,
                  "up/down: adc=%u, curr pot=%.2f, target pot=%.2f, curr "
                  "joint=%.2f, target joint=%.2f, velocity: %.2f",
@@ -383,7 +383,8 @@ static void motors_update_task([[maybe_unused]] void* args) {
         bool moving = stepper_is_moving(s_upper_arm_rotation_stepper_handle);
 
         ESP_LOGI(TAG,
-                 "adc: %u, Stepper elbow - Current(pot): %.2f°, Target(pot): "
+                 "adc: %u, Stepper upper arm rotation - Current(pot): %.2f°, "
+                 "Target(pot): "
                  "%.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: "
                  "%.2f°/s, Moving: %s",
                  s_latest_potentiometer_rotation_value,
