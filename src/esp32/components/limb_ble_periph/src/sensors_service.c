@@ -29,10 +29,9 @@ bool TryNotifyEmgSubscribers(void) {
     int err = ble_gatts_notify(gEmgSubscriptionHandle, gEmgValHandle);
     if (err) {
       ESP_LOGW(kLimbTag, "Failed to send EMG notification, err(%d).", err);
-    } else {
-      ESP_LOGI(kLimbTag, "EMG notification sent.");
-    }
-    return !err;
+      return false; 
+    } 
+    return true; 
   }
   return false;
 }
@@ -59,11 +58,12 @@ bool TryNotifyImuSubscribers(void) {
   if (gImuPeerNotifyEnabled) {
     int err = ble_gatts_notify(gImuSubscriptionHandle, gImuValHandle);
     if (err) {
+
       ESP_LOGW(kLimbTag, "Failed to send IMU notification, err(%d).", err);
-    } else {
-      ESP_LOGI(kLimbTag, "IMU notification sent.");
+      return false;
     }
-    return !err;
+
+    return true;
   }
   return false;
 }
@@ -88,15 +88,12 @@ CharacteristicBuffer get_piezo_buf(void) {
 
 bool TryNotifyPiezoSubscribers(void) {
   if (gPiezoPeerNotifyEnabled) {
-    // TODO(johan): Figure out if this function is blocking. If not, we might
-    // need use a mutex for the buffer.
     int err = ble_gatts_notify(gPiezoSubscriptionHandle, gPiezoValHandle);
     if (err) {
       ESP_LOGW(kLimbTag, "Failed to send piezo notification, err(%d).", err);
-    } else {
-      ESP_LOGI(kLimbTag, "Piezo notification sent.");
+      return false;
     }
-    return !err;
+    return true;
   }
   return false;
 }
@@ -109,37 +106,20 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
     char uuid_buf[BLE_UUID_STR_LEN] = {0};
     switch (context->op) {
       case BLE_GATT_ACCESS_OP_WRITE_DSC:
-        ESP_LOGW(kLimbTag,
-                 "Invalid write access on characteristic descriptor, UUID: ",
-                 ble_uuid_to_str(context->dsc->uuid, uuid_buf));
+        ESP_LOGW(kLimbTag, "Invalid write access on characteristic descriptor");
         return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
       case BLE_GATT_ACCESS_OP_WRITE_CHR: {
-        ESP_LOGW(kLimbTag, "Invalid read access on characteristic, UUID: ",
-                 ble_uuid_to_str(context->chr->uuid, uuid_buf));
+        ESP_LOGW(kLimbTag, "Invalid read access on characteristic");
         return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
       }
       case BLE_GATT_ACCESS_OP_READ_DSC: {
-        // We shouldn't have any descriptors for the characteristics.
-        ESP_LOGW(kLimbTag,
-                 "Invalid read access on characteristic descriptor, UUID: ",
-                 ble_uuid_to_str(context->dsc->uuid, uuid_buf));
+        ESP_LOGW(kLimbTag, "Invalid read access on characteristic descriptor");
         return BLE_ATT_ERR_READ_NOT_PERMITTED;
       }
-      default: {
-        // Unreachable.
-      };
+      default:
+        break;
     }
-    assert(false &&
-           "GATT operation that isn't r/w on characteristic or descriptor.");
     return BLE_ATT_ERR_UNLIKELY;
-  }
-
-  if (connection_handle != BLE_HS_CONN_HANDLE_NONE) {
-    ESP_LOGI(kLimbTag, "characteristic read; conn_handle=%d attr_handle=%d",
-             connection_handle, attribute_handle);
-  } else {
-    ESP_LOGI(kLimbTag, "characteristic read by nimble stack; attr_handle=%d",
-             attribute_handle);
   }
 
   uint8_t* buffer = NULL;
@@ -147,35 +127,22 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
 
   // Determine which characteristic we should send.
   if (attribute_handle == gEmgValHandle) {
-    ESP_LOGI(kLimbTag, "EMG read request.", connection_handle,
-             attribute_handle);
     buffer = gEmgVal;
     buffer_size = sizeof(gEmgVal);
   } else if (attribute_handle == gImuValHandle) {
-    ESP_LOGI(kLimbTag, "IMU read request.", connection_handle,
-             attribute_handle);
     buffer = gImuVal;
     buffer_size = sizeof(gImuVal);
   } else if (attribute_handle == gPiezoValHandle) {
-    ESP_LOGI(kLimbTag, "Piezo read request.", connection_handle,
-             attribute_handle);
     buffer = gPiezoVal;
     buffer_size = sizeof(gPiezoVal);
   } else {
-    ESP_LOGW(kLimbTag,
-             "Characteristic access with an invalid attribute_handle [%d].",
-             attribute_handle);
-    assert(false && "Char access with an invalid attribute_handle.");
+    ESP_LOGW(kLimbTag, "Invalid attribute_handle [%d].", attribute_handle);
     return BLE_ATT_ERR_INVALID_HANDLE;
   }
 
   int err = os_mbuf_append(context->om, buffer, buffer_size);
   if (err != 0) {
-    ESP_LOGE(kLimbTag,
-             "Error appending characterictic value to os memory buffer. [%d]",
-             err);
-    assert(false &&
-           "Error appending characterictic value to os memory buffer.");
+    ESP_LOGE(kLimbTag, "Error appending characteristic value [%d]", err);
     return BLE_ATT_ERR_INSUFFICIENT_RES;
   }
 

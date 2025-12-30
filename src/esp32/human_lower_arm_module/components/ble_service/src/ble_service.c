@@ -1,166 +1,136 @@
-/*
- * ble_service.c
- *
- * Implements the Consumer task: sync_send_task.
- * - Depends on limb_emg_adc (Producer)
- * - Depends on limb_imu (Producer)
- * - Depends on limb_ble_periph (The "Tool" to send data)
- */
-
-#include "ble_service.h" 
-
-// --- Includes needed by sync_send_task ---
-#include <stdio.h>
+#include "ble_service.h"
 #include <string.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
-#include "freertos/semphr.h"
+#include "esp_timer.h"
 
-// --- DEPENDENCIES  ---
 #include "limb_ble_periph.h"
 #include "sensors_service.h"
-
-// 2. The "Producers" 
-#include "emg_service.h"
+#include "adc_service.h"
 #include "imu_service.h"
 
-// --- Private Definitions ---
-static const char *TAG = "BLE_SERVICE"; 
+static const char *TAG = "BLE_SERVICE_STREAM";
 
-// This counter is now private to this component
-static uint32_t g_chunk_seq_num = 0;
-#define SEQ_NUM_RESET_VALUE 300000
-
-static EventGroupHandle_t s_sync_event_group;
-static EventBits_t s_bits_to_wait_for;
+// --- Local Temporary Buffers ---
+// Used to fetch data from sensor services before copying to BLE GATT buffers
+static emg_micro_packet_t   s_temp_emg;
+static piezo_micro_packet_t s_temp_piezo;
+static imu_micro_packet_t   s_temp_imu;
 
 /**
- * @brief This is the local data structure used to hold a
- * copy of the data before sending.
+ * @brief Main BLE synchronization and dispatch task.
+ * This task waits for event bits from ADC and IMU services.
+ * It ensures that data is sent as soon as it is ready, maintaining high throughput.
  */
-typedef struct {
-    emg_data_packet_t emg_data; 
-    imu_data_window_t imu_data; 
-} combined_packet_t;
+static void ble_sync_send_task(void *pvParameters) {
+    ble_task_params_t *params = (ble_task_params_t *)pvParameters;
+    EventGroupHandle_t sync_group = params->group;
+    
+    // Bits to monitor: EMG, Piezo, and IMU ready signals
+    const EventBits_t STREAM_BITS = (ADC_EMG_STREAM_BIT | ADC_PIEZO_STREAM_BIT | IMU_STREAM_BIT);
 
+    ESP_LOGI(TAG, "BLE Streaming Task: Dispatcher started.");
 
-// --- Task Prototype ---
-static void sync_send_task(void *pvParameters);
-
-
-// --- Public Function Implementation ---
-
-esp_err_t ble_service_start(EventGroupHandle_t event_group, EventBits_t bits_to_wait) {
-    ESP_LOGI(TAG, "Starting BLE Service...");
-
-    // Store the event group handles passed in from main
-    s_sync_event_group = event_group;
-    s_bits_to_wait_for = bits_to_wait;
-
-    // 1. Start the the BLE peripheral driver
-    // This creates the BleTask
-    xTaskCreate(BleTask, "ble_task", 4096, NULL, 5, NULL);
-    ESP_LOGI(TAG, "BLE Peripheral Task (BleTask) created.");
-
-    // 2. Start the consumer task
-    xTaskCreate(sync_send_task, "sync_task", 4096, NULL, 4, NULL);
-    ESP_LOGI(TAG, "Sync/Send Task (sync_send_task) created.");
-
-    return ESP_OK;
-}
-
-// =========================================================================
-// == TASK 3: CONSUMER (Synchronization & Send Task)
-// (This is your logic from main.c, but MODULARIZED)
-// =========================================================================
-static void sync_send_task(void *pvParameters)
-{
-    ESP_LOGI(TAG, "Sync Task started, waiting for producers...");
-
-    // --- Local packet buffer ---
-    static combined_packet_t local_packet;
-
-    // --- Get handles to the BLE "Tool" buffers ---
-    CharacteristicBuffer emg_buffer = get_emg_buf(); 
-    CharacteristicBuffer imu_buffer = get_imu_buf(); 
-
-    // --- Helper constants  ---
-    // These must match the Python receiver
-    const int emg_samples_per_chunk = kEmgNewSamplesPerWindow / kPartOfWindowPerSend; 
-    const int emg_chunk_bytes = emg_samples_per_chunk * kEmgBytesPerSample * kEmgSensorCount;
-    const int imu_samples_per_chunk = kImuNewSamplesPerWindow / kPartOfWindowPerSend;
-    const int imu_chunk_bytes = imu_samples_per_chunk * kImuBytesPerSample * kImuSensorCount;
-
-    // --- Get handles to the Producer Mutexes ---
-    SemaphoreHandle_t emg_mutex = emg_service_get_buffer_mutex();
-    SemaphoreHandle_t imu_mutex = imu_service_get_buffer_mutex();
+    // System Health Monitoring variables
+    uint32_t emg_count = 0, piezo_count = 0, imu_count = 0;
+    uint64_t last_log_time = esp_timer_get_time();
 
     while (1) {
-        // 1. Wait until both producers signal data is ready
-        EventBits_t uxBits = xEventGroupWaitBits(s_sync_event_group, 
-                                                s_bits_to_wait_for, 
-                                                pdTRUE, // Clear bits on exit
-                                                pdTRUE, // Wait for ALL bits
-                                                portMAX_DELAY);
+        // Wait for any of the sensor services to set their "Ready" bit
+        EventBits_t bits = xEventGroupWaitBits(
+            sync_group, 
+            STREAM_BITS,
+            pdTRUE,        // Clear bits on exit
+            pdFALSE,       // Wait for ANY bit
+            pdMS_TO_TICKS(1000)
+        );
 
-        if((uxBits & s_bits_to_wait_for) == s_bits_to_wait_for) {
+        uint64_t now = esp_timer_get_time();
 
-            // 2. Copy data from component buffers into local_packet
+        // --- EMG Dispatch ---
+        if (bits & ADC_EMG_STREAM_BIT) {
+            size_t sz = adc_service_get_emg_micropacket(&s_temp_emg);
+            CharacteristicBuffer master = get_emg_buf(); // Get pointer to GATT characteristic buffer
             
-            // --- Copy EMG data  ---
-            if (xSemaphoreTake(emg_mutex, portMAX_DELAY) == pdTRUE) {
-                // We no longer access g_emg_buffer
-                // We ASK the service for the packet
-                emg_service_get_packet(&local_packet.emg_data);
-                xSemaphoreGive(emg_mutex);
-            } else {
-                ESP_LOGE(TAG, "Failed to take EMG mutex! Skipping packet.");
-                continue;
-            }
-
-            // --- Copy IMU data ---
-            if (xSemaphoreTake(imu_mutex, portMAX_DELAY) == pdTRUE) {
-                // We ASK the service for the packet
-                imu_service_get_window_packet(&local_packet.imu_data);
-                xSemaphoreGive(imu_mutex);
-            } else {
-                ESP_LOGE(TAG, "Failed to take IMU mutex! Skipping packet.");
-                continue;
-            }
-
-            // 3. --- CHUNKING AND SENDING LOGIC  ---
-            
-            // ESP_LOGI(TAG, "Sending window: %d chunks", kPartOfWindowPerSend);
-
-            for (int i = 0; i < kPartOfWindowPerSend; i++) { 
-                //## -- create temporal vars for stack windows in EMG and IMU so BLE can send same as it does now
-                //## -- also size constants could remain the same
-                
-                // --- Prepare EMG Chunk ---
-                uint8_t *emg_chunk_ptr = (uint8_t *) &local_packet.emg_data.emg_ch0_window[i * emg_samples_per_chunk];
-                memcpy(emg_buffer.data, emg_chunk_ptr, emg_chunk_bytes);
-                memcpy(emg_buffer.data + emg_chunk_bytes, &g_chunk_seq_num, sizeof(uint32_t));
-
-                // --- Prepare IMU Chunk ---
-                // We use .samples because imu_data is now an imu_data_window_t struct
-                uint8_t *imu_chunk_ptr = (uint8_t *) &local_packet.imu_data.samples[i * imu_samples_per_chunk];
-                memcpy(imu_buffer.data, imu_chunk_ptr, imu_chunk_bytes);
-                memcpy(imu_buffer.data + imu_chunk_bytes, &g_chunk_seq_num, sizeof(uint32_t));
-
-                // --- Send Notifications  ---
-                TryNotifyEmgSubscribers();
-                TryNotifyImuSubscribers();
-                
-                // --- Increment global counter ---
-                g_chunk_seq_num++;
-            }
-            
-            if (g_chunk_seq_num >= SEQ_NUM_RESET_VALUE) {
-                ESP_LOGW(TAG, "Sequence number counter reset!");
-                g_chunk_seq_num = 0;
+            if (sz <= master.size) {
+                memcpy(master.data, &s_temp_emg, sz);
+                TryNotifyEmgSubscribers(); // Trigger BLE Notification
+                emg_count++;
             }
         }
-    } 
-} 
+
+        // --- Piezo Dispatch ---
+        if (bits & ADC_PIEZO_STREAM_BIT) {
+            size_t sz = adc_service_get_piezo_micropacket(&s_temp_piezo);
+            CharacteristicBuffer master = get_piezo_buf();
+            
+            if (sz <= master.size) {
+                memcpy(master.data, &s_temp_piezo, sz);
+                TryNotifyPiezoSubscribers();
+                piezo_count++;
+            }
+        }
+
+        // --- IMU Dispatch ---
+        if (bits & IMU_STREAM_BIT) {
+            size_t sz = imu_service_get_micropacket(&s_temp_imu);
+            CharacteristicBuffer master = get_imu_buf();
+            
+            if (sz <= master.size) {
+                memcpy(master.data, &s_temp_imu, sz);
+                TryNotifyImuSubscribers();
+                imu_count++;
+            }
+        }
+
+        // --- System Health & Diagnostic Report (Every 2 seconds) ---
+        if (now - last_log_time >= 5000000) {
+            ESP_LOGI("DIAG", "*******************");
+            // Values should be approx 200 (100 PPS * 2 seconds)
+            ESP_LOGI("DIAG", "Health [pps] -> EMG: %lu | IMU: %lu | PIEZO: %lu", 
+                     emg_count, imu_count, piezo_count);
+            ESP_LOGI("DIAG", "---------------------");
+            // Log last samples to verify signal integrity
+            ESP_LOGI("DIAG", "Last Data -> EMG1:%u | EMG2:%u | PIEZO:%u", 
+                     s_temp_emg.data[39], s_temp_emg.data[79], s_temp_piezo.data[9]);
+            
+            ESP_LOGI("DIAG", "IMU1 -> AccZ:%d | GyroZ:%d", s_temp_imu.imu1_data[2], s_temp_imu.imu1_data[5]);
+            ESP_LOGI("DIAG", "IMU2 -> AccZ:%d | GyroZ:%d", s_temp_imu.imu2_data[2], s_temp_imu.imu2_data[5]);
+            ESP_LOGI("DIAG", "*******************");
+            
+            // Reset counters for the next window
+            emg_count = 0;
+            piezo_count = 0;
+            imu_count = 0;
+            last_log_time = now;
+        }
+    }
+}
+
+/**
+ * @brief Initializes and starts the BLE services and synchronization tasks.
+ */
+esp_err_t ble_service_start(EventGroupHandle_t event_group, EventBits_t bits_to_wait) {
+    static ble_task_params_t params;
+    params.group = event_group;
+    params.mask = bits_to_wait;
+
+    // Start NimBLE/Stack core task
+    xTaskCreatePinnedToCore(BleTask, "ble_stack", 8192, NULL, 10, NULL, 0);
+
+    // Start our custom Synchronization Dispatcher task
+    // Assigned to Core 0 (or Core 1 depending on workload) with high priority
+    BaseType_t ret = xTaskCreatePinnedToCore(
+        ble_sync_send_task,
+        "ble_sync_task",
+        4096,
+        &params,
+        15, // High priority to avoid latency in radio dispatch
+        NULL,
+        0   // Core 0
+    );
+
+    return (ret == pdPASS) ? ESP_OK : ESP_FAIL;
+}
