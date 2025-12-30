@@ -379,12 +379,16 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
 // ------ Setters ------
 
 void stepper_set_target_angle(stepper_control_handle_t handle,
-                              PotentiometerAngle angle) {
+                              JointAngle target_angle) {
   motion_control_context_t *ctx = &s_contexts[handle];
 
-  angle = clamp_potentiometer_angle(&ctx->cfg.potentiometer, angle);
+  PotentiometerAngle target_potentiometer_angle =
+      to_potentiometer_angle(&ctx->cfg.potentiometer, target_angle);
+
+  target_potentiometer_angle = clamp_potentiometer_angle(
+      &ctx->cfg.potentiometer, target_potentiometer_angle);
   portENTER_CRITICAL(&ctx->spinlock);
-  ctx->target_angle = angle;
+  ctx->target_angle = target_potentiometer_angle;
   portEXIT_CRITICAL(&ctx->spinlock);
 }
 

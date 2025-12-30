@@ -89,7 +89,7 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
 
 // Set target angle (degrees)
 void stepper_set_target_angle(stepper_control_handle_t handle,
-                              PotentiometerAngle angle_deg);
+                              JointAngle target_angle);
 
 // Set emergency stop state
 void stepper_set_estop(stepper_control_handle_t handle, bool active);

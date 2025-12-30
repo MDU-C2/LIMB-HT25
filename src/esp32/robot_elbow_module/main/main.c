@@ -123,7 +123,7 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
         if (can_receive(&rx_id, msg_rx, &rx_len, portMAX_DELAY) == ESP_OK) {
             if (rx_id == CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION) {
                 JointAngle target_angle = {*(float*)msg_rx};
-                stepper_set_target_angle(s_elbow_stepper_handle, to_potentiometer_angle(&elbow_stepper_config->potentiometer, target_angle));
+                stepper_set_target_angle(s_elbow_stepper_handle, target_angle);
                 ESP_LOGI(TAG, "Received command: elbow target angle = %f degrees", target_angle.degree);
             }
         }
@@ -208,7 +208,7 @@ void stepper_test_task([[maybe_unused]] void *pvParameter) {
     while (1) {
         // Set new target angle
         float target = test_angles[angle_index];
-        stepper_set_target_angle(s_elbow_stepper_handle, to_potentiometer_angle(&elbow_cfg->potentiometer, (JointAngle){target}));
+        stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){target});
         ESP_LOGI(TAG, ">>> Setting target angle to %.1f°", target);
         
         // Wait for both steppers to reach target (or timeout after 5 seconds)
@@ -273,7 +273,7 @@ void app_main(void) {
     xTaskCreate(can_rx_task, "can_rx", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
     xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
     xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL, TASK_HIGH_PRIORITY, NULL);
-    // xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH, NULL, TASK_LOW_PRIORITY, NULL);  // Lower priority than stepper_task
+    xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH, NULL, TASK_LOW_PRIORITY, NULL);  // Lower priority than stepper_task
 
     ESP_LOGI(TAG, "Tasks created, system running");
 }

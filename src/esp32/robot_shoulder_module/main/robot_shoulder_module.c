@@ -255,11 +255,7 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         JointAngle joint_angle = {*(float*)can_buf};
         ESP_LOGI(TAG, "Received upper arm rotation joint angle %f",
                  joint_angle.degree);
-        // FIXME: stepper_set_target_angle should probably take a JointAngle
-        // instead.
-        PotentiometerAngle pot_angle = to_potentiometer_angle(
-            &kUpperArmRotationStepperConfig.potentiometer, joint_angle);
-        stepper_set_target_angle(s_left_right_servo_handle, pot_angle);
+        stepper_set_target_angle(s_left_right_servo_handle, joint_angle);
         break;
       }
       default: {
