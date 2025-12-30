@@ -149,14 +149,24 @@ void can_rx_task([[maybe_unused]] void *pvParameter) {
 void imu_task([[maybe_unused]] void *pvParameter) {
   imu_data_t imu_data;  // (imu_vector_t) accel and (imu_vector_t) gyro
 
+  TickType_t current_tick = xTaskGetTickCount();
   while (1) {
-    if (imu_read_data(&imu_data) == ESP_OK) {
-      // Log IMU data instead of sending over CAN (no CAN hardware)
-      ESP_LOGI(TAG, "IMU - Accel: X=%d, Y=%d, Z=%d | Gyro: X=%d, Y=%d, Z=%d",
-               imu_data.accel.x, imu_data.accel.y, imu_data.accel.z,
-               imu_data.gyro.x, imu_data.gyro.y, imu_data.gyro.z);
+    // Period of 100 Hz / 10 ms.
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(10));
+
+    // Read IMU data.
+    {
+      esp_err_t err = imu_read_data(&imu_data);
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Error reading IMU: %s", esp_err_to_name(err));
+        continue;
+      }
     }
-    vTaskDelay(pdMS_TO_TICKS(100));  // 10 Hz
+
+    // Log IMU data instead of sending over CAN (no CAN hardware)
+    ESP_LOGI(TAG, "IMU - Accel: X=%d, Y=%d, Z=%d | Gyro: X=%d, Y=%d, Z=%d",
+             imu_data.accel.x, imu_data.accel.y, imu_data.accel.z,
+             imu_data.gyro.x, imu_data.gyro.y, imu_data.gyro.z);
   }
 }
 
