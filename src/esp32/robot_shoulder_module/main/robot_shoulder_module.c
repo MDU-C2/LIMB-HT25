@@ -7,7 +7,6 @@
 #include "freertos/projdefs.h"
 #include "hal/adc_types.h"
 #include "hal/ledc_types.h"
-#include "imu.h"
 #include "limb_utils.h"
 #include "portmacro.h"
 #include "potentiometer.h"
@@ -32,8 +31,6 @@ enum {
   POTENTIOMETER_LEFT_RIGHT_CHANNEL = ADC_CHANNEL_3,
   CAN_TX_GPIO = GPIO_NUM_6,
   CAN_RX_GPIO = GPIO_NUM_7,
-  IMU_SDA_GPIO = GPIO_NUM_5,
-  IMU_SCL_GPIO = GPIO_NUM_4,
 };
 
 // Motors are hv2060
@@ -207,56 +204,6 @@ static void can_rx_task([[maybe_unused]] void* arg) {
   vTaskDelete(NULL);
 }
 
-static void imu_read_task([[maybe_unused]] void* arg) {
-  enum {
-    IMU_FREQUENCY_MS = 10,
-    CAN_LEN = 3,
-  };
-
-  TickType_t current_tick = xTaskGetTickCount();
-  ESP_LOGI(TAG, "imu_read_task started!");
-
-  uint16_t imu_xyz_buf[3] = {0};
-
-  while (true) {
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(IMU_FREQUENCY_MS));
-    imu_data_t data = {0};
-    {
-      esp_err_t err = imu_read_data(&data);
-      if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error calling imu_read_data: %s", esp_err_to_name(err));
-        continue;
-      }
-    }
-
-    {
-      imu_xyz_buf[0] = data.gyro.x;
-      imu_xyz_buf[1] = data.gyro.y;
-      imu_xyz_buf[2] = data.gyro.z;
-      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_IMU_GYRO,
-                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf), 0);
-      if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error calling can_send with IMU gyro: %s",
-                 esp_err_to_name(err));
-      }
-    }
-
-    {
-      imu_xyz_buf[0] = data.accel.x;
-      imu_xyz_buf[1] = data.accel.y;
-      imu_xyz_buf[2] = data.accel.z;
-      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_IMU_ACCEL,
-                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf), 0);
-      if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error calling can_send with IMU accel: %s",
-                 esp_err_to_name(err));
-      }
-    }
-  }
-
-  vTaskDelete(NULL);
-}
-
 static void servos_update_task([[maybe_unused]] void* args) {
   enum { PERIOD_MS = 10 };
 
@@ -334,26 +281,6 @@ static void servos_update_task([[maybe_unused]] void* args) {
 }
 
 void app_main(void) {
-  // IMU initialization.
-  {
-    imu_config_t imu_config = IMU_CONFIG_DEFAULT();
-    imu_config.sda_pin = IMU_SDA_GPIO;
-    imu_config.scl_pin = IMU_SCL_GPIO;
-
-    esp_err_t err = imu_init(&imu_config);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Error calling imu_init: %s", esp_err_to_name(err));
-      return;
-    }
-
-    if (!imu_is_present()) {
-      ESP_LOGE(TAG, "Error: IMU sensor isn't present");
-      return;
-    }
-
-    ESP_LOGI(TAG, "IMU initialized!");
-  }
-
   // CAN initialization.
   {
     CanMsgFilter can_filter = {
@@ -418,7 +345,6 @@ void app_main(void) {
   }
 
   xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
-  xTaskCreate(imu_read_task, "IMU read task", 1024 * 2 * 2, NULL, 5, NULL);
   xTaskCreate(servos_update_task, "Servos update task", 1024 * 2 * 2, NULL, 6,
               NULL);
 }
