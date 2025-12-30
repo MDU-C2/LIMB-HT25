@@ -15,7 +15,7 @@
 // --- Private function declarations ---
 static bool adc_mgr_channel_buffer_push(AdcMgrChannelBuffer *buf,
                                         uint16_t value);
-static void write_results_to_channel_buffers(
+static bool write_results_to_channel_buffers(
     const adc_digi_output_data_t *outputs, uint32_t output_count,
     AdcMgrReadResults *inout_results);
 static esp_err_t adc_mgr_init_handle_preconditions(AdcMgrConfig config);
@@ -226,18 +226,30 @@ esp_err_t adc_mgr_read(AdcMgrReadResults *inout_results,
     return ESP_ERR_INVALID_ARG;
   }
 
+  const TickType_t starting_tick = xTaskGetTickCount();
+
   esp_err_t err = ESP_OK;
+  bool wrote_value = false;
   uint32_t read_bytes = 0;
   do {
-    err = adc_continuous_read(s_handle, (uint8_t *)s_adc_read_buf,
-                              kAdcReadBufLen, &read_bytes, timeout_ms);
+    // We want to make sure the overall timeout is `timeout_ms`, not use
+    // `timeout_ms` every new call to `adc_continuous_read`.
+    const uint32_t ms_since_start =
+        pdTICKS_TO_MS(xTaskGetTickCount() - starting_tick);
+    const uint32_t remaining_timeout_ms =
+        MAX((int32_t)timeout_ms - (int32_t)ms_since_start, 0);
+
+    err =
+        adc_continuous_read(s_handle, (uint8_t *)s_adc_read_buf, kAdcReadBufLen,
+                            &read_bytes, remaining_timeout_ms);
     switch (err) {
       case ESP_OK: {
         const adc_digi_output_data_t *outputs =
             (adc_digi_output_data_t *)s_adc_read_buf;
         const uint32_t output_count = read_bytes / sizeof(*outputs);
 
-        write_results_to_channel_buffers(outputs, output_count, inout_results);
+        wrote_value = write_results_to_channel_buffers(outputs, output_count,
+                                                       inout_results);
         break;
       }
       case ESP_ERR_INVALID_STATE: {
@@ -247,12 +259,16 @@ esp_err_t adc_mgr_read(AdcMgrReadResults *inout_results,
         return ESP_ERR_INVALID_STATE;
       }
       case ESP_ERR_TIMEOUT: {
-        // Timing out probably means we've finished reading all buffered values
-        // in cases where the ADC's buffer pool is larger than the caller's
-        // provided buffers. In cases where we actually didn't read anything
-        // before the timeout, the inout_results buffer lengths will simply be
-        // unchanged.
-        return ESP_OK;
+        if (wrote_value) {
+          // Timing out while having written a value means we've finished
+          // reading all buffered values in cases where the ADC's buffer pool is
+          // larger than the caller's provided buffers.
+          return ESP_OK;
+        }
+
+        // If we got a timeout without writing a value, we treat it as an actual
+        // timeout.
+        return ESP_ERR_TIMEOUT;
       }
       default: {
         return err;
@@ -290,9 +306,10 @@ static bool adc_mgr_channel_buffer_push(AdcMgrChannelBuffer *buf,
 }
 
 // Pushes the read ADC values to the corresponding channel buffers.
-static void write_results_to_channel_buffers(
+static bool write_results_to_channel_buffers(
     const adc_digi_output_data_t *outputs, const uint32_t output_count,
     AdcMgrReadResults *inout_results) {
+  bool wrote_value = false;
   for (size_t i = 0; i < output_count; ++i) {
     const adc_channel_t channel = outputs[i].type2.channel;
     const uint16_t value = outputs[i].type2.data;
@@ -306,10 +323,13 @@ static void write_results_to_channel_buffers(
         ESP_LOGW(TAG, "Channel buffer for ADC values is full.");
         // In a debug build we don't want this situation to be missed.
         assert(false && "Channel buffer for ADC values is full.");
+      } else {
+        wrote_value = true;
       }
       s_values_read_already_in_period[channel] = 0;
     }
   }
+  return wrote_value;
 }
 
 static esp_err_t adc_mgr_init_handle_preconditions(
