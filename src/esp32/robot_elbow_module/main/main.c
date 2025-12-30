@@ -18,8 +18,8 @@ static const char *const TAG = "robot_elbow_module";
 
 enum {
   // CAN configuration
-  CAN_TX_PIN = 5,
-  CAN_RX_PIN = 4,
+  CAN_TX_PIN = GPIO_NUM_5,
+  CAN_RX_PIN = GPIO_NUM_4,
   CAN_BAUDRATE = 1000000,
 
   // IMU pins.
