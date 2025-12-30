@@ -61,14 +61,13 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
     .pwm_timer = PWM_ELBOW_TIMER,
     .potentiometer = (Potentiometer) {
         .degrees_of_motion = {285.F},
-        // TODO(Johan): Figure out which values to use through measurements.
-        .min_adc_value = 6,
-        .max_adc_value = 3087,
+        .min_adc_value = 282,
+        .max_adc_value = 3130,
         .min_potentiometer_angle_as_joint_angle = {0.F},
-        // FIXME: This means a 90 degree range, but it doesn't look like it should be.
-        .min_potentiometer_angle = {143.F},
-        .max_potentiometer_angle = {233.F},
-        // FIXME: Make sure this is in the correct order (and that it's the correct values).
+        .min_potentiometer_angle = {80.F},
+        // Using the ratio between the joint angles and potentiomter angles,
+        // 60 degrees of joint angle becomes 72 degrees of potentiometer angle.
+        .max_potentiometer_angle = {152.F},
         .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
     },
 };
@@ -199,7 +198,7 @@ void stepper_test_task([[maybe_unused]] void *pvParameter) {
     vTaskDelay(pdMS_TO_TICKS(2000));
     
     // Test angles to cycle through (in degrees)
-    const float test_angles[] = {0.0F, 30.0F, -30.0F, 45.0F, -45.0F, 0.0F};
+    const float test_angles[] = {0.0F, 60.F };
     int num_angles = sizeof(test_angles) / sizeof(test_angles[0]);
     int angle_index = 0;
     
