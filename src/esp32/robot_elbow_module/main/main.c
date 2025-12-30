@@ -209,43 +209,43 @@ static void stepper_task([[maybe_unused]] void *pvParameter) {
     stepper_update(s_elbow_stepper_handle, dt_ms,
                    s_latest_potentiometer_adc_value);
 
-    // Send status over CAN and log
+    // Send current angle over CAN.
+    PotentiometerAngle current_pot_angle =
+        stepper_get_current_angle(s_elbow_stepper_handle);
+    JointAngle current_angle =
+        to_joint_angle(&s_elbow_stepper_cfg.potentiometer, current_pot_angle);
+    // Send status over CAN
+    uint8_t can_data[CAN_MAX_MESSAGE_SIZE] = {0};
+    *(float *)can_data = current_angle.degree;
+    esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER, can_data,
+                             sizeof(current_angle.degree), 0);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Error sending elbow status over CAN: %s",
+               esp_err_to_name(err));
+    }
+
     static uint32_t status_counter = 0;
     enum {
       ITERATIONS_PER_LOGGING = 10,
     };
     if (++status_counter >= ITERATIONS_PER_LOGGING) {  // Every 100ms
       status_counter = 0;
-      PotentiometerAngle current_pot_angle =
-          stepper_get_current_angle(s_elbow_stepper_handle);
       PotentiometerAngle target_pot_angle =
           stepper_get_target_angle(s_elbow_stepper_handle);
-      JointAngle current_angle =
-          to_joint_angle(&s_elbow_stepper_cfg.potentiometer, current_pot_angle);
       JointAngle target_angle =
           to_joint_angle(&s_elbow_stepper_cfg.potentiometer, target_pot_angle);
       AngularVelocity velocity =
           stepper_get_current_velocity(s_elbow_stepper_handle);
       bool moving = stepper_is_moving(s_elbow_stepper_handle);
 
-      // Send status over CAN
-      uint8_t can_data[CAN_MAX_MESSAGE_SIZE] = {0};
-      *(float *)can_data = current_angle.degree;
-      esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER,
-                               can_data, sizeof(current_angle.degree), 0);
-      if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error sending elbow status over CAN: %s",
-                 esp_err_to_name(err));
-      }
-
       // Also log locally
       ESP_LOGI(TAG,
-               "Stepper elbow - Current(pot): %.2f°, Target(pot): %.2f°, "
-               "Current(Joint): %.2f, Target(Joint): %.2f, Velocity: %.2f°/s, "
-               "Moving: %s",
-               current_pot_angle.degree, target_pot_angle.degree,
-               current_angle.degree, target_angle.degree, velocity.dps,
-               moving ? "Yes" : "No");
+               "adc: %u, Stepper elbow - Current(pot): %.2f°, Target(pot): "
+               "%.2f°, Current(Joint): %.2f, Target(Joint): %.2f, Velocity: "
+               "%.2f°/s, Moving: %s",
+               s_latest_potentiometer_adc_value, current_pot_angle.degree,
+               target_pot_angle.degree, current_angle.degree,
+               target_angle.degree, velocity.dps, moving ? "Yes" : "No");
     }
 
     xTaskDelayUntil(&last_wake_time, period_ms);
