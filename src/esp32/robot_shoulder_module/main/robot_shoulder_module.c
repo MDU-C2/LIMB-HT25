@@ -234,7 +234,7 @@ static void imu_read_task([[maybe_unused]] void* arg) {
       imu_xyz_buf[1] = data.gyro.y;
       imu_xyz_buf[2] = data.gyro.z;
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_IMU_GYRO,
-                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf));
+                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG, "Error calling can_send with IMU gyro: %s",
                  esp_err_to_name(err));
@@ -246,7 +246,7 @@ static void imu_read_task([[maybe_unused]] void* arg) {
       imu_xyz_buf[1] = data.accel.y;
       imu_xyz_buf[2] = data.accel.z;
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_IMU_ACCEL,
-                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf));
+                               (uint8_t*)imu_xyz_buf, sizeof(imu_xyz_buf), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG, "Error calling can_send with IMU accel: %s",
                  esp_err_to_name(err));
@@ -304,9 +304,9 @@ static void servos_update_task([[maybe_unused]] void* args) {
         ESP_LOGI(TAG, "Current up/down joint angle: %f", joint_angle.degree);
         i = 0;
       }
-      esp_err_t err =
-          can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
-                   (uint8_t*)&joint_angle.degree, sizeof(joint_angle.degree));
+      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
+                               (uint8_t*)&joint_angle.degree,
+                               sizeof(joint_angle.degree), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG, "Error sending shoulder up/down angle over CAN: %s",
                  esp_err_to_name(err));
@@ -320,9 +320,9 @@ static void servos_update_task([[maybe_unused]] void* args) {
                                      s_latest_potentiometer_left_right_value);
       JointAngle joint_angle = to_joint_angle(
           &kLeftRightServoConfig.potentiometer, potentiometer_angle);
-      esp_err_t err =
-          can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
-                   (uint8_t*)&joint_angle.degree, sizeof(joint_angle.degree));
+      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
+                               (uint8_t*)&joint_angle.degree,
+                               sizeof(joint_angle.degree), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG, "Error sending shoulder left/right angle over CAN: %s",
                  esp_err_to_name(err));

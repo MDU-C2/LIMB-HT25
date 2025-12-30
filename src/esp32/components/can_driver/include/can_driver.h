@@ -127,7 +127,7 @@ uint16_t create_filter_mask(CanMessageTypeFilterMask msg_type_filter_mask,
 esp_err_t can_init(int tx_pin, int rx_pin, int baudrate, const CanMsgFilter* filter);
 
 // Send a CAN message
-esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len);
+esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len, uint32_t ms_to_wait);
 
 // Try to receive a message (blocking for timeout_ms)
 esp_err_t can_receive(uint32_t *id, uint8_t *data, uint8_t *len, int timeout_ms);

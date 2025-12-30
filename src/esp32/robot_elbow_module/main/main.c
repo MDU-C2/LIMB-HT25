@@ -174,7 +174,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
             // Send status over CAN
             uint8_t can_data[CAN_MAX_MESSAGE_SIZE] = {0};
             *(float*)can_data = current_angle.degree;
-            esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER, can_data, sizeof(current_angle.degree));
+            esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER, can_data, sizeof(current_angle.degree), 0);
             if (err != ESP_OK) {
                 ESP_LOGW(TAG, "Error sending elbow status over CAN: %s", esp_err_to_name(err));
             }

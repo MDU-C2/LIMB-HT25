@@ -68,7 +68,7 @@ void app_main(void) {
             // Send temperature data
             char temp_msg[8];
             snprintf(temp_msg, sizeof(temp_msg), "T:%d", temperature);
-            can_send(ID_SENSOR_TEMP, (uint8_t*)temp_msg, strlen(temp_msg));
+            can_send(ID_SENSOR_TEMP, (uint8_t*)temp_msg, strlen(temp_msg), 0);
             ESP_LOGI(TAG, "Sending temperature: %d°C", temperature);
             
             vTaskDelay(pdMS_TO_TICKS(500));
@@ -76,7 +76,7 @@ void app_main(void) {
             // Send humidity data
             char hum_msg[8];
             snprintf(hum_msg, sizeof(hum_msg), "H:%d", humidity);
-            can_send(ID_SENSOR_HUM, (uint8_t*)hum_msg, strlen(hum_msg));
+            can_send(ID_SENSOR_HUM, (uint8_t*)hum_msg, strlen(hum_msg), 0);
             ESP_LOGI(TAG, "Sending humidity: %d%%", humidity);
             
             // Send every 3 seconds

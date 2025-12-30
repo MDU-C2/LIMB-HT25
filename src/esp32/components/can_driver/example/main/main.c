@@ -32,7 +32,7 @@ const char* get_node_name(uint32_t id) {
 }
 
 void app_main(void) {
-    can_init(5, 4, 125000); // TX=5, RX=4, 125 kbps
+    can_init(5, 4, 125000, NULL); // TX=5, RX=4, 125 kbps
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "   ESP32 #4 - MONITOR NODE STARTED");
     ESP_LOGI(TAG, "   Priority: LOW (ID: 0x040)");
@@ -48,7 +48,7 @@ void app_main(void) {
     
     // Announce presence
     vTaskDelay(pdMS_TO_TICKS(1000));
-    can_send(ID_MONITOR_STATUS, (uint8_t*)"ONLINE", 6);
+    can_send(ID_MONITOR_STATUS, (uint8_t*)"ONLINE", 6, 0);
     ESP_LOGI(TAG, "Monitor ONLINE - Starting traffic capture");
 
     while (1) {
@@ -79,9 +79,9 @@ void app_main(void) {
 
             // Send report to bus
             if (stats.total > 0) {
-                can_send(ID_MONITOR_STATUS, (uint8_t*)"OK", 2);
+                can_send(ID_MONITOR_STATUS, (uint8_t*)"OK", 2, 0);
             } else {
-                can_send(ID_MONITOR_STATUS, (uint8_t*)"QUIET", 5);
+                can_send(ID_MONITOR_STATUS, (uint8_t*)"QUIET", 5, 0);
                 ESP_LOGW(TAG, "WARNING: No traffic detected on the bus");
             }
             
