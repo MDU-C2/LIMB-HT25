@@ -308,7 +308,7 @@ static void motors_update_task([[maybe_unused]] void* args) {
       JointAngle joint_angle = to_joint_angle(&kUpDownServoConfig.potentiometer,
                                               potentiometer_angle);
       static int i = 0;
-      if (++i == 10) {
+      if (++i == 100) {
         i = 0;
         PotentiometerAngle target_pot_angle =
             servo_get_target_angle(s_up_down_servo_handle);
@@ -339,8 +339,9 @@ static void motors_update_task([[maybe_unused]] void* args) {
                                      s_latest_potentiometer_left_right_value);
       JointAngle joint_angle = to_joint_angle(
           &kLeftRightServoConfig.potentiometer, potentiometer_angle);
-      static int i = 0;
-      if (++i == 10) {
+
+      static int i = 33;
+      if (++i == 100) {
         i = 0;
         PotentiometerAngle target_pot_angle =
             servo_get_target_angle(s_left_right_servo_handle);
@@ -371,8 +372,9 @@ static void motors_update_task([[maybe_unused]] void* args) {
           s_latest_potentiometer_rotation_value);
       JointAngle joint_angle = to_joint_angle(
           &kUpperArmRotationStepperConfig.potentiometer, potentiometer_angle);
-      static uint32_t i = 0;
-      if (++i >= 10) {  // Every 100ms
+
+      static uint32_t i = 66;
+      if (++i >= 100) {  // Every 100ms
         i = 0;
         PotentiometerAngle target_pot_angle =
             stepper_get_target_angle(s_upper_arm_rotation_stepper_handle);
