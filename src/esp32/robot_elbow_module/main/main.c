@@ -51,19 +51,19 @@ const stepper_control_config_t s_elbow_stepper_cfg = {
     .microstep_m1_gpio = GPIO_NUM_NC,
     .microstep_m2_gpio = GPIO_NUM_NC,
 
-    .direction = STEPPER_DIR_NORMAL,
+    .direction = STEPPER_DIR_REVERSE,
     .steps_per_rev = 200,
-    .gear_ratio = 1.0F,
-    .max_velocity = {90.0F},
-    .max_accel = {100.0F},
+    .gear_ratio = 15.0F,
+    .max_velocity = {20.0F},
+    .max_accel = {20.0F},
     .pot_adc_channel = ADC_ELBOW_CHANNEL,
     .pwm_channel = PWM_ELBOW_CHANNEL,
     .pwm_timer = PWM_ELBOW_TIMER,
     .potentiometer = (Potentiometer) {
         .degrees_of_motion = {285.F},
         // TODO(Johan): Figure out which values to use through measurements.
-        .min_adc_value = 0,
-        .max_adc_value = 4095,
+        .min_adc_value = 6,
+        .max_adc_value = 3087,
         .min_potentiometer_angle_as_joint_angle = {0.F},
         // FIXME: This means a 90 degree range, but it doesn't look like it should be.
         .min_potentiometer_angle = {143.F},
