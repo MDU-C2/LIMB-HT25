@@ -73,7 +73,7 @@ static const ServoConfig kUpDownServoConfig = {
             .min_adc_value = 6,
             .max_adc_value = 3087,
             // FIXME: These need to be calibrated.
-            .min_potentiometer_angle = {20},
+            .min_potentiometer_angle = {40},
             .max_potentiometer_angle = {70},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
@@ -102,19 +102,19 @@ static const ServoConfig kLeftRightServoConfig = {
     // moving.
     .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
-    .max_angular_velocity = {60.F},
-    .max_angular_acceleration = {200.F},
-    .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
+    .max_angular_velocity = {34.F},
+    .max_angular_acceleration = {40.F},
+    .pot_adc_channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 6,
+            .min_adc_value = 20,
             .max_adc_value = 3087,
             // FIXME: These need to be calibrated.
-            .min_potentiometer_angle = {20},
-            .max_potentiometer_angle = {70},
+            .min_potentiometer_angle = {90},
+            .max_potentiometer_angle = {138},
             .min_potentiometer_angle_as_joint_angle = {0.F},
-            .joint_angle_to_potentiometer_angle_ratio = 1.F,
+            .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
         },
 };
 
