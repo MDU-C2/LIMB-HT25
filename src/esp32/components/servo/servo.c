@@ -56,7 +56,7 @@ esp_err_t servo_init(const ServoConfig *servo_config,
                      uint16_t latest_potentiometer_values_len,
                      ServoHandle *out_handle) {
   // Configure LEDC timer (shared by all servos).
-  ledc_timer_config_t ledc_timer = {
+  const ledc_timer_config_t ledc_timer = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
       .duty_resolution = LEDC_TIMER_13_BIT,
       .timer_num = LEDC_TIMER_0,
@@ -79,7 +79,7 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   }
   s_channels_assigned[servo_config->ledc_channel] = true;
 
-  ledc_channel_config_t channel_config = {
+  const ledc_channel_config_t channel_config = {
       .gpio_num = servo_config->gpio_pin,
       .speed_mode = LEDC_LOW_SPEED_MODE,
       .channel = servo_config->ledc_channel,
@@ -91,9 +91,9 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   ESP_RETURN_ON_ERROR(ledc_channel_config(&channel_config), TAG,
                       "Couldn't configure ledc_channel");
 
-  uint16_t current_pot_adc_value = limb_average16(
+  const uint16_t current_pot_adc_value = limb_average16(
       latest_potentiometer_values, latest_potentiometer_values_len);
-  PotentiometerAngle current_angle = potentiometer_adc_to_angle(
+  const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &servo_config->potentiometer, current_pot_adc_value);
 
   s_servo_contexts[servo_config->ledc_channel] = (ServoContext){
@@ -183,13 +183,14 @@ static void apply_motor_velocity(ServoHandle handle, float velocity_dps,
     min_degree_delta = -min_degree_delta;
   }
 
-  float new_angle = ctx->current_angle.degree + degrees_delta;
+  const PotentiometerAngle new_angle = {ctx->current_angle.degree +
+                                        degrees_delta};
   ESP_LOGI(TAG,
            "curr: %.2f, delta: %.2f, mindelta: %.2f new: %.2f, target: %.2f",
            ctx->current_angle.degree, degrees_delta, min_degree_delta,
-           new_angle, ctx->target_angle.degree);
+           new_angle.degree, ctx->target_angle.degree);
 
-  servo_move_to_degree(handle, (PotentiometerAngle){new_angle});
+  servo_move_to_degree(handle, new_angle);
 }
 
 bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
@@ -208,7 +209,7 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
   const PotentiometerAngle current_angle = potentiometer_adc_to_angle(
       &ctx->cfg.potentiometer, ctx->latest_approximated_adc_value);
 
-  MotorRampingArgs args = {
+  const MotorRampingArgs args = {
       .current_angle = current_angle,
       .target_angle = ctx->target_angle,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
@@ -259,8 +260,8 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 }
 
 void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width) {
-  ServoContext *ctx = servo_get_context(handle);
-  uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
+  const ServoContext *ctx = servo_get_context(handle);
+  const uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
 
   ESP_LOGI(TAG, "pw: %u, duty: %u", pulse_width, duty);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.ledc_channel, duty);
@@ -269,11 +270,11 @@ void servo_move_to_pulse_width(ServoHandle handle, uint16_t pulse_width) {
 
 // Write angle to specific servo channel
 void servo_move_to_degree(ServoHandle handle, PotentiometerAngle deg) {
-  ServoContext *ctx = servo_get_context(handle);
+  const ServoContext *ctx = servo_get_context(handle);
 
   deg = clamp_servo_angle(&ctx->cfg, deg);
 
-  uint32_t us = angle_to_pulse_width(deg, &ctx->cfg);
+  const uint32_t us = angle_to_pulse_width(deg, &ctx->cfg);
 
   servo_move_to_pulse_width(handle, us);
 
