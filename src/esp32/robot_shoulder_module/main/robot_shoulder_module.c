@@ -90,19 +90,13 @@ static const ServoConfig kLeftRightServoConfig = {
     .direction = SERVO_DIR_NORMAL,
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
-    // FIXME: Figure out what to set this to. With no load the servo maxes out
-    // at an offset of about 140-150, but it might be different with load.
     .max_capable_angular_velocity_pw_offset = 150,
-    // FIXME: All of the below values need to be calibrated. Different servo (of
-    // the same model) that might have slightly different characteristics, and
-    // also different movement.
     // This velocity was roughly eyeballed when the
     // servo was moving at its fastest pace with no load.
     .min_capable_angular_velocity = {34.F},
     // This is the lowest pulse width offset that results in the servo actually
     // moving.
     .min_capable_angular_velocity_pw_offset = 17,
-    // FIXME: Figure out good values for these.
     .gear_ratio = 15.F,
     .max_velocity = {8.F},
     .max_accel = {8.F},
@@ -112,7 +106,6 @@ static const ServoConfig kLeftRightServoConfig = {
             .degrees_of_motion = {285.F},
             .min_adc_value = 20,
             .max_adc_value = 3087,
-            // FIXME: These need to be calibrated.
             .min_potentiometer_angle = {90},
             .max_potentiometer_angle = {138},
             .min_potentiometer_angle_as_joint_angle = {0.F},
