@@ -1,0 +1,62 @@
+-----------------------------------
+Setting up the script
+-----------------------------------
+
+FOR THE FIRST TIME
+
+1. Create a folder and copy ble_rx.py and requirements.txt
+2. Open a new terminal in that folder
+3. create and activate a new Python virtual environment (Windows)
+	Create: python -m venv limb_emg_capture 
+
+	Activate: .\limb_emg_capture\Scripts\activate.bat
+
+4. install requirements
+	pip install -r requirements.txt
+
+5. Run script
+	python ble_rx.py
+
+6. deactivate the environment with command "deactivate" in terminal
+
+NEXT TIME
+
+1. Open a new terminal in the folder with the file
+2. Activate the python environment
+	Activate: .\limb_emg_capture\Scripts\activate.bat
+3. Run script
+	python ble_rx.py
+
+4. Deactivate the environment with command "deactivate" in terminal
+
+
+
+------------------------------------------------------------
+USING THE SCRIPT
+------------------------------------------------------------
+
+
+
+1. run ble_rx.py program (Be sure you have python, required libraries installed and Bluetooth enabled in the computer)
+
+2. Enter the label of the gesture to be performed 
+-> 1: Hand close
+-> 2: rest
+
+3. Enter to start capturing
+-> Always the capture last 8 second in which first 2 seconds are for rest, next 4 seconds are to perform the gesture and hold it and last 2 seconds are rest again
+
+-> the terminal in which you execute the program, shows the progress in number of windows captured 
+	- first 20 windows are rest
+	- window 20 to window 60 gesture
+	- window 60 to 80 rest
+
+4. Once the program finished the data is saved in the same folder as the script in folder raw data
+	- Each file contains all the data windows of a capture
+
+corresponding to the previous distribution:
+		*Window 0 to 20: label 2
+		*Window 20 to 60: label 1
+		*Window 80 to 20: label 2
+
+5. You can capture data continuously. Once a capture is done, the program starts again from the point 2. Enter the label.
