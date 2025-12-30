@@ -94,6 +94,8 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   s_servo_contexts[servo_config->pwm_channel] = (ServoContext){
       .cfg = *servo_config,
       .current_angle = current_angle,
+      .target_angle = clamp_potentiometer_angle(&servo_config->potentiometer,
+                                                current_angle),
   };
 
   *out_handle = servo_config->pwm_channel;
