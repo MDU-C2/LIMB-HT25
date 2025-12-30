@@ -1,6 +1,5 @@
 #include "adc_manager.h"
 #include "can_driver.h"
-#include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -38,35 +37,79 @@ enum {
 };
 
 // Motors are hv2060
-static const ServoConfig kServoConfigs[] = {
-    (ServoConfig){
-        .gpio_pin = SERVO_UP_DOWN_GPIO,
-        .ledc_channel = LEDC_CHANNEL_0,
-        .name = "Shoulder up/down servo",
-        // TODO(johan): These need to be changed after testing on actual arm.
-        .direction = SERVO_DIR_NORMAL,
-        .min_angle = 285.F / 2.F - 90.F,
-        .max_angle = 285.F / 2.F + 90.F,
-        .min_pulse_us = HV2060_MIN_PULSEWIDTH_US,
-        .max_pulse_us = HV2060_MAX_PULSEWIDTH_US,
-        .initial_angle = 285.F / 2.F,
-    },
-    (ServoConfig){
-        .gpio_pin = SERVO_LEFT_RIGHT_GPIO,
-        .ledc_channel = LEDC_CHANNEL_1,
-        .name = "Shoulder left/right servo",
-        // TODO(johan): These need to be changed after testing on actual arm.
-        .direction = SERVO_DIR_NORMAL,
-        .min_angle = 285.F / 2.F - 90.F,
-        .max_angle = 285.F / 2.F + 90.F,
-        .min_pulse_us = HV2060_MIN_PULSEWIDTH_US,
-        .max_pulse_us = HV2060_MAX_PULSEWIDTH_US,
-        .initial_angle = 285.F / 2.F,
-    },
+
+static const ServoConfig kUpDownServoConfig = {
+    .gpio_pin = SERVO_UP_DOWN_GPIO,
+    .ledc_timer = LEDC_TIMER_0,
+    .ledc_channel = LEDC_CHANNEL_0,
+    .name = "Shoulder up/down servo",
+    // TODO(johan): These need to be changed after testing on actual arm.
+    .direction = SERVO_DIR_NORMAL,
+    .motionless_pw = 1500,
+    .max_capable_angular_velocity = {400},
+    // FIXME: Figure out what to set this to. With no load the servo maxes out
+    // at an offset of about 140-150, but it might be different with load.
+    .max_capable_angular_velocity_pw_offset = 800,
+    // This velocity was roughly eyeballed when the servo was moving at its
+    // fastest pace with no load.
+    .min_capable_angular_velocity = {34.F},
+    // This is the lowest pulse width offset that results in the servo actually
+    // moving.
+    .min_capable_angular_velocity_pw_offset = 17,
+    // FIXME: Figure out good values for these.
+    .max_angular_velocity = {60.F},
+    .max_angular_acceleration = {200.F},
+    .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
+    .potentiometer =
+        (Potentiometer){
+            .degrees_of_motion = {285.F},
+            .min_adc_value = 6,
+            .max_adc_value = 3087,
+            // FIXME: These need to be calibrated.
+            .min_potentiometer_angle = {20},
+            .max_potentiometer_angle = {70},
+            .min_potentiometer_angle_as_joint_angle = {0.F},
+            .joint_angle_to_potentiometer_angle_ratio = 1.F,
+        },
 };
 
-static const ServoConfig* const kUpDownServo = &kServoConfigs[0];
-static const ServoConfig* const kLeftRightServo = &kServoConfigs[1];
+static const ServoConfig kLeftRightServoConfig = {
+    .gpio_pin = SERVO_LEFT_RIGHT_GPIO,
+    .ledc_timer = LEDC_TIMER_0,
+    .ledc_channel = LEDC_CHANNEL_1,
+    .name = "Shoulder left/right servo",
+    // TODO(johan): These need to be changed after testing on actual arm.
+    .direction = SERVO_DIR_NORMAL,
+    .motionless_pw = 1500,
+    .max_capable_angular_velocity = {400},
+    // FIXME: Figure out what to set this to. With no load the servo maxes out
+    // at an offset of about 140-150, but it might be different with load.
+    .max_capable_angular_velocity_pw_offset = 800,
+    // FIXME: All of the below values need to be calibrated. Different servo (of
+    // the same model) that might have slightly different characteristics, and
+    // also different movement.
+    // This velocity was roughly eyeballed when the
+    // servo was moving at its fastest pace with no load.
+    .min_capable_angular_velocity = {34.F},
+    // This is the lowest pulse width offset that results in the servo actually
+    // moving.
+    .min_capable_angular_velocity_pw_offset = 17,
+    // FIXME: Figure out good values for these.
+    .max_angular_velocity = {60.F},
+    .max_angular_acceleration = {200.F},
+    .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
+    .potentiometer =
+        (Potentiometer){
+            .degrees_of_motion = {285.F},
+            .min_adc_value = 6,
+            .max_adc_value = 3087,
+            // FIXME: These need to be calibrated.
+            .min_potentiometer_angle = {20},
+            .max_potentiometer_angle = {70},
+            .min_potentiometer_angle_as_joint_angle = {0.F},
+            .joint_angle_to_potentiometer_angle_ratio = 1.F,
+        },
+};
 
 static const AdcMgrChannelConfig kAdcMgrChannelConfigs[] = {
     (AdcMgrChannelConfig){
@@ -114,32 +157,10 @@ static AdcMgrChannelBuffer* s_potentiometer_left_right_buffer =
 
 static uint16_t s_latest_potentiometer_up_down_value = 0;
 static uint16_t s_latest_potentiometer_left_right_value = 0;
+
+static ServoHandle s_left_right_servo_handle;
+static ServoHandle s_up_down_servo_handle;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
-
-static const Potentiometer kUpDownPotentiometer = {
-    .degrees_of_motion = {285},
-    // TODO(Johan): These are temporary test values. The proper values need to
-    // be measured on the actual robot.
-    .min_adc_value = 0,
-    .max_adc_value = 4095,
-    .min_potentiometer_angle = {(285.F / 2.F) - 90.F},
-    .max_potentiometer_angle = {(285.F / 2.F) + 90.F},
-    .min_potentiometer_angle_as_joint_angle = {0},
-    .joint_angle_to_potentiometer_angle_ratio = 1.F,
-};
-
-static const Potentiometer kLeftRightPotentiometer = {
-    .degrees_of_motion = {285},
-    // TODO(Johan): These are temporary test values. The proper values need to
-    // be measured on the actual robot.
-    .min_adc_value = 0,
-    .max_adc_value = 4095,
-    .min_potentiometer_angle = {(285.F / 2.F) - 90.F},
-    .max_potentiometer_angle = {(285.F / 2.F) + 90.F},
-    .min_potentiometer_angle_as_joint_angle = {0},
-    // FIXME: Make sure this is this is in the correct order (and that the values are correct).
-    .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
-};
 
 static void can_rx_task([[maybe_unused]] void* arg) {
   uint32_t can_id = 0;
@@ -153,40 +174,27 @@ static void can_rx_task([[maybe_unused]] void* arg) {
       continue;
     }
 
-    // NOTE: For the "stop" messages, we use the latest potentiometer values,
-    // which might be slighly out of date. This could result in a sudden change
-    // in direction which might be undesirable.
     switch (can_id) {
       case CAN_ID_ROBOT_SHOULDER_UP_DOWN_STOP: {
-        PotentiometerAngle angle = potentiometer_adc_to_angle(
-            &kUpDownPotentiometer, s_latest_potentiometer_up_down_value);
-
-        servo_move_to_degree(kUpDownServo, (int)angle.degree);
+        servo_set_target_angle(s_up_down_servo_handle, (JointAngle){0});
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_STOP: {
-        PotentiometerAngle angle = potentiometer_adc_to_angle(
-            &kLeftRightPotentiometer, s_latest_potentiometer_left_right_value);
-
-        servo_move_to_degree(kLeftRightServo, (int)angle.degree);
+        servo_set_target_angle(s_left_right_servo_handle, (JointAngle){0});
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION: {
         assert(can_buf_len == 4);
         JointAngle joint_angle = {*(float*)can_buf};
-        PotentiometerAngle potentiometer_angle =
-            to_potentiometer_angle(&kUpDownPotentiometer, joint_angle);
-        ESP_LOGI(TAG, "Received joint angle %f / potentiometer angle %f",
-                 joint_angle.degree, potentiometer_angle.degree);
-        servo_move_to_degree(kUpDownServo, (int)potentiometer_angle.degree);
+        ESP_LOGI(TAG, "Received up/down joint angle %f", joint_angle.degree);
+        servo_set_target_angle(s_up_down_servo_handle, joint_angle);
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION: {
         assert(can_buf_len == 4);
         JointAngle joint_angle = {*(float*)can_buf};
-        PotentiometerAngle potentiometer_angle =
-            to_potentiometer_angle(&kUpDownPotentiometer, joint_angle);
-        servo_move_to_degree(kLeftRightServo, (int)potentiometer_angle.degree);
+        ESP_LOGI(TAG, "Received left/right joint angle %f", joint_angle.degree);
+        servo_set_target_angle(s_left_right_servo_handle, joint_angle);
         break;
       }
       default: {
@@ -249,52 +257,47 @@ static void imu_read_task([[maybe_unused]] void* arg) {
   vTaskDelete(NULL);
 }
 
-static void adc_read_task([[maybe_unused]] void* arg) {
-  // We're only reading potentiometer ADC values. To make the values more
-  // stable, we want to average the last couple of values. To do that, we have
-  // a higher sample rate than the frequency we actually want to send the data
-  // at.
-  enum {
-    CAN_POTENTIOMETER_MSG_FREQUENCY_MS = 10,
-  };
+static void servos_update_task([[maybe_unused]] void* args) {
+  enum { PERIOD_MS = 10 };
 
   TickType_t current_tick = xTaskGetTickCount();
-  ESP_LOGI(TAG, "adc_read_task started!");
 
   while (true) {
-    xTaskDelayUntil(&current_tick,
-                    pdMS_TO_TICKS(CAN_POTENTIOMETER_MSG_FREQUENCY_MS));
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(PERIOD_MS));
 
-    {
-      esp_err_t err = adc_mgr_read(&s_adc_read_results, 0);
-      if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error calling adc_mgr_read: %s", esp_err_to_name(err));
-        continue;
-      }
+    // Read ADC.
+    esp_err_t err = adc_mgr_read(&s_adc_read_results, 0);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Error calling adc_mgr_read: %s", esp_err_to_name(err));
     }
 
-    // Get the average of the potentiometer values.
-    if (s_potentiometer_up_down_buffer->length > 0) {
-      s_latest_potentiometer_up_down_value =
-          limb_average16(s_potentiometer_up_down_buffer->data,
+    s_latest_potentiometer_up_down_value =
+        moving_average16(s_latest_potentiometer_up_down_value,
+                         s_potentiometer_up_down_buffer->data,
                          s_potentiometer_up_down_buffer->length);
-      s_potentiometer_up_down_buffer->length = 0;
-    }
+    s_potentiometer_up_down_buffer->length = 0;
 
-    if (s_potentiometer_left_right_buffer->length > 0) {
-      s_latest_potentiometer_left_right_value =
-          limb_average16(s_potentiometer_left_right_buffer->data,
+    s_latest_potentiometer_left_right_value =
+        moving_average16(s_latest_potentiometer_left_right_value,
+                         s_potentiometer_left_right_buffer->data,
                          s_potentiometer_left_right_buffer->length);
-      s_potentiometer_left_right_buffer->length = 0;
-    }
+    s_potentiometer_left_right_buffer->length = 0;
 
+    // Update servos.
+    servo_update(s_up_down_servo_handle, PERIOD_MS,
+                 s_latest_potentiometer_up_down_value);
+    servo_update(s_left_right_servo_handle, PERIOD_MS,
+                 s_latest_potentiometer_left_right_value);
+
+    // FIXME: Figure out how often we want to send the status updates.
     // Send up/down potentiometer status update.
     {
       static int i = 0;
-      PotentiometerAngle potentiometer_angle = potentiometer_adc_to_angle(
-          &kUpDownPotentiometer, s_latest_potentiometer_up_down_value);
-      JointAngle joint_angle =
-          to_joint_angle(&kUpDownPotentiometer, potentiometer_angle);
+      PotentiometerAngle potentiometer_angle =
+          potentiometer_adc_to_angle(&kUpDownServoConfig.potentiometer,
+                                     s_latest_potentiometer_up_down_value);
+      JointAngle joint_angle = to_joint_angle(&kUpDownServoConfig.potentiometer,
+                                              potentiometer_angle);
       if (++i == 100) {
         ESP_LOGI(TAG, "Current up/down pot angle: %f",
                  potentiometer_angle.degree);
@@ -312,10 +315,11 @@ static void adc_read_task([[maybe_unused]] void* arg) {
 
     // Send left/right potentiometer status update.
     {
-      PotentiometerAngle potentiometer_angle = potentiometer_adc_to_angle(
-          &kLeftRightPotentiometer, s_latest_potentiometer_left_right_value);
-      JointAngle joint_angle =
-          to_joint_angle(&kLeftRightPotentiometer, potentiometer_angle);
+      PotentiometerAngle potentiometer_angle =
+          potentiometer_adc_to_angle(&kLeftRightServoConfig.potentiometer,
+                                     s_latest_potentiometer_left_right_value);
+      JointAngle joint_angle = to_joint_angle(
+          &kLeftRightServoConfig.potentiometer, potentiometer_angle);
       esp_err_t err =
           can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
                    (uint8_t*)&joint_angle.degree, sizeof(joint_angle.degree));
@@ -330,20 +334,6 @@ static void adc_read_task([[maybe_unused]] void* arg) {
 }
 
 void app_main(void) {
-  // Servo initialization.
-  {
-    esp_err_t err = servos_init(kServoConfigs, LIMB_ARR_LEN(kServoConfigs));
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Error calling servos_init: %s", esp_err_to_name(err));
-      return;
-    }
-  }
-
-  vTaskDelay(pdMS_TO_TICKS(5000));
-  servo_move_to_degree(kUpDownServo, kUpDownServo->max_angle);
-  vTaskDelay(pdMS_TO_TICKS(1000));
-  servo_move_to_degree(kUpDownServo, kUpDownServo->min_angle);
-
   // IMU initialization.
   {
     imu_config_t imu_config = IMU_CONFIG_DEFAULT();
@@ -387,19 +377,48 @@ void app_main(void) {
       ESP_LOGE(TAG, "Error calling adc_mgr_init: %s", esp_err_to_name(err));
       return;
     }
+  }
 
-    err = adc_mgr_read(&s_adc_read_results, 10);
-    ESP_LOGI(TAG, "Latest up/down value: %d",
-             s_potentiometer_up_down_buffer
-                 ->data[s_potentiometer_up_down_buffer->length - 1]);
+  // Servo initialization.
+  {
+    vTaskDelay(pdMS_TO_TICKS(10));
+    esp_err_t err = adc_mgr_read(&s_adc_read_results, 0);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling adc_mgr_read: %s", esp_err_to_name(err));
+      return;
+    }
+
+    s_latest_potentiometer_up_down_value =
+        limb_average16(s_potentiometer_up_down_buffer->data,
+                       s_potentiometer_up_down_buffer->length);
     s_potentiometer_up_down_buffer->length = 0;
-    ESP_LOGI(TAG, "Latest left/right value: %d",
-             s_potentiometer_left_right_buffer
-                 ->data[s_potentiometer_left_right_buffer->length - 1]);
+    s_latest_potentiometer_left_right_value =
+        limb_average16(s_potentiometer_left_right_buffer->data,
+                       s_potentiometer_left_right_buffer->length);
     s_potentiometer_left_right_buffer->length = 0;
+
+    err = servo_init(&kUpDownServoConfig, s_latest_potentiometer_up_down_value,
+                     &s_up_down_servo_handle);
+    s_potentiometer_up_down_buffer->length = 0;
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling servos_init for up/down servo: %s",
+               esp_err_to_name(err));
+      return;
+    }
+
+    err = servo_init(&kLeftRightServoConfig,
+                     s_latest_potentiometer_left_right_value,
+                     &s_left_right_servo_handle);
+    s_potentiometer_left_right_buffer->length = 0;
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling servos_init for left/right servo: %s",
+               esp_err_to_name(err));
+      return;
+    }
   }
 
   xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
-  xTaskCreate(adc_read_task, "ADC read task", 1024 * 2 * 2, NULL, 5, NULL);
   xTaskCreate(imu_read_task, "IMU read task", 1024 * 2 * 2, NULL, 5, NULL);
+  xTaskCreate(servos_update_task, "Servos update task", 1024 * 2 * 2, NULL, 6,
+              NULL);
 }
