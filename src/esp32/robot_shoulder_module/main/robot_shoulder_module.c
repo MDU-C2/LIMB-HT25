@@ -56,7 +56,7 @@ static const ServoConfig kUpDownServoConfig = {
     .max_capable_angular_velocity = {400},
     // FIXME: Figure out what to set this to. With no load the servo maxes out
     // at an offset of about 140-150, but it might be different with load.
-    .max_capable_angular_velocity_pw_offset = 800,
+    .max_capable_angular_velocity_pw_offset = 150,
     // This velocity was roughly eyeballed when the servo was moving at its
     // fastest pace with no load.
     .min_capable_angular_velocity = {34.F},
@@ -64,14 +64,14 @@ static const ServoConfig kUpDownServoConfig = {
     // moving.
     .min_capable_angular_velocity_pw_offset = 17,
     // FIXME: Figure out good values for these.
-    .gear_ratio = 1.F,
-    .max_velocity = {60.F},
-    .max_accel = {200.F},
+    .gear_ratio = 15.F,
+    .max_velocity = {10.F},
+    .max_accel = {8.F},
     .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 6,
+            .min_adc_value = 20,
             .max_adc_value = 3087,
             // FIXME: These need to be calibrated.
             .min_potentiometer_angle = {40},
