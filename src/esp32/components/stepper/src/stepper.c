@@ -62,9 +62,7 @@ static void stop_motor(stepper_control_handle_t handle) {
 
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, 0);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
-  if (ctx->cfg.enable_gpio != GPIO_NUM_NC) {
-    gpio_set_level(ctx->cfg.enable_gpio, 1);  // Disable (active low)
-  }
+
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->is_moving = false;
   ctx->current_velocity = (AngularVelocity){0.0F};
