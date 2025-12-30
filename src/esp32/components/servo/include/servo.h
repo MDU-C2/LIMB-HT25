@@ -70,6 +70,8 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 // Sets the target angle that `servo_update` aims for.
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);
 
+void servo_set_estop(ServoHandle handle, bool active);
+
 PotentiometerAngle servo_get_current_angle(ServoHandle handle);
 
 PotentiometerAngle servo_get_target_angle(ServoHandle handle);

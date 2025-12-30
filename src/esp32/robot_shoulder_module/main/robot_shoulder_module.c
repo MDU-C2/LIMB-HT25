@@ -210,11 +210,11 @@ static void can_rx_task([[maybe_unused]] void* arg) {
 
     switch (can_id) {
       case CAN_ID_ROBOT_SHOULDER_UP_DOWN_STOP: {
-        servo_set_target_angle(s_up_down_servo_handle, (JointAngle){0});
+        servo_set_estop(s_up_down_servo_handle, true);
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_STOP: {
-        servo_set_target_angle(s_left_right_servo_handle, (JointAngle){0});
+        servo_set_estop(s_left_right_servo_handle, true);
         break;
       }
       case CAN_ID_ROBOT_UPPER_ARM_ROTATION_STOP: {

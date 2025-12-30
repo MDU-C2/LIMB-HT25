@@ -20,6 +20,7 @@ typedef struct {
   AngularVelocity current_angular_velocity;
   PotentiometerAngle target_angle;
   PotentiometerAngle current_angle;
+  bool estop_active;
 } ServoContext;
 
 enum {
@@ -123,11 +124,8 @@ void servo_set_target_angle(ServoHandle handle, JointAngle target_angle) {
 
 void stop_motor(ServoHandle handle) {
   ServoContext *ctx = servo_get_context(handle);
-  // TODO(johan): Check how sudden this stop is.
   servo_apply_velocity(handle, (AngularVelocity){0});
-  // FIXME: This will move the target angle to the current target angle, which
-  // might be off from the original intended target angle. This might(?) result
-  // in drift?
+
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->current_angular_velocity.dps = 0.F;
   portEXIT_CRITICAL(&ctx->spinlock);
@@ -136,8 +134,7 @@ void stop_motor(ServoHandle handle) {
 void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
   const ServoContext *ctx = servo_get_context(handle);
 
-  if (velocity.dps == 0.F) {
-    ESP_LOGI(TAG, "Stopping!");
+  if (velocity.dps == 0.F || ctx->estop_active) {
     servo_apply_pulse_width_as_velocity(handle, ctx->cfg.motionless_pw);
     return;
   }
@@ -214,7 +211,6 @@ void servo_apply_pulse_width_as_velocity(ServoHandle handle,
   const ServoContext *ctx = servo_get_context(handle);
   const uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
 
-  ESP_LOGI(TAG, "pw: %u, duty: %u", pulse_width, duty);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
 }
@@ -241,4 +237,16 @@ AngularVelocity servo_get_current_velocity(ServoHandle handle) {
   AngularVelocity velocity = ctx->current_angular_velocity;
   portEXIT_CRITICAL(&ctx->spinlock);
   return velocity;
+}
+
+void servo_set_estop(ServoHandle handle, bool active) {
+  ServoContext *ctx = servo_get_context(handle);
+
+  portENTER_CRITICAL(&ctx->spinlock);
+  ctx->estop_active = active;
+  portEXIT_CRITICAL(&ctx->spinlock);
+  if (active) {
+    stop_motor(handle);
+  }
+  ESP_LOGW(TAG, "Estop activated for %s", ctx->cfg.name);
 }
