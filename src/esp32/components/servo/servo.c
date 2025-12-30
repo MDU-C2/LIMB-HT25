@@ -146,6 +146,9 @@ void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
                             ctx->cfg.max_velocity.dps);
 
   velocity.dps *= ctx->cfg.gear_ratio;
+  if (ctx->cfg.direction == SERVO_DIR_REVERSE) {
+    velocity.dps = -velocity.dps;
+  }
 
   // FIXME: The servo goes from 0dps directly to ~15dps at at a certain pulse
   // width. 0-15 pulse width range might not be linear.
