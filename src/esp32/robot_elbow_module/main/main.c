@@ -248,7 +248,7 @@ void stepper_task([[maybe_unused]] void *pvParameter) {
                moving ? "Yes" : "No");
     }
 
-    vTaskDelayUntil(&last_wake_time, period_ms);
+    xTaskDelayUntil(&last_wake_time, period_ms);
   }
 }
 
