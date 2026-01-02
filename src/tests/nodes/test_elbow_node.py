@@ -1,3 +1,31 @@
+"""
+
+This script tests the elbow node hardware.
+It sends actuation commands, stop commands, and reads feedback messages.
+It also tests the interactive control mode.
+It can be run with different options to test different aspects of the elbow node.
+
+Usage:
+    python test_elbow_node.py [--interface <interface>] [--bitrate <bitrate>] [--interactive] [--feedback-only]
+
+Options:
+    --interface <interface>  CAN interface (default: can0)
+    --bitrate <bitrate>      CAN bitrate (default: 1000000)
+    --interactive            Run interactive test
+    --feedback-only          Only test feedback reading
+
+Ensure CAN is set up on AGX:
+    # Run the setup script (as root)
+    sudo scripts/agx_setup_can.sh
+
+    # Verify CAN interface is up
+    ip link show can0
+
+    # Check CAN statistics
+    ip -s -s link show can0
+"""
+
+
 
 import sys
 import time
@@ -20,7 +48,7 @@ class ElbowNodeTester:
     ELBOW_IMU_GYRO_ID = 0x5A2
     ELBOW_IMU_ACCEL_ID = 0x5A3
 
-    def __init__(self):
+    def __init__(self, interface: str = "can0", bitrate: int = 1000000):
         self.can_interface = SocketCANInterface(interface="can0", bitrate=1000000)
         self.can_parser = CANMessageParser()
         self.running = False
@@ -76,6 +104,8 @@ class ElbowNodeTester:
             print("Sent stop command.")
         else:
             print("Failed to send stop command.")
+        
+        return success
 
     def read_feedback(self, timeout: float = 1.0) -> dict:
         """
