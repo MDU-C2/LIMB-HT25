@@ -780,7 +780,7 @@ class ControlLayer(Process):
             # Extract joint angles
             j1, j2, j3, j4, j5 = joint_positions
             
-            # Robot arm parameters (from URDF)
+            # Robot arm parameters (from URDF) TODO: Check these
             L1 = 0.305  # Shoulder to elbow length
             L2 = 0.310  # Elbow to wrist length (main component)
             L2_y_offset = 0.0085  # Small Y offset in forearm
