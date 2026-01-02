@@ -92,6 +92,8 @@ class TestInputLayer(unittest.TestCase):
         self.assertIsNone(self.input_layer.latest_pressure)
         self.assertIsNone(self.input_layer.latest_motor_state)
         self.assertIsNone(self.input_layer.latest_robot_imu)
+        self.assertEqual(self.input_layer.potentiometer_values, {})
+        self.assertEqual(self.input_layer.robot_imu_buffer, {})
         
     def test_window_buffer_initialization(self):
         """Test that WindowBuffer initializes correctly"""
@@ -149,20 +151,20 @@ class TestInputLayer(unittest.TestCase):
     def test_pressure_sensor_processing(self):
         """Test processing pressure sensor data from CAN"""
 
-        # Test individual finger pressure messages
-        finger_order = ["thumb", "index", "middle", "ring", "little"]
+        # Test individual finger pressure messages (new CAN message format)
+        finger_order = ["thumb", "index", "middle", "ring", "pinky"]
         pressure_values = [0.5, 0.3, 0.7, 0.2, 0.4]
 
         for finger, value in zip(finger_order, pressure_values):
             can_message = MockCANMessage(
-                f"pressure_{finger}",
+                f"robot_{finger}_pressure",
                 {"finger": finger, "value": value},
                 time.time()
             )
             self.mock_can.read.return_value = [can_message]
 
-            # Simulate processing CAN message
-            if can_message.message_type.startswith("pressure_"):
+            # Simulate processing CAN message (matching input_layer logic)
+            if can_message.message_type.endswith("_pressure"):
                 if can_message.parsed_data and "value" in can_message.parsed_data and "finger" in can_message.parsed_data:
                     finger_name = can_message.parsed_data["finger"]
                     pressure_value = can_message.parsed_data["value"]
@@ -177,89 +179,122 @@ class TestInputLayer(unittest.TestCase):
         self.assertIsNotNone(self.input_layer.latest_pressure)
         self.assertEqual(self.input_layer.latest_pressure, pressure_values)
 
-    def test_motor_status_processing(self):
-        """Test processing motor status from CAN"""
-        joint_positions = [0.1, 0.2, 0.3, 0.4, 0.5]
+    def test_potentiometer_processing(self):
+        """Test processing potentiometer data from CAN for joint position feedback"""
         timestamp = time.time()
-
-        can_message = MockCANMessage(
-            "motor_status",
-            {"joint_positions": joint_positions},
-            timestamp
-        )
-        self.mock_can.read.return_value = [can_message]
-
-        # Simulate processing CAN message
-        if can_message.message_type == "motor_status":
-            if can_message.parsed_data:
-                positions = can_message.parsed_data.get("joint_positions", [])
-                if len(positions) == 5:
-                    self.input_layer.latest_motor_state = MotorState(
-                        joint_positions=np.array(positions),
-                        gripper_state={},
-                        timestamp=timestamp
-                    )
-
-        # Verify motor state was updated
-        self.assertIsNotNone(self.input_layer.latest_motor_state)
-        np.testing.assert_array_equal(self.input_layer.latest_motor_state.joint_positions, joint_positions)
-
-    def test_gripper_status_processing(self):
-        """Test processing gripper status from CAN"""
         
-        # First create a motor state
+        # Test potentiometer messages for joints 0-3 (joint 4 has no potentiometer)
+        potentiometer_messages = [
+            ("robot_shoulder_up_down_potentiometer", "shoulder_up_down", 0, 0.1),
+            ("robot_shoulder_left_right_potentiometer", "shoulder_left_right", 1, 0.2),
+            ("robot_elbow_up_down_potentiometer", "elbow_up_down", 2, 0.3),
+            ("robot_upper_arm_rotation_potentiometer", "upper_arm_rotation", 3, 0.4),
+        ]
+        
+        for msg_type, source, joint_idx, value in potentiometer_messages:
+            can_message = MockCANMessage(
+                msg_type,
+                {"source": source, "value": value},
+                timestamp
+            )
+            self.mock_can.read.return_value = [can_message]
+            
+            # Simulate processing CAN message (matching input_layer logic)
+            if "potentiometer" in can_message.message_type:
+                source = can_message.parsed_data.get("source")
+                value = can_message.parsed_data.get("value")
+                
+                if source and value is not None:
+                    joint_idx_mapped = self.input_layer.potentiometer_mapping.get(source)
+                    if joint_idx_mapped is not None:
+                        self.input_layer.potentiometer_values[joint_idx_mapped] = value
+                        self.input_layer._update_motor_state_from_potentiometers(can_message.timestamp)
+        
+        # Verify potentiometer values are stored
+        self.assertEqual(len(self.input_layer.potentiometer_values), 4)
+        self.assertEqual(self.input_layer.potentiometer_values[0], 0.1)
+        self.assertEqual(self.input_layer.potentiometer_values[1], 0.2)
+        self.assertEqual(self.input_layer.potentiometer_values[2], 0.3)
+        self.assertEqual(self.input_layer.potentiometer_values[3], 0.4)
+        
+        # Verify motor state was updated with joint positions
+        self.assertIsNotNone(self.input_layer.latest_motor_state)
+        np.testing.assert_array_almost_equal(
+            self.input_layer.latest_motor_state.joint_positions[:4],
+            [0.1, 0.2, 0.3, 0.4]
+        )
+        # Joint 4 should be 0.0 (no potentiometer)
+        self.assertEqual(self.input_layer.latest_motor_state.joint_positions[4], 0.0)
+
+    def test_gripper_state_tracking(self):
+        """Test internal gripper state tracking (no CAN gripper_status message exists)"""
+        
+        # Gripper state is tracked internally, not from CAN messages
+        # Test that gripper state can be updated manually
+        self.input_layer.gripper_state["open"] = False
+        self.input_layer.gripper_state["force"] = 0.5
+        
+        # Create motor state and update gripper state
         self.input_layer.latest_motor_state = MotorState(
             joint_positions=np.array([0.0] * 5),
-            gripper_state={},
+            gripper_state=self.input_layer.gripper_state.copy(),
             timestamp=time.time()
         )
-
-        # Then update gripper state
-        gripper_state = 1
-        gripper_force = 0.5
-        timestamp = time.time()
-
-        can_message = MockCANMessage(
-            "gripper_status",
-            {"state": gripper_state, "force": gripper_force},
-            timestamp
-        )
-
-        # Simulate processing CAN message
-        if can_message.message_type == "gripper_status":
-            if self.input_layer.latest_motor_state and can_message.parsed_data:
-                self.input_layer.latest_motor_state.gripper_state = {
-                    "open": can_message.parsed_data.get("state", 0) == 1,
-                    "force": can_message.parsed_data.get("force", 0.0)
-                }
-
-        # Verify gripper state was updated
-        self.assertTrue(self.input_layer.latest_motor_state.gripper_state["open"])
-        self.assertEqual(self.input_layer.latest_motor_state.gripper_state["force"], gripper_force)
+        
+        # Verify gripper state is tracked
+        self.assertFalse(self.input_layer.gripper_state["open"])
+        self.assertEqual(self.input_layer.gripper_state["force"], 0.5)
+        self.assertIsNotNone(self.input_layer.latest_motor_state)
+        self.assertFalse(self.input_layer.latest_motor_state.gripper_state["open"])
+        self.assertEqual(self.input_layer.latest_motor_state.gripper_state["force"], 0.5)
 
     def test_robot_imu_processing(self):
-        """Test processing robot IMU data from CAN"""
-        imu_data = [1.0, 2.0, 3.0, 0.1, 0.2, 0.3]  # [ax, ay, az, wx, wy, wz]
+        """Test processing robot IMU data from CAN (separate gyro and accel messages)"""
+        accel_data = [1.0, 2.0, 3.0]  # [ax, ay, az]
+        gyro_data = [0.1, 0.2, 0.3]   # [wx, wy, wz]
+        expected_combined = accel_data + gyro_data  # [ax, ay, az, wx, wy, wz]
         timestamp = time.time()
         
-        can_message = MockCANMessage(
-            "IMU",
-            {"data": imu_data},
+        # Send gyro message first
+        gyro_message = MockCANMessage(
+            "robot_hand_imu_gyro",
+            {"source": "robot_hand", "data": gyro_data},
             timestamp
         )
-        self.mock_can.read.return_value = [can_message]
+        self.mock_can.read.return_value = [gyro_message]
         
-        # Simulate processing CAN message
-        if can_message.message_type == "IMU":
-            if can_message.parsed_data and "data" in can_message.parsed_data:
-                self.input_layer.latest_robot_imu = {
-                    "data": can_message.parsed_data["data"],
-                    "timestamp": can_message.timestamp
-                }
+        # Simulate processing gyro message
+        if gyro_message.message_type.endswith("_imu_gyro"):
+            source = gyro_message.parsed_data.get("source", "unknown")
+            if source not in self.input_layer.robot_imu_buffer:
+                self.input_layer.robot_imu_buffer[source] = {}
+            self.input_layer.robot_imu_buffer[source]["gyro"] = gyro_message.parsed_data["data"]
         
-        # Verify robot IMU was stored
+        # Send accel message
+        accel_message = MockCANMessage(
+            "robot_hand_imu_accel",
+            {"source": "robot_hand", "data": accel_data},
+            timestamp
+        )
+        self.mock_can.read.return_value = [accel_message]
+        
+        # Simulate processing accel message and combining when both are available
+        if accel_message.message_type.endswith("_imu_accel"):
+            source = accel_message.parsed_data.get("source", "unknown")
+            if source not in self.input_layer.robot_imu_buffer:
+                self.input_layer.robot_imu_buffer[source] = {}
+            self.input_layer.robot_imu_buffer[source]["accel"] = accel_message.parsed_data["data"]
+            
+            # Combine when both are available (for robot_hand)
+            if source == "robot_hand" and "gyro" in self.input_layer.robot_imu_buffer[source] and "accel" in self.input_layer.robot_imu_buffer[source]:
+                gyro = self.input_layer.robot_imu_buffer[source]["gyro"]
+                accel = self.input_layer.robot_imu_buffer[source]["accel"]
+                combined = accel + gyro
+                self.input_layer.latest_robot_imu = {"data": combined, "timestamp": accel_message.timestamp}
+        
+        # Verify robot IMU was stored and combined correctly
         self.assertIsNotNone(self.input_layer.latest_robot_imu)
-        self.assertEqual(self.input_layer.latest_robot_imu["data"], imu_data)
+        self.assertEqual(self.input_layer.latest_robot_imu["data"], expected_combined)
         self.assertEqual(self.input_layer.latest_robot_imu["timestamp"], timestamp)
 
     def test_packet_creation_when_window_full(self):

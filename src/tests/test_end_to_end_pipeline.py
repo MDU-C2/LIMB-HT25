@@ -340,11 +340,11 @@ class TestEndToEndPipeline(unittest.TestCase):
         self.mock_can.start()
         self.assertTrue(self.mock_can.is_running())
         
-        # Add and read messages
-        self.mock_can.add_message("pressure_thumb", {"finger": "thumb", "value": 0.5})
+        # Add and read messages (using new CAN message format)
+        self.mock_can.add_message("robot_thumb_pressure", {"finger": "thumb", "value": 0.5})
         messages = self.mock_can.read()
         self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0].message_type, "pressure_thumb")
+        self.assertEqual(messages[0].message_type, "robot_thumb_pressure")
         
         # Test BLE interface
         self.mock_ble.start()

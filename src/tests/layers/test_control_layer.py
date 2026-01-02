@@ -168,23 +168,49 @@ class TestControlLayer(unittest.TestCase):
 
     def test_check_stable_grip(self):
         """Test stable grip detection"""
+        import time
+        
+        # Set gripper state to closed with sufficient force
         gripper_state = {
             "open": False,
-            "force": 0.5,
-            "stable": True
+            "force": 0.5  # Above threshold (0.3)
         }
+        
+        # Set state entry time to allow stabilization (0.5 seconds ago)
+        self.control_layer.state_entry_time = time.time() - 1.0
         
         is_stable = self.control_layer._check_stable_grip(gripper_state)
         self.assertTrue(is_stable)
 
     def test_check_stable_grip_unstable(self):
         """Test unstable grip detection"""
+        import time
+        
+        # Set state entry time
+        self.control_layer.state_entry_time = time.time() - 1.0
+        
+        # Test with gripper open (unstable)
+        gripper_state = {
+            "open": True,
+            "force": 0.5
+        }
+        is_stable = self.control_layer._check_stable_grip(gripper_state)
+        self.assertFalse(is_stable)
+        
+        # Test with low force (below threshold of 0.3)
         gripper_state = {
             "open": False,
-            "force": 0.5,
-            "stable": False
+            "force": 0.01  # Below threshold
         }
+        is_stable = self.control_layer._check_stable_grip(gripper_state)
+        self.assertFalse(is_stable)
         
+        # Test with insufficient time since state entry
+        gripper_state = {
+            "open": False,
+            "force": 0.5
+        }
+        self.control_layer.state_entry_time = time.time() - 0.1  # Only 0.1 seconds ago
         is_stable = self.control_layer._check_stable_grip(gripper_state)
         self.assertFalse(is_stable)
 
@@ -214,11 +240,17 @@ class TestControlLayer(unittest.TestCase):
         
         encoded = self.control_layer._encode_arm_command(joint_positions)
         
-        # Should return (can_id, data) tuple
+        # Should return a list of (can_id, data) tuples, one for each joint
         self.assertIsNotNone(encoded)
-        self.assertEqual(len(encoded), 2)
-        self.assertIsInstance(encoded[0], int)  # CAN ID
-        self.assertIsInstance(encoded[1], bytes)  # Data
+        self.assertIsInstance(encoded, list)
+        self.assertEqual(len(encoded), 5)  # One command per joint
+        
+        # Verify each element is a tuple with (can_id, data)
+        for cmd in encoded:
+            self.assertIsInstance(cmd, tuple)
+            self.assertEqual(len(cmd), 2)
+            self.assertIsInstance(cmd[0], int)  # CAN ID
+            self.assertIsInstance(cmd[1], bytes)  # Data
 
     def test_encode_arm_command_invalid(self):
         """Test encoding invalid arm command"""
@@ -359,8 +391,26 @@ class TestControlLayer(unittest.TestCase):
         
         self.control_layer._send_commands(commands)
         
-        # Verify CAN send was called
-        self.mock_can.send.assert_called()
+        # Verify CAN send was called multiple times (once per joint)
+        self.assertGreaterEqual(self.mock_can.send.call_count, 5)
+        
+        # Test gripper command
+        commands_gripper = {
+            "gripper": {
+                "action": "close",
+                "force": 0.5
+            }
+        }
+        
+        self.mock_can.send.reset_mock()
+        self.control_layer._send_commands(commands_gripper)
+        
+        # Verify CAN send was called for gripper
+        self.mock_can.send.assert_called_once()
+        
+        # Verify gripper state was updated
+        self.assertFalse(self.control_layer.gripper_state["open"])
+        self.assertEqual(self.control_layer.gripper_state["force"], 0.5)
 
     def test_stop_method(self):
         """Test that stop method works correctly"""

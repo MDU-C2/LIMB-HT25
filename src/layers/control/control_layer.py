@@ -1,5 +1,6 @@
 from multiprocessing import Process, Event
 import time
+import numpy as np
 from hardware.can.can_message_parser import CANMessageParser
 from shared.queues import DataQueue
 from typing import Optional, Dict, Tuple, List
@@ -758,42 +759,361 @@ class ControlLayer(Process):
         """
         Compute the forward kinematics for the arm.
         
+        Joint mapping:
+        - J1 (index 0): shoulder_up_down (X-axis rotation)
+        - J2 (index 1): shoulder_left_right (Z-axis rotation, azimuth)
+        - J3 (index 2): elbow_up_down (Y-axis rotation, bend)
+        - J4 (index 3): upper_arm_rotation (Y-axis rotation around upper arm)
+        - J5 (index 4): lower_arm_rotation (Z-axis rotation, forearm twist)
+        
         Args:
-            joint_positions: List of 5 joint angles in radians
+            joint_positions: List of 5 joint angles in radians [J1, J2, J3, J4, J5]
         
         Returns:
-            Dict with 'position' and 'orientation', or None if computation fails
+            Dict with 'position' [x, y, z] and 'orientation' [roll, pitch, yaw], 
+            or None if computation fails
         """
-        # TODO: Implement forward kinematics based on robot arm DH parameters
-        # This is a placeholder - needs to be implemented with actual robot arm model
-        # Example structure:
-        #   - Use DH parameters or transformation matrices
-        #   - Compute end-effector position [x, y, z]
-        #   - Compute end-effector orientation (quaternion or euler angles)
+        if not joint_positions or len(joint_positions) != 5:
+            return None
         
-        print("[Control Layer] Forward kinematics not yet implemented")
-        return None
+        try:
+            # Extract joint angles
+            j1, j2, j3, j4, j5 = joint_positions
+            
+            # Robot arm parameters (from URDF)
+            L1 = 0.305  # Shoulder to elbow length
+            L2 = 0.310  # Elbow to wrist length (main component)
+            L2_y_offset = 0.0085  # Small Y offset in forearm
+            L2_z_offset = -0.005  # Small Z offset in forearm
+            L3 = 0.120  # Wrist to hand center (approximate)
+            
+            # Base rotation (URDF has 90° rotation around Z)
+            base_rotation = np.pi / 2.0
+            
+            # Start with identity transformation
+            T = np.eye(4)
+            
+            # Apply base rotation (90° around Z)
+            cos_base = np.cos(base_rotation)
+            sin_base = np.sin(base_rotation)
+            R_base = np.array([
+                [cos_base, -sin_base, 0, 0],
+                [sin_base, cos_base, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ R_base
+            
+            # J2: Shoulder left/right (Z-axis rotation)
+            cos_j2 = np.cos(j2)
+            sin_j2 = np.sin(j2)
+            R_z_j2 = np.array([
+                [cos_j2, -sin_j2, 0, 0],
+                [sin_j2, cos_j2, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ R_z_j2
+            
+            # J1: Shoulder up/down (X-axis rotation)
+            cos_j1 = np.cos(j1)
+            sin_j1 = np.sin(j1)
+            R_x_j1 = np.array([
+                [1, 0, 0, 0],
+                [0, cos_j1, -sin_j1, 0],
+                [0, sin_j1, cos_j1, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ R_x_j1
+            
+            # J4: Upper arm rotation (Y-axis rotation)
+            cos_j4 = np.cos(j4)
+            sin_j4 = np.sin(j4)
+            R_y_j4 = np.array([
+                [cos_j4, 0, sin_j4, 0],
+                [0, 1, 0, 0],
+                [-sin_j4, 0, cos_j4, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ R_y_j4
+            
+            # Translate along upper arm (L1)
+            T_trans1 = np.array([
+                [1, 0, 0, L1],
+                [0, 1, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ T_trans1
+            
+            # J3: Elbow up/down (Y-axis rotation, bend)
+            cos_j3 = np.cos(j3)
+            sin_j3 = np.sin(j3)
+            R_y_j3 = np.array([
+                [cos_j3, 0, sin_j3, 0],
+                [0, 1, 0, 0],
+                [-sin_j3, 0, cos_j3, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ R_y_j3
+            
+            # J5: Lower arm rotation (Z-axis rotation, forearm twist)
+            cos_j5 = np.cos(j5)
+            sin_j5 = np.sin(j5)
+            R_z_j5 = np.array([
+                [cos_j5, -sin_j5, 0, 0],
+                [sin_j5, cos_j5, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ R_z_j5
+            
+            # Translate along forearm (L2 with offsets)
+            T_trans2 = np.array([
+                [1, 0, 0, L2],
+                [0, 1, 0, L2_y_offset],
+                [0, 0, 1, L2_z_offset],
+                [0, 0, 0, 1]
+            ])
+            T = T @ T_trans2
+            
+            # Translate to hand center (L3)
+            T_trans3 = np.array([
+                [1, 0, 0, L3],
+                [0, 1, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            T = T @ T_trans3
+            
+            # Extract position
+            position = T[:3, 3]
+            
+            # Extract orientation (rotation matrix to Euler angles: roll, pitch, yaw)
+            R = T[:3, :3]
+            
+            # Convert rotation matrix to Euler angles (ZYX convention)
+            sy = np.sqrt(R[0, 0]**2 + R[1, 0]**2)
+            singular = sy < 1e-6
+            
+            if not singular:
+                roll = np.arctan2(R[2, 1], R[2, 2])
+                pitch = np.arctan2(-R[2, 0], sy)
+                yaw = np.arctan2(R[1, 0], R[0, 0])
+            else:
+                roll = np.arctan2(-R[1, 2], R[1, 1])
+                pitch = np.arctan2(-R[2, 0], sy)
+                yaw = 0
+            
+            orientation = [roll, pitch, yaw]
+            
+            return {
+                "position": position.tolist(),
+                "orientation": orientation
+            }
+            
+        except Exception as e:
+            print(f"[Control Layer] Forward kinematics error: {e}")
+            return None
 
     def _inverse_kinematics(self, target_pose: Dict) -> List[float]:
         """
-        Compute the inverse kinematics for the arm.
+        Compute the inverse kinematics for the arm using numerical Jacobian-based method.
+        
+        Uses iterative gradient descent with Jacobian pseudo-inverse to find joint angles
+        that achieve the target end-effector pose.
+        
+        Joint mapping:
+        - J1 (index 0): shoulder_up_down
+        - J2 (index 1): shoulder_left_right
+        - J3 (index 2): elbow_up_down
+        - J4 (index 3): upper_arm_rotation
+        - J5 (index 4): lower_arm_rotation
         
         Args:
-            target_pose: Dict with 'position' and optionally 'orientation'
-                Format: {'position': [x, y, z], 'orientation': ...}
+            target_pose: Dict with 'position' [x, y, z] and optionally 'orientation'
+                Format: {'position': [x, y, z], 'orientation': [roll, pitch, yaw] (optional)}
         
         Returns:
-            List of 5 joint angles in radians, or None if no solution found
+            List of 5 joint angles in radians [J1, J2, J3, J4, J5], or None if no solution found
         """
-        # TODO: Implement inverse kinematics based on robot arm DH parameters
-        # This is a placeholder - needs to be implemented with actual robot arm model
-        # Example approaches:
-        #   - Analytical IK if available
-        #   - Numerical IK (e.g., Jacobian-based iterative method)
-        #   - Use existing IK library (e.g., ikpy, pybullet)
+        if not target_pose or "position" not in target_pose:
+            return None
         
-        print("[Control Layer] Inverse kinematics not yet implemented")
+        target_pos = np.array(target_pose["position"])
+        if len(target_pos) != 3:
+            return None
+        
+        # Optional: use orientation constraint (for now, prioritize position)
+        target_orient = target_pose.get("orientation")
+        use_orientation = target_orient is not None and len(target_orient) == 3
+        
+        # Initial guess: use geometric initial guess for better convergence
+        current_joints = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+        
+        # Try to use geometric initial guess based on target position
+        dx, dy, dz = target_pos[0], target_pos[1], target_pos[2]
+        dist_xy = np.sqrt(dx**2 + dy**2)
+        dist_total = np.sqrt(dx**2 + dy**2 + dz**2)
+        
+        # Rough initial guess using simplified 2D geometry
+        if dist_total > 0.1:  # Avoid division by zero
+            # J2: Base rotation to point toward target (shoulder left/right)
+            current_joints[1] = np.arctan2(dy, dx) - np.pi/2.0  # Account for base rotation
+            
+            # J1: Rough estimate for shoulder up/down tilt
+            current_joints[0] = np.arctan2(dz, dist_xy) * 0.5
+            
+            # J4: Upper arm rotation (start at zero)
+            current_joints[3] = 0.0
+            
+            # J3: Elbow bend (rough estimate)
+            L1 = 0.305
+            L2 = 0.310 + 0.120  # Total forearm + hand length
+            if dist_total < L1 + L2 and dist_total > abs(L1 - L2):
+                # Use law of cosines for rough elbow angle
+                cos_elbow = (L1**2 + L2**2 - dist_total**2) / (2 * L1 * L2)
+                cos_elbow = np.clip(cos_elbow, -1.0, 1.0)
+                elbow_angle = np.arccos(cos_elbow) - np.pi
+                current_joints[2] = elbow_angle * 0.5  # Rough estimate
+            else:
+                current_joints[2] = -np.pi / 3.0  # Default bend
+            
+            # J5: Lower arm rotation (start at zero)
+            current_joints[4] = 0.0
+        
+        # IK parameters
+        max_iterations = 100
+        tolerance_pos = 0.01  # 1cm position tolerance
+        tolerance_orient = 0.1  # ~6° orientation tolerance
+        step_size = 0.5  # Damping factor for stability
+        lambda_damping = 0.01  # Damping for Jacobian pseudo-inverse
+        
+        for iteration in range(max_iterations):
+            # Compute current pose using FK
+            current_pose = self._forward_kinematics(current_joints.tolist())
+            if current_pose is None:
+                return None
+            
+            current_pos = np.array(current_pose["position"])
+            
+            # Compute position error
+            pos_error = target_pos - current_pos
+            pos_error_norm = np.linalg.norm(pos_error)
+            
+            # Check position convergence
+            if pos_error_norm < tolerance_pos:
+                if not use_orientation:
+                    # Position-only IK: converged
+                    return current_joints.tolist()
+                else:
+                    # Check orientation if specified
+                    current_orient = np.array(current_pose["orientation"])
+                    orient_error = np.array(target_orient) - current_orient
+                    # Normalize angles to [-pi, pi]
+                    orient_error = np.arctan2(np.sin(orient_error), np.cos(orient_error))
+                    orient_error_norm = np.linalg.norm(orient_error)
+                    
+                    if orient_error_norm < tolerance_orient:
+                        return current_joints.tolist()
+            
+            # Compute Jacobian matrix (numerical differentiation)
+            jacobian = self._compute_jacobian(current_joints, use_orientation)
+            if jacobian is None:
+                return None
+            
+            # Compute error vector
+            if use_orientation:
+                current_orient = np.array(current_pose["orientation"])
+                orient_error = np.array(target_orient) - current_orient
+                orient_error = np.arctan2(np.sin(orient_error), np.cos(orient_error))
+                error = np.concatenate([pos_error, orient_error])
+            else:
+                error = pos_error
+            
+            # Compute joint angle update using damped least squares
+            # Δθ = J^T (J J^T + λI)^(-1) Δx
+            J = jacobian
+            JJT = J @ J.T
+            damping_matrix = lambda_damping * np.eye(JJT.shape[0])
+            try:
+                J_pseudo_inv = J.T @ np.linalg.inv(JJT + damping_matrix)
+            except np.linalg.LinAlgError:
+                # If inversion fails, use Moore-Penrose pseudo-inverse
+                J_pseudo_inv = np.linalg.pinv(J)
+            
+            delta_theta = step_size * J_pseudo_inv @ error
+            
+            # Update joint angles
+            current_joints = current_joints + delta_theta
+            
+            # Clamp joints to limits
+            for i in range(5):
+                if i < len(self.joint_limits):
+                    lower, upper = self.joint_limits[i]
+                    current_joints[i] = np.clip(current_joints[i], lower, upper)
+        
+        # Did not converge
+        print(f"[Control Layer] IK did not converge after {max_iterations} iterations. Final error: {pos_error_norm:.4f}m")
         return None
+    
+    def _compute_jacobian(self, joint_positions: np.ndarray, include_orientation: bool = False) -> Optional[np.ndarray]:
+        """
+        Compute the Jacobian matrix numerically using finite differences.
+        
+        The Jacobian relates joint velocities to end-effector velocities:
+        ẋ = J(q) · q̇
+        
+        Args:
+            joint_positions: Current joint angles (5x1 array) [J1, J2, J3, J4, J5]
+            include_orientation: If True, include orientation in Jacobian (6x5), else position only (3x5)
+        
+        Returns:
+            Jacobian matrix (3x5 or 6x5), or None if computation fails
+        """
+        try:
+            delta = 1e-6  # Small perturbation for numerical differentiation
+            
+            # Compute current pose
+            current_pose = self._forward_kinematics(joint_positions.tolist())
+            if current_pose is None:
+                return None
+            
+            current_pos = np.array(current_pose["position"])
+            if include_orientation:
+                current_orient = np.array(current_pose["orientation"])
+                current_state = np.concatenate([current_pos, current_orient])
+                jacobian = np.zeros((6, 5))
+            else:
+                current_state = current_pos
+                jacobian = np.zeros((3, 5))
+            
+            # Compute Jacobian column by column (one joint at a time)
+            for i in range(5):
+                # Perturb joint i
+                joints_perturbed = joint_positions.copy()
+                joints_perturbed[i] += delta
+                
+                # Compute perturbed pose
+                perturbed_pose = self._forward_kinematics(joints_perturbed.tolist())
+                if perturbed_pose is None:
+                    return None
+                
+                perturbed_pos = np.array(perturbed_pose["position"])
+                if include_orientation:
+                    perturbed_orient = np.array(perturbed_pose["orientation"])
+                    perturbed_state = np.concatenate([perturbed_pos, perturbed_orient])
+                else:
+                    perturbed_state = perturbed_pos
+                
+                # Compute finite difference
+                jacobian[:, i] = (perturbed_state - current_state) / delta
+            
+            return jacobian
+            
+        except Exception as e:
+            print(f"[Control Layer] Jacobian computation error: {e}")
+            return None
 
     def _get_current_arm_pose(self, packet) -> Dict:
         """Get the current arm pose from the packet"""

@@ -12,7 +12,8 @@ from datetime import datetime
 
 # --- CONFIGURATION ---
 TARGET_NAME = "LIMBServer"
-EMG_CHAR_UUID = "24011525-1212-efde-1523-785feabcd122"
+EMG_CHAR_UUID = "24011525-1212-efde-1523-785feabcd122" #24011525-1212-efde-1523-785feabcd122
+#EMG_CHAR_UUID = "24011525-1212-efde-1523-785feabcd122" 
 
 # --- ASSEMBLY PARAMETERS ---
 CHUNKS_PER_WINDOW = 10
@@ -153,7 +154,20 @@ class EMGCapture:
                 if sensor_type == 'EMG':
                     captured_windows.append(list(data))
                     count += 1
-                    print(f"\rProgress: {count}/{target_count} windows captured", end='', flush=True)
+                    
+                    # Determine phase based on window count
+                    if count <= REST_START_WINDOWS:
+                        phase = "REST"
+                        phase_color = "\033[92m"  # Green
+                    elif count <= GESTURE_END_WINDOWS:
+                        phase = "GRIP"
+                        phase_color = "\033[93m"  # Yellow/Orange
+                    else:
+                        phase = "REST"
+                        phase_color = "\033[92m"  # Green
+                    
+                    reset_color = "\033[0m"
+                    print(f"\r{phase_color}Window {count}/{target_count} - {phase}{reset_color}  ", end='', flush=True)
             
             except asyncio.TimeoutError:
                 print(f"\nWarning: Timeout waiting for window {count}. "

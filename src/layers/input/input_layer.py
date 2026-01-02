@@ -141,7 +141,7 @@ class InputLayer(Process):
                             self.potentiometer_values[joint_idx] = value
 
                             # Update motor_state with joint positions from potentiometers
-                            self._update_motor_state_from_potentiometer(msg.timestamp)
+                            self._update_motor_state_from_potentiometers(msg.timestamp)
 
                     # Update motor_state with gripper state (from tracked state)
                     # This happens after processing all CAN messages
