@@ -31,9 +31,13 @@ import sys
 import time
 import struct
 from typing import Optional
+import os
 
 # Add parent directory to path
-sys.path.insert(0, "/".join(__file__.split("/")[:-3]))
+test_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.abspath(os.path.join(test_dir, "../../"))
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 from hardware.can.can_socketcan import SocketCANInterface
 from hardware.can.can_message_parser import CANMessageParser
