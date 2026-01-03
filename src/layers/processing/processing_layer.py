@@ -77,6 +77,7 @@ class ProcessingLayer(Process):
         self.imu_gravity_removal_method = "madgwick"
         self.imu_velocity_threshold = 0.2 # m/s
         self.imu_direction_timeout = 4.0 # seconds
+        self.imu_displayed_direction = None
         
         # Velocity tracking state
         self.imu_velocity = np.array([0.0, 0.0, 0.0])  # [vx, vy, vz] in m/s

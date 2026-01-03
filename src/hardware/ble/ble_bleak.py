@@ -50,8 +50,8 @@ class BleakBLEInterface(BLEInterface):
         self.sample_queue: Queue = Queue(maxsize=1000)
 
         # Stats?
-        # self.rx_count = 0
-        # self.error_count = 0
+        self.rx_count = 0
+        self.error_count = 0
 
     
     def start(self) -> bool:
