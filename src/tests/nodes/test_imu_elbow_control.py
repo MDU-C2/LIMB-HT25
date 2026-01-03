@@ -47,7 +47,7 @@ class IMUElbowController:
         
         # Configuration (all in degrees)
         self.angle_step_size = 5.7      # Degrees per movement detection
-        self.min_angle = -90.0          # Minimum angle in degrees
+        self.min_angle = 0.0            # Minimum angle in degrees
         self.max_angle = 90.0            # Maximum angle in degrees
         self.confidence_threshold = 0.3  # Minimum confidence to act
         
