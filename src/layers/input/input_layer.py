@@ -74,7 +74,7 @@ class InputLayer(Process):
                     self.window_buffer.add_emg(sample.data["channels"], sample.timestamp)
                 elif sample.message_type == "IMU":
                     self.window_buffer.add_imu(sample.data["data"], sample.timestamp)
-                elif sample.message_type == "piezo":
+                elif sample.message_type == "PIEZO":
                     # Add piezo to window buffer
                     piezo_value = sample.data.get("value")
                     if piezo_value is not None:
