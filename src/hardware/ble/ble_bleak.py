@@ -225,6 +225,7 @@ class BleakBLEInterface(BLEInterface):
                 bytes_per_value=IMU_BYTES_PER_VALUE,
                 values_per_sample=IMU_VALUES_PER_SAMPLE,
                 sensor_count=IMU_SENSOR_COUNT,
+                signed=True,
             )
 
             timestamp = time.time()

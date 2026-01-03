@@ -17,6 +17,7 @@ def deserialize_packet_data(
     bytes_per_value: int,
     values_per_sample: int,
     sensor_count: int,
+    signed: bool = False,
 ) -> list[npt.NDArray]:
     """Turn packet data into a list of channel samples.
 
@@ -46,8 +47,9 @@ def deserialize_packet_data(
             list[i][j] -> Sample j of sensor i.
             list[i][j][k] -> Value k of sample j of sensor i.
     """
+    signed_str = "i" if signed else "u"
     # Treat byte array as array of n-byte little-endian unsigned values.
-    values = np.frombuffer(packet_data_view, dtype=f"<u{bytes_per_value}")
+    values = np.frombuffer(packet_data_view, dtype=f"<{signed_str}{bytes_per_value}")
 
     # Group values by the amount of values present in a single sample (e.g. the first 6
     # values in IMU data belong to the same sample, the next 6 values belong to another
