@@ -497,11 +497,11 @@ class ProcessingLayer(Process):
                 if max_vel_mag > self.imu_velocity_threshold:
                     # Determine direction based on dominant axis and sign
                     if max_idx == 0:
-                        direction = "forward" if self.imu_velocity[0] < 0 else "backward"
+                        direction = "up" if self.imu_velocity[0] < 0 else "down"
                     elif max_idx == 1:
-                        direction = "left" if self.imu_velocity[1] < 0 else "right"
+                        direction = "forward" if self.imu_velocity[1] < 0 else "backward"
                     else:
-                        direction = "up" if self.imu_velocity[2] > 0 else "down"
+                        direction = "left" if self.imu_velocity[2] > 0 else "right"
                     
                     # Only update if direction changed
                     if direction != self.imu_displayed_direction:
