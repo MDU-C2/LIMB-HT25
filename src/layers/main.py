@@ -20,7 +20,9 @@ from typing import Optional
 import yaml
 
 # Add parent directory to path for imports
-sys.path.insert(0, sys.path[0] + "/../..")
+current_file_directory = sys.path[0]
+sys.path.insert(0, current_file_directory + "/..")
+sys.path.insert(0, current_file_directory + "/../..")
 
 from layers.input.input_layer import InputLayer
 from layers.processing.processing_layer import ProcessingLayer
