@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 // These are angles from the potentiometer's frame of reference.
 typedef struct {
@@ -35,6 +36,12 @@ typedef struct {
   // angles.
   uint16_t min_adc_value;
   uint16_t max_adc_value;
+
+  // If you want the relationship between joint angles and
+  // potentiometer angles to be reversed, i.e. the min joint angle
+  // corresponds to the max potentiometer angle and an increase in the
+  // joint angle corresponds to a decrease in the potentiometer angle.
+  bool is_reversed;
 } Potentiometer;
 
 // Converts the provided ADC value to the potentiometer's corresponding angle.

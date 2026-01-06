@@ -15,8 +15,11 @@ PotentiometerAngle potentiometer_adc_to_angle(
 
 JointAngle to_joint_angle(const Potentiometer *potentiometer,
                           PotentiometerAngle angle) {
-  float degrees_from_min_joint_angle =
-      angle.degree - potentiometer->min_potentiometer_angle.degree;
+  const float degrees_from_min_joint_angle =
+      potentiometer->is_reversed
+          ? potentiometer->max_potentiometer_angle.degree - angle.degree
+          : angle.degree - potentiometer->min_potentiometer_angle.degree;
+
   return (JointAngle){
       potentiometer->min_potentiometer_angle_as_joint_angle.degree +
       (degrees_from_min_joint_angle /
@@ -25,14 +28,19 @@ JointAngle to_joint_angle(const Potentiometer *potentiometer,
 
 PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
                                           JointAngle angle) {
-  float degrees_from_min_joint_angle =
+  const float distance_from_min_joint_angle =
       angle.degree -
       potentiometer->min_potentiometer_angle_as_joint_angle.degree;
+  const float distance_as_pot_angle =
+      distance_from_min_joint_angle *
+      potentiometer->joint_angle_to_potentiometer_angle_ratio;
 
   return (PotentiometerAngle){
-      potentiometer->min_potentiometer_angle.degree +
-      (degrees_from_min_joint_angle *
-       potentiometer->joint_angle_to_potentiometer_angle_ratio)};
+      potentiometer->is_reversed
+          ? potentiometer->max_potentiometer_angle.degree -
+                distance_as_pot_angle
+          : potentiometer->min_potentiometer_angle.degree +
+                distance_as_pot_angle};
 }
 
 PotentiometerAngle clamp_potentiometer_angle(const Potentiometer *potentiometer,
