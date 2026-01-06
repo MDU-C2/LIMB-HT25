@@ -13,8 +13,8 @@ class CANMessageParser:
         # Stop messages
         0x120: {"type": "robot_shoulder_up_down_stop", "format": None},
         0x121: {"type": "robot_shoulder_left_right_stop", "format": None},
+        0x122: {"type": "robot_upper_arm_rotation_stop", "format": None},
         0x140: {"type": "robot_elbow_up_down_stop", "format": None},
-        0x141: {"type": "robot_upper_arm_rotation_stop", "format": None},
         0x160: {"type": "robot_lower_arm_rotation_stop", "format": None},
         0x161: {"type": "robot_fingers_stop", "format": None},
         0x162: {"type": "robot_thumb_stop", "format": None},
@@ -26,8 +26,8 @@ class CANMessageParser:
         # Actuation messages
         0x220: {"type": "robot_shoulder_up_down_actuation", "format": "<f"},  # float32: position/velocity
         0x221: {"type": "robot_shoulder_left_right_actuation", "format": "<f"},
+        0x222: {"type": "robot_upper_arm_rotation_actuation", "format": "<f"},
         0x240: {"type": "robot_elbow_up_down_actuation", "format": "<f"},
-        0x241: {"type": "robot_upper_arm_rotation_actuation", "format": "<f"},
         0x260: {"type": "robot_lower_arm_rotation_actuation", "format": "<f"},
         0x261: {"type": "robot_thumb_actuation", "format": "<f"},
         0x262: {"type": "robot_index_actuation", "format": "<f"},
