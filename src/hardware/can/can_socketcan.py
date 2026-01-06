@@ -58,6 +58,13 @@ class SocketCANInterface(CANInterface):
             # TODO: Do I need to add self.running = False here?
             return False
 
+    # Receive and ignore all messages that are waiting in the CAN RX buffer.
+    def flush_rx(self) -> None:
+        if not self.running or not self.bus:
+            return
+        while self.bus.recv(timeout=0) is not None:
+            pass
+
     def read(self, timeout: Optional[float] = None) -> List[CANMessage]:
         """Read messages from the CAN bus (non-blocking or with timeout)"""
         if not self.running or not self.bus:
