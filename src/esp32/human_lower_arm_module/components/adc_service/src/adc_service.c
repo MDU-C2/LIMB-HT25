@@ -6,6 +6,8 @@
 #include "esp_adc/adc_cali_scheme.h"
 #include <string.h>
 #include "esp_timer.h"
+#include "hal/adc_types.h"
+#include "limb_utils.h"
 
 static const char *TAG = "ADC_SERVICE_STREAM";
 
@@ -14,7 +16,12 @@ static EventGroupHandle_t s_adc_event_group;
 static portMUX_TYPE s_adc_mux = portMUX_INITIALIZER_UNLOCKED; 
 
 // --- Channels & Calibration ---
-static const adc_channel_t s_physical_channels[ADC_SERVICE_CHANNEL_COUNT] = {ADC_CHANNEL_0, ADC_CHANNEL_1, ADC_CHANNEL_2};
+enum {
+    kEmg1Channel = ADC_CHANNEL_2,
+    kEmg2Channel = ADC_CHANNEL_0,
+    kPiezoChannel = ADC_CHANNEL_3,
+};
+static const adc_channel_t s_physical_channels[ADC_SERVICE_CHANNEL_COUNT] = {kEmg1Channel, kEmg2Channel, kPiezoChannel};
 static adc_cali_handle_t s_adc_cali_handle[ADC_SERVICE_CHANNEL_COUNT] = {NULL};
 
 // --- Streaming Data (Micro-packets) ---
@@ -22,6 +29,28 @@ static emg_micro_packet_t s_emg_packet;
 static piezo_micro_packet_t s_piezo_packet;
 static uint32_t s_emg_seq = 0;
 static uint32_t s_piezo_seq = 0;
+
+// --- ADC config ---
+const AdcMgrChannelConfig kAdcChannelConfigs[] = {
+  {
+    .channel = kEmg1Channel,
+    .sample_rate = ADC_EMG_SAMPLE_RATE_HZ,
+  },
+  {
+    .channel = kEmg2Channel,
+    .sample_rate = ADC_EMG_SAMPLE_RATE_HZ,
+  },
+  {
+    .channel = kPiezoChannel,
+    .sample_rate = ADC_PIEZO_SAMPLE_RATE_HZ,
+  }
+};
+
+const AdcMgrConfig kAdcMgrConfig = {
+    .channel_configs = kAdcChannelConfigs, 
+    .channel_configs_len = LIMB_ARR_LEN(kAdcChannelConfigs),
+    .ms_worth_of_buffer_size = 200
+};
 
 // --- DMA Temporary Buffers (Reduced size to optimize RAM) ---
 #define ADC_READ_TEMP_CAPACITY 512 
@@ -97,15 +126,23 @@ static void process_new_sample(int local_index, uint16_t value) {
  * @brief High-priority task that fetches DMA data from ADC Manager every 10ms.
  */
 static void adc_task(void *pvParameters) {
-    AdcMgrReadResults res = {0}; 
-    
     // Map temporary buffers to active channels
-    res.channel_buffers[s_physical_channels[0]].data = s_temp_data_emg;
-    res.channel_buffers[s_physical_channels[0]].capacity = ADC_READ_TEMP_CAPACITY;
-    res.channel_buffers[s_physical_channels[1]].data = s_temp_data_emg_1;
-    res.channel_buffers[s_physical_channels[1]].capacity = ADC_READ_TEMP_CAPACITY;
-    res.channel_buffers[s_physical_channels[2]].data = s_temp_data_piezo;
-    res.channel_buffers[s_physical_channels[2]].capacity = ADC_READ_TEMP_CAPACITY;
+    AdcMgrReadResults res = {
+      .channel_buffers = {
+        [kEmg1Channel] = {
+          .data = s_temp_data_emg,
+          .capacity = ADC_READ_TEMP_CAPACITY,
+        },
+        [kEmg2Channel] = {
+          .data = s_temp_data_emg_1,
+          .capacity = ADC_READ_TEMP_CAPACITY,
+        },
+        [kPiezoChannel] = {
+          .data = s_temp_data_piezo,
+          .capacity = ADC_READ_TEMP_CAPACITY,
+        },
+      },
+    }; 
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(10); // 100Hz processing rate
@@ -138,32 +175,21 @@ static void adc_task(void *pvParameters) {
 
 esp_err_t adc_service_init(EventGroupHandle_t event_group) {
     s_adc_event_group = event_group;
-    AdcMgrChannelConfig configs[3];
-    uint8_t count = 0;
-
-    // Configure Sampling Rates (oversampling at 12kHz to be decimated/processed)
-    configs[count].channel = s_physical_channels[0];
-    configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3;
-    configs[count].channel = s_physical_channels[1];
-    configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3;
-    configs[count].channel = s_physical_channels[2];
-    configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3; 
 
     // Init the ADC Manager DMA engine
-    esp_err_t err = adc_mgr_init((AdcMgrConfig){
-        .channel_configs = configs, 
-        .channel_configs_len = count, 
-        .ms_worth_of_buffer_size = 200
-    });
+    esp_err_t err = adc_mgr_init(kAdcMgrConfig);
     if (err != ESP_OK) return err;
 
     // Create calibration handles and reset indices
-    for (int i = 0; i < ADC_SERVICE_CHANNEL_COUNT; i++) {
+    for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
+        // TODO(johan): The calibration scheme functionality should
+        // probably be moved to the ADC manager component so the
+        // settings are guaranteed to be consistent.
         adc_cali_curve_fitting_config_t cali_cfg = {
-            .unit_id = ADC_UNIT_1, 
-            .chan = s_physical_channels[i], 
-            .atten = ADC_ATTEN_DB_12, 
-            .bitwidth = ADC_BITWIDTH_DEFAULT
+            .unit_id = ADC_UNIT_1,
+            .chan = kAdcChannelConfigs[i].channel,
+            .atten = ADC_ATTEN_DB_12,
+            .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
         };
         adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali_handle[i]);
         s_channel_controls[i].current_index = 0;
