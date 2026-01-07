@@ -16,6 +16,7 @@
 #define ROTARY_ENCODER_DT_GPIO   18    // DT pin (B phase)
 #define ROTARY_ENCODER_SW_GPIO   19    // SW pin (button/switch)
 
+#define TWIST_SERVO_GPIO 9
 #define THUMB_SERVO_GPIO    5          
 #define INDEX_SERVO_GPIO    6           
 #define MID_SERVO_GPIO      7           
@@ -34,7 +35,9 @@
 #define SERVO_PERIOD_US   (1000000UL / SERVO_FREQ_HZ)
 #define SERVO_MAX_DUTY    ((1U << SERVO_RES_BITS) - 1)
 
-#define NUM_SERVOS        5
+#define NUM_SERVOS        6
+#define NUM_FINGER_SERVOS        5
+#define WRIST_SERVO_CONFIG_INDEX (NUM_SERVOS - 1)
 
 // Direction enum
 typedef enum {

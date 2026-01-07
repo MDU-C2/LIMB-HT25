@@ -60,7 +60,18 @@ static servo_config_t servos[NUM_SERVOS] = {
         .max_pulse_us = 1700,
         .direction = SERVO_DIR_REVERSE,
         .name = "Pinky"
-    }
+    },
+    {
+        .gpio_pin = TWIST_SERVO_GPIO,
+        .ledc_channel = LEDC_CHANNEL_5,
+        // FIXME: Real???
+        .min_angle = 0,
+        .max_angle = 45,
+        .min_pulse_us = 1000,
+        .max_pulse_us = 2000,
+        .direction = SERVO_DIR_NORMAL,
+        .name = "Wrist"
+    },
 };
 
 // Convert microseconds to duty cycle
@@ -107,16 +118,24 @@ esp_err_t servo_led_init(void)
     }
 
     ESP_LOGI(TAG, "All channels configured, setting initial positions");
-    
+
+    // Set initial wrist rotation at center position.
+    servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, (servos[WRIST_SERVO_CONFIG_INDEX].max_angle - servos[WRIST_SERVO_CONFIG_INDEX].min_angle) / 2 + 2);
+
     // Set initial positions after all channels are configured
-    for (int i = 0; i < NUM_SERVOS; i++) {
+    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
         servo_write_deg_channel(i, 180);  // Start at center position
         vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
     }
     vTaskDelay(pdMS_TO_TICKS(2000));
     
-    for (int i = 0; i < NUM_SERVOS; i++) {
+    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
         servo_write_deg_channel(i, 0);  // Start at center position
+        vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
+    }
+
+    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
+        servo_write_deg_channel(i, 180);  // Start at center position
         vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
     }
 
