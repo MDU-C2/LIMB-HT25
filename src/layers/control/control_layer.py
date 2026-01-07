@@ -737,7 +737,7 @@ class ControlLayer(Process):
             position_deg = float(np.degrees(position))
             
             if msg_type:
-                result = self.can_parser.encode(msg_type, {"value": position})
+                result = self.can_parser.encode(msg_type, {"value": position_deg})
                 if result:
                     encoded_commands.append(result)
                 else:
