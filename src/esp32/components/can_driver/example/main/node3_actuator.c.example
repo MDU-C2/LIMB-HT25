@@ -75,7 +75,7 @@ void app_main(void) {
                         // Send current status
                         char status[8];
                         snprintf(status, sizeof(status), "F:%d,L:%d", fan_on, led_on);
-                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)status, strlen(status));
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)status, strlen(status), 0);
                         ESP_LOGI(TAG, "Status sent: %s", status);
                     }
                     break;
@@ -85,12 +85,12 @@ void app_main(void) {
                         gpio_set_level(PIN_FAN_LED, 1);
                         fan_on = true;
                         ESP_LOGI(TAG, "FAN TURNED ON");
-                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"FAN:ON", 6);
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"FAN:ON", 6, 0);
                     } else if (strcmp((char*)msg_rx, "FAN_OFF") == 0) {
                         gpio_set_level(PIN_FAN_LED, 0);
                         fan_on = false;
                         ESP_LOGI(TAG, "FAN TURNED OFF");
-                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"FAN:OFF", 7);
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"FAN:OFF", 7, 0);
                     }
                     break;
                 
@@ -99,12 +99,12 @@ void app_main(void) {
                         gpio_set_level(PIN_LED, 1);
                         led_on = true;
                         ESP_LOGI(TAG, "LED TURNED ON");
-                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"LED:ON", 6);
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"LED:ON", 6, 0);
                     } else if (strcmp((char*)msg_rx, "LED_OFF") == 0) {
                         gpio_set_level(PIN_LED, 0);
                         led_on = false;
                         ESP_LOGI(TAG, "LED TURNED OFF");
-                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"LED:OFF", 7);
+                        can_send(ID_ACTUATOR_STATUS, (uint8_t*)"LED:OFF", 7, 0);
                     }
                     break;
                 default:

@@ -89,7 +89,7 @@ esp_err_t can_init(int tx_pin, int rx_pin, int baudrate, const CanMsgFilter *fil
     return ESP_OK;
 }
 
-esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len) {
+esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len, uint32_t ms_to_wait) {
     twai_message_t message = {
         .identifier = id,
         .data_length_code = len,
@@ -99,8 +99,8 @@ esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len) {
     for (int i = 0; i < len && i < 8; i++) {
         message.data[i] = data[i];
     }
-    
-    return twai_transmit(&message, pdMS_TO_TICKS(1000));
+
+    return twai_transmit(&message, pdMS_TO_TICKS(ms_to_wait));
 }
 
 esp_err_t can_receive(uint32_t *id, uint8_t *data, uint8_t *len, int timeout_ms) {

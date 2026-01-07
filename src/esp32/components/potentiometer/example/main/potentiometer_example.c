@@ -77,10 +77,9 @@ void app_main(void) {
     // potentiometer is turned to its extremes (these should be measured).
     const Potentiometer potentiometer = {
         .degrees_of_motion = {285.F},
-        .min_joint_angle = {-90.0F},
-        .max_joint_angle = {90.0F},
-        .min_joint_angle_as_potentiometer_angle = {20.F},
-        .max_joint_angle_as_potentiometer_angle = {200.F},
+        .min_potentiometer_angle_as_joint_angle = {-90.0F},
+        .min_potentiometer_angle = {20.F},
+        .max_potentiometer_angle = {200.F},
         .min_adc_value = 5,
         .max_adc_value = 3200,
     };

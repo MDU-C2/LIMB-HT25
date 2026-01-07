@@ -1,10 +1,8 @@
 idf_component_register(
   SRCS
-  "servo.c"
+  "motor_ramping.c"
   INCLUDE_DIRS
   "include"
   REQUIRES
-  driver
   limb_utils
-  potentiometer
-  motor_ramping)
+  potentiometer)

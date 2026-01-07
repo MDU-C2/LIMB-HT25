@@ -47,8 +47,8 @@ typedef enum {
   // Stop messages.
   CAN_ID_ROBOT_SHOULDER_UP_DOWN_STOP = 0x120,
   CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_STOP = 0x121,
+  CAN_ID_ROBOT_UPPER_ARM_ROTATION_STOP = 0x122,
   CAN_ID_ROBOT_ELBOW_UP_DOWN_STOP = 0x140,
-  CAN_ID_ROBOT_UPPER_ARM_ROTATION_STOP = 0x141,
   CAN_ID_ROBOT_LOWER_ARM_ROTATION_STOP = 0x160,
   CAN_ID_ROBOT_FINGERS_STOP = 0x161,
   CAN_ID_ROBOT_THUMB_STOP = 0x162,
@@ -60,8 +60,8 @@ typedef enum {
   // Actuation messages.
   CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION = 0x220,
   CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION = 0x221,
+  CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION = 0x222,
   CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION = 0x240,
-  CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION = 0x241,
   CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION = 0x260,
   CAN_ID_ROBOT_THUMB_ACTUATION = 0x261,
   CAN_ID_ROBOT_INDEX_ACTUATION = 0x262,
@@ -127,7 +127,7 @@ uint16_t create_filter_mask(CanMessageTypeFilterMask msg_type_filter_mask,
 esp_err_t can_init(int tx_pin, int rx_pin, int baudrate, const CanMsgFilter* filter);
 
 // Send a CAN message
-esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len);
+esp_err_t can_send(uint32_t id, const uint8_t *data, uint8_t len, uint32_t ms_to_wait);
 
 // Try to receive a message (blocking for timeout_ms)
 esp_err_t can_receive(uint32_t *id, uint8_t *data, uint8_t *len, int timeout_ms);

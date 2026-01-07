@@ -4,5 +4,6 @@ idf_component_register(
   INCLUDE_DIRS
   "."
   REQUIRES
+  adc_manager
   servo
   freertos)
