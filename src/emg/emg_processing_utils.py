@@ -5,6 +5,53 @@ Shared EMG processing utilities for CSV data processing.
 import numpy as np
 from scipy.signal import butter, filtfilt, iirnotch
 
+# Preprocessing functions
+
+def preprocess_emg_signal(signal, fs, lowcut, highcut, notch_freq, order=4):
+    """
+    Preprocesses a raw, multi-channel EMG signal.
+    Order: 1. Remove DC offset -> 2. Filter (Band-pass + Notch).
+    
+    Args:
+        signal (np.ndarray): Input signal with shape (num_channels, samples).
+        fs (float): Sampling frequency in Hz.
+        lowcut (float): Lower cutoff frequency for band-pass filter in Hz.
+        highcut (float): Upper cutoff frequency for band-pass filter in Hz.
+        notch_freq (float): Notch frequency to eliminate (typically 50 Hz for powerline noise).
+        order (int): Order of the Butterworth band-pass filter (default: 4).
+    
+    Returns:
+        np.ndarray: Preprocessed signal with same shape as input (num_channels, samples).
+    """
+    # --- 1. Remove DC offset from each channel ---
+    # Centers the signal around zero for accurate filtering.
+    signal_mean_removed = signal - np.mean(signal, axis=1, keepdims=True)
+    
+    # --- 2. Define filter parameters ---
+    Q = 30  # Quality factor for the Notch filter
+    
+    # --- 3. Design filters ---
+    # Design Butterworth band-pass filter
+    nyquist = 0.5 * fs
+    low = lowcut / nyquist
+    high = highcut / nyquist
+    b_band, a_band = butter(order, [low, high], btype='band')
+    
+    # Design Notch filter
+    b_notch, a_notch = iirnotch(notch_freq, Q, fs)
+    
+    # --- 4. Apply filters to each channel ---
+    # Use filtfilt for zero-phase filtering (no time delay).
+    signal_filtered = np.zeros_like(signal_mean_removed)
+    for i in range(signal_mean_removed.shape[0]):
+        # Apply band-pass filter first
+        ch_band_filtered = filtfilt(b_band, a_band, signal_mean_removed[i, :])
+        # Then apply notch filter to the result
+        ch_notch_filtered = filtfilt(b_notch, a_notch, ch_band_filtered)
+        signal_filtered[i, :] = ch_notch_filtered
+    
+    return signal_filtered
+
 # Feature calculation functions
 def calculate_mav(window):
     """Mean Absolut Value"""

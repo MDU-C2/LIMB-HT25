@@ -3,5 +3,6 @@ idf_component_register(
   "main.c"
   PRIV_REQUIRES
   imu
+  limb_ble_periph
 )
 

@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import os
 import glob
-from .emg_processing_utils import extract_time_domain_features, create_sequences
+from .emg_processing_utils import preprocess_emg_signal, extract_time_domain_features, create_sequences
 
 # CONSTANTS from data collection code
 WINDOWS_PER_CAPTURE = 80
@@ -59,7 +59,7 @@ def segment_windows(windows):
     
     return segmented
 
-def process_csv_file(csv_path, num_channels, seq_len):
+def process_csv_file(csv_path, num_channels, seq_len, fs, lowcut, highcut, notch_freq, apply_preprocessing=True):
     """
     Process a CSV file and extract sequences.
 
@@ -67,6 +67,11 @@ def process_csv_file(csv_path, num_channels, seq_len):
         csv_path (str): The path to the CSV file.
         num_channels (int): The number of channels in the EMG signal.
         seq_len (int): The length of the sequences to extract.
+        fs (float): Sampling frequency in Hz.
+        lowcut (float): Lower cutoff frequency for band-pass filter in Hz.
+        highcut (float): Upper cutoff frequency for band-pass filter in Hz.
+        notch_freq (float): Notch frequency to eliminate in Hz.
+        apply_preprocessing (bool): Whether to apply signal preprocessing (default: True).
 
     Returns:
         np.ndarray: The sequences matrix with shape (num_sequences, seq_length, num_features).
@@ -78,6 +83,32 @@ def process_csv_file(csv_path, num_channels, seq_len):
     segmented = segment_windows(windows)
     window_data = np.array([w[0] for w in segmented]) # Shape (80, 400) = (num_windows, num_samples_per_window)
     labels = np.array([w[1] for w in segmented]) # Shape (80,)
+
+    # Preprocess each window if enabled
+    if apply_preprocessing:
+        num_windows = window_data.shape[0]
+        samples_per_window = window_data.shape[1]
+        samples_per_channel = samples_per_window // num_channels
+        
+        preprocessed_windows = []
+        for i in range(num_windows):
+            # Reshape window to (num_channels, samples_per_channel) for preprocessing
+            window_reshaped = window_data[i, :].reshape(num_channels, samples_per_channel)
+            
+            # Apply preprocessing
+            window_preprocessed = preprocess_emg_signal(
+                signal=window_reshaped,
+                fs=fs,
+                lowcut=lowcut,
+                highcut=highcut,
+                notch_freq=notch_freq,
+                order=4
+            )
+            
+            # Flatten back to original shape for feature extraction
+            preprocessed_windows.append(window_preprocessed.flatten())
+        
+        window_data = np.array(preprocessed_windows)
 
     # Extract time domain features for each window
     features = extract_time_domain_features(window_data, num_channels)
@@ -132,6 +163,35 @@ def main():
         default=10,
         help="Sequence length for LSTM (default: 10)"
     )
+    parser.add_argument(
+        "--fs",
+        type=float,
+        default=1000.0,
+        help="Sampling frequency in Hz (default: 1000.0)"
+    )
+    parser.add_argument(
+        "--lowcut",
+        type=float,
+        default=20.0,
+        help="Lower cutoff frequency for band-pass filter in Hz (default: 20.0)"
+    )
+    parser.add_argument(
+        "--highcut",
+        type=float,
+        default=450.0,
+        help="Upper cutoff frequency for band-pass filter in Hz (default: 450.0)"
+    )
+    parser.add_argument(
+        "--notch-freq",
+        type=float,
+        default=50.0,
+        help="Notch frequency to eliminate in Hz (default: 50.0)"
+    )
+    parser.add_argument(
+        "--no-preprocessing",
+        action="store_true",
+        help="Disable signal preprocessing (use raw data as in old pipeline)"
+    )
     
     args = parser.parse_args()
 
@@ -158,7 +218,16 @@ def main():
         print(f"\nProcessing {subject_id}: {len(csv_files)} CSV files found in {subject_path}")
 
         for csv_file in csv_files:
-            X, y = process_csv_file(csv_file, args.num_channels, args.seq_len)
+            X, y = process_csv_file(
+                csv_file, 
+                args.num_channels, 
+                args.seq_len,
+                fs=args.fs,
+                lowcut=args.lowcut,
+                highcut=args.highcut,
+                notch_freq=args.notch_freq,
+                apply_preprocessing=not args.no_preprocessing
+            )
             if X is not None:
                 all_sequences_X.append(X)
                 all_sequences_y.append(y)
@@ -181,6 +250,11 @@ def main():
         print(f"Output: {output_path}")
         print(f"Sequences shape (X): {X_final.shape}")
         print(f"Labels shape (y): {y_final.shape}")
+        print(f"Preprocessing: {'Enabled' if not args.no_preprocessing else 'Disabled'}")
+        if not args.no_preprocessing:
+            print(f"  Sampling frequency: {args.fs} Hz")
+            print(f"  Band-pass filter: {args.lowcut}-{args.highcut} Hz")
+            print(f"  Notch filter: {args.notch_freq} Hz")
         print(f"Label distribution:")
         unique, counts = np.unique(y_final, return_counts=True)
         for label, count in zip(unique, counts):
