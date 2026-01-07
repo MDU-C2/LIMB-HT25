@@ -726,6 +726,9 @@ class ControlLayer(Process):
         encoded_commands = []
         for joint_idx, position in enumerate(joint_positions):
             msg_type = joint_to_actuation.get(joint_idx)
+            
+            position_deg = float(np.degrees(position))
+            
             if msg_type:
                 result = self.can_parser.encode(msg_type, {"value": position})
                 if result:
