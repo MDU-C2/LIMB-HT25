@@ -2,19 +2,21 @@
 #include "HS422_led.h"
 #include "can_driver.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
 #include "freertos/task.h"
+#include "portmacro.h"
 
 static const char *TAG = "SERVOS";
 
 void app_main() 
 {
     ESP_LOGI(TAG, "Starting servo control application");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    // vTaskDelay(pdMS_TO_TICKS(2000));
     
     // Initialize all servos
     ESP_LOGI(TAG, "Initializing servos...");
     servo_led_init();
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    // vTaskDelay(pdMS_TO_TICKS(1000));
     
     // Initialize rotary encoder
     // ESP_LOGI(TAG, "Initializing rotary encoder...");
@@ -26,7 +28,7 @@ void app_main()
     // start_calibration_mode();
 
     //init CAN CX---------------
-    can_init(3, 4, 125000, NULL);
+    // can_init(3, 4, 125000, NULL);
     uint8_t msg_rx[8];
     uint32_t rx_id;
     uint8_t rx_len = 1; 
@@ -39,6 +41,28 @@ void app_main()
     
     ESP_LOGI(TAG, "Starting servo test loop...");
     // ESP_LOGI(TAG, "number %d", rx_len);
+    TickType_t current_tick = xTaskGetTickCount();
+
+    // Ready to pick cup up
+    servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, 35);
+
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(15000));
+
+    // Grip
+    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
+        servo_write_deg_channel(i, 10);  // Start at center position
+    }
+
+    // place cup down
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(22000));
+    servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, 52);
+
+    // Release
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(32000));
+    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
+        servo_write_deg_channel(i, 180);  // Start at center position
+    }
+    return;
     
     while(1) {
 
