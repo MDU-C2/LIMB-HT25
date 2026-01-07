@@ -94,9 +94,13 @@ class LIMBSystem:
                 can_interface=self.can_interface,
                 ble_interface=self.ble_interface,
                 output_queue=self.input_to_processing_queue,
-                window_size=input_config.get("window_size", 100),
-                sample_rate=input_config.get("sample_rate", 100.0),
-                vision_source=vision_source
+                window_size_ms=input_config.get("window_size_ms", 200.0),
+                overlap_ms=input_config.get("overlap_ms", 0.0),
+                emg_frequency=input_config.get("emg_frequency", 4000.0),
+                imu_frequency=input_config.get("imu_frequency", 100.0),
+                piezo_frequency=input_config.get("piezo_frequency", 100.0),
+                vision_source=vision_source,
+                config=input_config
             )
 
             # Processing layer

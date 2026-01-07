@@ -18,8 +18,11 @@ class InputLayer(Process):
     def __init__(self, can_interface: CANInterface,
                     ble_interface: BLEInterface, 
                     output_queue: DataQueue, 
-                    window_size: int = 100, 
-                    sample_rate: float = 100.0,
+                    window_size_ms: float = 200.0,
+                    overlap_ms: float = 0.0,
+                    emg_frequency: float = 4000.0,
+                    imu_frequency: float = 100.0,
+                    piezo_frequency: float = 100.0,
                     vision_source = None,
                     config: Optional[Dict] = None):
 
@@ -27,9 +30,16 @@ class InputLayer(Process):
         self.running = Event() # Event to signal the process to stop
         self.can_interface = can_interface
         self.ble_interface = ble_interface
-        self.window_buffer = WindowBuffer(window_size)
+        self.window_buffer = WindowBuffer(
+            window_size_ms=window_size_ms,
+            overlap_ms=overlap_ms,
+            emg_frequency=emg_frequency,
+            imu_frequency=imu_frequency,
+            piezo_frequency=piezo_frequency
+        )
         self.packet_builder = PacketBuilder(sequence_start=0, vision_source=vision_source)
-        self.sample_rate = sample_rate
+        # Calculate effective sample rate (weighted average or use EMG as reference)
+        self.sample_rate = emg_frequency  # Use EMG frequency as reference for packet metadata
         self.output_queue = output_queue
         self.vision_source = vision_source
 

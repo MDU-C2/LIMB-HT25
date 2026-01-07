@@ -12,8 +12,11 @@ hardware:
 
 # Input layer configuration
 input_layer:
-  window_size: 100  # Number of samples per window
-  sample_rate: 100.0  # Hz
+  window_size_ms: 200.0  # Window duration in milliseconds (matches hardware: 200ms)
+  overlap_ms: 100.0  # Overlap between windows in milliseconds (50% overlap: 200ms window, 100ms overlap)
+  emg_frequency: 4000.0  # EMG sampling frequency in Hz
+  imu_frequency: 100.0  # IMU sampling frequency in Hz
+  piezo_frequency: 100.0  # Piezo sampling frequency in Hz
 
   potentiometer_mapping:
     shoulder_up_down: 0
@@ -28,7 +31,7 @@ processing_layer:
     path: null  # Path to LSTM model checkpoint (.pth file)
     scaler_path: null  # Path to StandardScaler pickle file
     config:
-      input_dim: 12  # Input dimension for LSTM
+      input_dim: 6  # Input dimension for LSTM
       hidden_dim: 32  # Hidden dimension for LSTM
   
   # EMG signal processing
