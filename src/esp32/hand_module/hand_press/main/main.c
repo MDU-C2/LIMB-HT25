@@ -67,20 +67,21 @@ void loop_control(void) {
     uint8_t rx_len = 1;
 
     if (can_receive(&rx_id, rx_data, &rx_len, 0) == ESP_OK) {
-        uint8_t command = rx_data[0];
-        ESP_LOGI(TAG, "CAN RECIBID: ID %X, Data: %X", rx_id, command);
+        bool should_close = rx_data[0];
+
+        ESP_LOGI(TAG, "CAN RECIBID: ID %X, Data: %d", rx_id, should_close);
         if (rx_id == CAN_ID_ROBOT_HAND_SET_GRIP_STATE) {
-            
-            if (command == 0x01) { 
+
+            if (should_close) { 
                 ESP_LOGW(TAG, ">>> REMOTE START RECEIVED!");
                 current_state = E1_START;
-            } 
-            else if (command == 0x02) { // COMANDO STOP
+            } else { // COMANDO STOP
                 ESP_LOGW(TAG, ">>> REMOTE STOP RECEIVED! Opening hand...");
                 current_state = E0_IDLE; 
                 
                 servo_angle = 180;
                 uint8_t open_msg = (uint8_t)servo_angle;
+                // NOTE: We're using the thumb activation as a hack. Sorry.
                 can_send(CAN_ID_ROBOT_THUMB_ACTUATION, &open_msg, 1);
             }
         }    
