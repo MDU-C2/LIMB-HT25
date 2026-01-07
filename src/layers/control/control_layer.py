@@ -65,12 +65,19 @@ class ControlLayer(Process):
             self.joint_limits = joint_limits_config
         else:
             # Default joint limits
+            #self.joint_limits = [
+                #(-3.14, 3.14),  # Joint 1: ±180 degrees
+                #(-1.57, 1.57),  # Joint 2: ±90 degrees
+                #(-3.14, 3.14),  # Joint 3: ±180 degrees
+                #(-1.57, 1.57),  # Joint 4: ±90 degrees
+                #(-3.14, 3.14),  # Joint 5: ±180 degrees
+            
             self.joint_limits = [
-                (-3.14, 3.14),  # Joint 1: ±180 degrees
-                (-1.57, 1.57),  # Joint 2: ±90 degrees
-                (-3.14, 3.14),  # Joint 3: ±180 degrees
-                (-1.57, 1.57),  # Joint 4: ±90 degrees
-                (-3.14, 3.14),  # Joint 5: ±180 degrees
+                (0.0, np.radians(30)),  # J1: Shoulder Up/Down (Max 30° !) values founded via motors improvements BRANCH, src-esp32-robot_shoulder_module-main or same with the elbow
+                (0.0, np.radians(40)),  # J2: Shoulder Left/Right (Max 40°)
+                (0.0, np.radians(67)),  # J3: Elbow (Max 67°)
+                (0.0, np.radians(90)),  # J4: Upper Arm Rotation (Max 90°)
+                (-1.57, 1.57),          # Joint 5: ±90 degrees
             ]
 
     def run(self):
