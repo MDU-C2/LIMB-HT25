@@ -55,8 +55,12 @@ void app_main()
 
                 ESP_LOGI(TAG, "RX-angles %d", angle);
                 
+            } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION) {
+                float angle = *(float*)msg_rx;
+                servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, angle);
+                ESP_LOGI(TAG, "Actuation wrist to %.2f degrees", angle);
             } else {
-                 ESP_LOGI(TAG, "CAN RX: Mensaje con ID 0x%X ", rx_id);
+                ESP_LOGI(TAG, "CAN RX: Mensaje con ID 0x%X ", rx_id);
             } 
 
         } 
