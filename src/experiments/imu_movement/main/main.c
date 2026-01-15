@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <math.h>
 #include <string.h>
+#include <math.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -52,7 +52,7 @@ void SendImuDataTask(void* arg)
             
             uint8_t* sensor_data = imu_buf.data + 4; // Skip sequence number
             
-            // Write sensor 1 data (gyro then accel)
+            // Write sensor 1 data (gyro then accel) - raw int16_t values
             memcpy(sensor_data + 0, &data.gyro.x, 2);  // gyro.x (int16_t, little-endian)
             memcpy(sensor_data + 2, &data.gyro.y, 2);  // gyro.y
             memcpy(sensor_data + 4, &data.gyro.z, 2);  // gyro.z
@@ -61,7 +61,7 @@ void SendImuDataTask(void* arg)
             memcpy(sensor_data + 10, &data.accel.z, 2); // accel.z
             
             // Duplicate for sensor 2 (since kImuSensorCount = 2)
-            // memcpy(sensor_data + 12, sensor_data, 12);
+            memcpy(sensor_data + 12, sensor_data, 12);
             
             // Send notification to BLE subscribers
             bool sent = TryNotifyImuSubscribers();
@@ -90,10 +90,12 @@ void app_main(void)
     
     ESP_LOGI(TAG, "Starting IMU Movement with BLE");
     
+    // Note: NVS initialization is handled by limb_ble_periph in BleTask
+    
     // Initialize IMU with default config
     imu_config_t config = IMU_CONFIG_DEFAULT();
-    config.sda_pin = 5;
-    config.scl_pin = 4;
+    config.sda_pin = 4;
+    config.scl_pin = 5;
     
     ESP_LOGI(TAG, "Initializing IMU: SDA=%d, SCL=%d, addr=0x%02X", 
              config.sda_pin, config.scl_pin, config.sensor_addr);
@@ -125,4 +127,3 @@ void app_main(void)
     ESP_LOGI(TAG, "Device name: LIMBServer");
     ESP_LOGI(TAG, "Waiting for BLE connection...");
 }
-

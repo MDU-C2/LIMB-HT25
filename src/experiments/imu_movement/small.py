@@ -151,11 +151,16 @@ def read_and_print_imu(port=None, baudrate=115200, method='estimate', visualize=
         ser = serial.Serial(
             port=port,
             baudrate=baudrate,
-            timeout=1.0,
+            timeout=0.1,  # Shorter timeout to avoid blocking
+            write_timeout=0.1,
+            inter_byte_timeout=0.1,  # Timeout between bytes
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
             bytesize=serial.EIGHTBITS
         )
+        # Flush any existing data
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
     except serial.SerialException as e:
         print(f"Error opening serial port: {e}")
         return
@@ -215,6 +220,11 @@ def read_and_print_imu(port=None, baudrate=115200, method='estimate', visualize=
         plt.tight_layout()
         plt.show(block=False)
     
+    # Throttle visualization updates for performance
+    # Update every N samples (1 = every sample, 2 = every other sample, etc.)
+    VIZ_UPDATE_INTERVAL = 2 if visualize else 999999  # Update every 2 samples for smooth 50Hz visualization
+    last_viz_update_sample = 0
+    
     buffer = ""
     sample_count = 0
     
@@ -265,14 +275,82 @@ def read_and_print_imu(port=None, baudrate=115200, method='estimate', visualize=
         gravity_vector = np.array([0.0, 0.0, GRAVITY])
     
     try:
+        error_count = 0
+        max_consecutive_errors = 10
+        
         while True:
             # Read available data
-            if ser.in_waiting > 0:
-                data = ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
-                buffer += data
+            try:
+                # Check if port is still open
+                if not ser.is_open:
+                    print("--- Serial port closed. Attempting to reopen...")
+                    ser.open()
+                    time.sleep(0.5)
+                    error_count = 0
+                    continue
                 
-                # Process complete lines
-                while '\n' in buffer:
+                # Read available data - use a more robust approach
+                try:
+                    # Try to read with a small timeout
+                    # This avoids the race condition with in_waiting
+                    if ser.in_waiting > 0:
+                        # Read what's available, but limit size
+                        bytes_to_read = min(ser.in_waiting, 1024)
+                        data_bytes = ser.read(bytes_to_read)
+                        
+                        if len(data_bytes) > 0:
+                            data = data_bytes.decode('utf-8', errors='ignore')
+                            if data:  # Only add non-empty data
+                                buffer += data
+                                error_count = 0  # Reset error count on successful read
+                        # If bytes_to_read was > 0 but we got 0 bytes, it's the "no data" error
+                        # This is a known pyserial quirk - just continue silently
+                    else:
+                        # No data available, small sleep to prevent busy waiting
+                        time.sleep(0.001)
+                        
+                except (serial.SerialException, OSError, ValueError) as read_error:
+                    # Handle read-specific errors
+                    error_msg = str(read_error).lower()
+                    # Suppress the common "no data" error messages to reduce spam
+                    if "no data" not in error_msg and "device reports readiness" not in error_msg:
+                        if error_count < 3:  # Only log first few unique errors
+                            print(f"--- Read error: {read_error}")
+                    error_count += 1
+                    time.sleep(0.01)
+                    
+            except serial.SerialException as e:
+                # Handle transient serial errors gracefully
+                error_count += 1
+                if error_count <= max_consecutive_errors:
+                    # Only print error occasionally to avoid spam
+                    if error_count == 1 or error_count % 5 == 0:
+                        print(f"--- Serial error (count: {error_count}): {e}")
+                    
+                    time.sleep(0.1)  # Brief pause before retrying
+                    
+                    # Try to reopen the port if it was closed
+                    try:
+                        if not ser.is_open:
+                            ser.open()
+                            time.sleep(0.5)
+                    except:
+                        pass  # Port might already be open
+                else:
+                    # Too many consecutive errors - might be disconnected
+                    print(f"--- Too many errors ({error_count}). Device may be disconnected.")
+                    print("--- Waiting 2 seconds before retrying...")
+                    time.sleep(2.0)
+                    error_count = 0  # Reset and try again
+                    try:
+                        if not ser.is_open:
+                            ser.open()
+                    except:
+                        pass
+                continue  # Skip line processing on error
+            
+            # Process complete lines
+            while '\n' in buffer:
                     line, buffer = buffer.split('\n', 1)
                     line = line.strip()
                     
@@ -282,6 +360,10 @@ def read_and_print_imu(port=None, baudrate=115200, method='estimate', visualize=
                     # Skip ESP-IDF log messages
                     if line.startswith(('I (', 'W (', 'E (', 'D (')):
                         continue
+                    
+                    # Fix malformed JSON with double braces (buffering issue)
+                    if line.startswith('{{'):
+                        line = line[1:]  # Remove extra opening brace
                     
                     # Parse JSON
                     if line.startswith('{'):
@@ -478,7 +560,7 @@ def read_and_print_imu(port=None, baudrate=115200, method='estimate', visualize=
                                         velocity[1] += ay_linear * dt
                                         velocity[2] += az_linear * dt
                                 
-                                # Update visualization and print every 25 samples
+                                # Print to console every 25 samples (to avoid spam)
                                 if sample_count % 25 == 0:
                                     print(f"Sample #{sample_count}:")
                                     print(f"  Accel (raw): x={ax_raw:7.3f}  y={ay_raw:7.3f}  z={az_raw:7.3f} m/s²")
@@ -492,111 +574,114 @@ def read_and_print_imu(port=None, baudrate=115200, method='estimate', visualize=
                                     if temp is not None:
                                         print(f"  Temp:  {temp:.1f} °C")
                                     print()
+                                
+                                # Update visualization live (throttled for smooth performance)
+                                if visualize and (sample_count - last_viz_update_sample) >= VIZ_UPDATE_INTERVAL:
+                                    last_viz_update_sample = sample_count
                                     
-                                    # Update visualization
-                                    if visualize:
-                                        # Update bar heights
-                                        bars[0].set_height(velocity[0])
-                                        bars[1].set_height(velocity[1])
-                                        bars[2].set_height(velocity[2])
-                                        
-                                        # Auto-adjust y-axis range
-                                        max_vel = max(abs(v) for v in velocity)
-                                        if max_vel > 0:
-                                            y_range = max(5, max_vel * 1.2)
-                                            ax.set_ylim(-y_range, y_range)
-                                        
-                                        # Update colors based on sign
-                                        for i, bar in enumerate(bars):
-                                            if velocity[i] >= 0:
-                                                bar.set_color(['red', 'green', 'blue'][i])
-                                            else:
-                                                bar.set_color(['darkred', 'darkgreen', 'darkblue'][i])
-                                        
-                                        # Check if enough time has passed to allow new direction detection
-                                        time_since_last = current_timestamp - last_direction_time if last_direction_time is not None else float('inf')
-                                        can_detect_new = time_since_last >= DIRECTION_TIMEOUT
-                                        
-                                        # Update countdown timer (always update, even if direction hasn't changed)
-                                        if last_direction_time is not None:
-                                            time_remaining = DIRECTION_TIMEOUT - time_since_last
-                                            if time_remaining > 0:
-                                                countdown_str = f'Next detection: {time_remaining:.1f}s'
-                                                countdown_text.set_color('orange')
-                                            else:
-                                                countdown_str = 'Next detection: Ready'
-                                                countdown_text.set_color('green')
+                                    # Update bar heights
+                                    bars[0].set_height(velocity[0])
+                                    bars[1].set_height(velocity[1])
+                                    bars[2].set_height(velocity[2])
+                                    
+                                    # Auto-adjust y-axis range
+                                    max_vel = max(abs(v) for v in velocity)
+                                    if max_vel > 0:
+                                        y_range = max(5, max_vel * 1.2)
+                                        ax.set_ylim(-y_range, y_range)
+                                    
+                                    # Update colors based on sign
+                                    for i, bar in enumerate(bars):
+                                        if velocity[i] >= 0:
+                                            bar.set_color(['red', 'green', 'blue'][i])
+                                        else:
+                                            bar.set_color(['darkred', 'darkgreen', 'darkblue'][i])
+                                    
+                                    # Check if enough time has passed to allow new direction detection
+                                    time_since_last = current_timestamp - last_direction_time if last_direction_time is not None else float('inf')
+                                    can_detect_new = time_since_last >= DIRECTION_TIMEOUT
+                                    
+                                    # Update countdown timer (always update, even if direction hasn't changed)
+                                    if last_direction_time is not None:
+                                        time_remaining = DIRECTION_TIMEOUT - time_since_last
+                                        if time_remaining > 0:
+                                            countdown_str = f'Next detection: {time_remaining:.1f}s'
+                                            countdown_text.set_color('orange')
                                         else:
                                             countdown_str = 'Next detection: Ready'
                                             countdown_text.set_color('green')
-                                        countdown_text.set_text(countdown_str)
-                                        
-                                        # Determine dominant direction based on velocity magnitude
-                                        VEL_THRESH = 0.2  # Minimum velocity to show direction
-                                        
-                                        # Find the axis with the largest absolute velocity
-                                        abs_velocities = [abs(velocity[0]), abs(velocity[1]), abs(velocity[2])]
-                                        max_idx = np.argmax(abs_velocities)
-                                        max_vel_mag = abs_velocities[max_idx]
-                                        
-                                        # Only detect/update direction if timeout has passed
-                                        if can_detect_new:
-                                            if max_vel_mag > VEL_THRESH:
-                                                # Determine direction based on dominant axis and sign
-                                                if max_idx == 0:  # X-axis
-                                                    if velocity[0] < 0:
-                                                        current_direction = "Forward"
-                                                    else:
-                                                        current_direction = "Back"
-                                                elif max_idx == 1:  # Y-axis
-                                                    if velocity[1] < 0:
-                                                        current_direction = "Left"
-                                                    else:
-                                                        current_direction = "Right"
-                                                else:  # Z-axis
-                                                    if velocity[2] > 0:
-                                                        current_direction = "Up"
-                                                    else:
-                                                        current_direction = "Down"
+                                    else:
+                                        countdown_str = 'Next detection: Ready'
+                                        countdown_text.set_color('green')
+                                    countdown_text.set_text(countdown_str)
+                                    
+                                    # Determine dominant direction based on velocity magnitude
+                                    VEL_THRESH = 0.2  # Minimum velocity to show direction
+                                    
+                                    # Find the axis with the largest absolute velocity
+                                    abs_velocities = [abs(velocity[0]), abs(velocity[1]), abs(velocity[2])]
+                                    max_idx = np.argmax(abs_velocities)
+                                    max_vel_mag = abs_velocities[max_idx]
+                                    
+                                    # Only detect/update direction if timeout has passed
+                                    if can_detect_new:
+                                        if max_vel_mag > VEL_THRESH:
+                                            # Determine direction based on dominant axis and sign
+                                            if max_idx == 0:  # X-axis
+                                                if velocity[0] < 0:
+                                                    current_direction = "Forward"
+                                                else:
+                                                    current_direction = "Back"
+                                            elif max_idx == 1:  # Y-axis
+                                                if velocity[1] < 0:
+                                                    current_direction = "Left"
+                                                else:
+                                                    current_direction = "Right"
+                                            else:  # Z-axis
+                                                if velocity[2] > 0:
+                                                    current_direction = "Up"
+                                                else:
+                                                    current_direction = "Down"
+                                            
+                                            # Only update if direction changed
+                                            if current_direction != displayed_direction:
+                                                displayed_direction = current_direction
+                                                last_direction = current_direction
+                                                last_direction_time = current_timestamp
                                                 
-                                                # Only update if direction changed
-                                                if current_direction != displayed_direction:
-                                                    displayed_direction = current_direction
-                                                    last_direction = current_direction
-                                                    last_direction_time = current_timestamp
-                                                    
-                                                    # Add to history
-                                                    direction_history.append(current_direction)
-                                                    if len(direction_history) > MAX_HISTORY:
-                                                        direction_history.pop(0)  # Remove oldest
-                                                    
-                                                    # Update history text
-                                                    history_lines = direction_history[-MAX_HISTORY:]  # Show last N
-                                                    history_str = '\n'.join([f"{i+1}. {d}" for i, d in enumerate(history_lines)])
-                                                    if not history_str:
-                                                        history_str = "No directions yet"
-                                                    history_text.set_text(history_str)
-                                                    
-                                                    # Reset countdown display
-                                                    countdown_str = f'Next detection: {DIRECTION_TIMEOUT:.1f}s'
-                                                    countdown_text.set_color('orange')
-                                                    countdown_text.set_text(countdown_str)
-                                            else:
-                                                # Below threshold - show None only if we can detect
-                                                displayed_direction = None
-                                                current_direction = None
-                                        # else: keep showing the last displayed direction during countdown
-                                        
-                                        # Display the current direction (either new or frozen during countdown)
-                                        if displayed_direction is not None:
-                                            direction_str = f"Direction: {displayed_direction}"
+                                                # Add to history
+                                                direction_history.append(current_direction)
+                                                if len(direction_history) > MAX_HISTORY:
+                                                    direction_history.pop(0)  # Remove oldest
+                                                
+                                                # Update history text
+                                                history_lines = direction_history[-MAX_HISTORY:]  # Show last N
+                                                history_str = '\n'.join([f"{i+1}. {d}" for i, d in enumerate(history_lines)])
+                                                if not history_str:
+                                                    history_str = "No directions yet"
+                                                history_text.set_text(history_str)
+                                                
+                                                # Reset countdown display
+                                                countdown_str = f'Next detection: {DIRECTION_TIMEOUT:.1f}s'
+                                                countdown_text.set_color('orange')
+                                                countdown_text.set_text(countdown_str)
                                         else:
-                                            direction_str = "Direction: None"
-                                        
-                                        direction_text.set_text(direction_str)
-                                        
-                                        fig.canvas.draw()
-                                        fig.canvas.flush_events()
+                                            # Below threshold - show None only if we can detect
+                                            displayed_direction = None
+                                            current_direction = None
+                                    # else: keep showing the last displayed direction during countdown
+                                    
+                                    # Display the current direction (either new or frozen during countdown)
+                                    if displayed_direction is not None:
+                                        direction_str = f"Direction: {displayed_direction}"
+                                    else:
+                                        direction_str = "Direction: None"
+                                    
+                                    direction_text.set_text(direction_str)
+                                    
+                                    # Update the plot
+                                    fig.canvas.draw()
+                                    fig.canvas.flush_events()
                                 
                         except json.JSONDecodeError:
                             # Skip invalid JSON lines
