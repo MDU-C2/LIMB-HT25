@@ -7,9 +7,9 @@ from torch.utils.data import DataLoader
 import tempfile
 import os
 
-from datasets import EMGSequenceDataset, load_standardize_splits
-from models import SimpleLSTM, get_simple_lstm
-from training import train_epoch, eval_model
+from .datasets import EMGSequenceDataset, load_standardize_splits
+from .models import SimpleLSTM, get_simple_lstm
+from .training import train_epoch, eval_model
 
 
 class TestModels(unittest.TestCase):
@@ -79,7 +79,7 @@ class TestDatasets(unittest.TestCase):
             tmp_path = tmp_file.name
         
         try:
-            (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_standardize_splits(
+            (X_train, y_train), (X_val, y_val), (X_test, y_test), scaler = load_standardize_splits(
                 tmp_path, test_size=0.3, val_ratio_of_temp=0.5, random_state=42
             )
             
@@ -87,6 +87,9 @@ class TestDatasets(unittest.TestCase):
             self.assertGreater(len(X_train), 0)
             self.assertGreater(len(X_val), 0)
             self.assertGreater(len(X_test), 0)
+            
+            # Check that scaler is returned
+            self.assertIsNotNone(scaler)
             
             # Check that data is standardized (mean ~0, std ~1 for train)
             X_train_flat = X_train.reshape(-1, n_features)

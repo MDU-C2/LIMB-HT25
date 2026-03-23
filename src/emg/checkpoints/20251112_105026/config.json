@@ -1,0 +1,12 @@
+{
+  "input_dim": 48,
+  "hidden_dim": 32,
+  "num_classes": 2,
+  "dropout": 0.5,
+  "learning_rate": 0.001,
+  "batch_size": 64,
+  "epochs": 50,
+  "seed": 42,
+  "test_size": 0.3,
+  "val_ratio": 0.5
+}
