@@ -23,6 +23,7 @@ class DataQueue:
                 pass
         
         self._queue.put(item, block=block, timeout=timeout)
+        time.sleep(0.01)
 
     def get(self, block: bool = True, timeout: Optional[float] = None):
         return self._queue.get(block=block, timeout=timeout)
@@ -35,3 +36,6 @@ class DataQueue:
 
     def full(self):
         return self._queue.full()
+
+    def size(self):
+        return self._queue.qsize()

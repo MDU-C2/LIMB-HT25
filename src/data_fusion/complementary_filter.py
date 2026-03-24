@@ -55,7 +55,7 @@ class ComplementaryFilter:
         # Gravity vector (for accelerometer-based orientation)
         self.gravity = np.array([0.0, 0.0, 9.81])  # m/s² (Z-up convention)
         
-        print(f"ComplementaryFilter initialized (alpha={alpha}, alpha_pos={alpha_position})")
+        #print(f"ComplementaryFilter initialized (alpha={alpha}, alpha_pos={alpha_position})")
     
     def initialize(self, position: np.ndarray, orientation: Optional[np.ndarray] = None):
         """
@@ -76,7 +76,7 @@ class ComplementaryFilter:
         self.last_update_time = time.time()
         self.initialized = True
         
-        print(f"Filter initialized: pos={self.position}, orient={self.orientation}")
+        #print(f"Filter initialized: pos={self.position}, orient={self.orientation}")
     
     def predict_with_imu(self, gyro: np.ndarray, accel: np.ndarray, dt: Optional[float] = None) -> dict:
         """
@@ -192,7 +192,7 @@ class ComplementaryFilter:
         self.angular_velocity = np.zeros(3)
         self.last_update_time = None
         self.initialized = False
-        print("Filter reset")
+        #print("Filter reset")
     
     # ========== Utility Functions ==========
     

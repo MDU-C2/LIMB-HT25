@@ -228,6 +228,7 @@ def set_up_notify_handler(
             bytes_per_value=IMU_BYTES_PER_VALUE,
             values_per_sample=IMU_VALUES_PER_SAMPLE,
             sensor_count=IMU_SENSOR_COUNT,
+            signed=True,
         )
         global first_imu_sequence_number
         global latest_imu_sequence_number

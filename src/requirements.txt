@@ -1,0 +1,55 @@
+# LIMB-HT25 System Requirements
+# Install with: pip install -r requirements.txt
+#
+# For development/testing, you may also need:
+#   pip install -r requirements.txt --upgrade
+
+# ============================================================================
+# Core Dependencies
+# ============================================================================
+numpy>=1.24.0
+scipy>=1.10.0
+
+# ============================================================================
+# Configuration
+# ============================================================================
+PyYAML>=6.0
+
+# ============================================================================
+# Machine Learning & Signal Processing
+# ============================================================================
+torch>=2.0.0
+scikit-learn>=1.3.0
+
+# ============================================================================
+# Hardware Interfaces
+# ============================================================================
+python-can>=4.0.0  # CAN bus interface (SocketCAN)
+# Note: On Linux, also install: sudo apt-get install can-utils
+bleak>=0.22.3      # Bluetooth Low Energy (BLE) interface
+
+# ============================================================================
+# Vision System (OAK-D Camera)
+# ============================================================================
+depthai>=3.0.0     # OAK-D camera SDK
+opencv-python>=4.8.0
+
+# ============================================================================
+# Data Processing & Visualization (Optional - used in some scripts)
+# ============================================================================
+pandas>=2.0.0      # Used in EMG data processing scripts
+matplotlib>=3.7.0  # Used for plotting and visualization
+
+# ============================================================================
+# System Dependencies (install separately)
+# ============================================================================
+# Linux (Ubuntu/Debian):
+#   sudo apt-get install can-utils python3-dev
+#   sudo apt-get install libgl1-mesa-glx libglib2.0-0
+#
+# macOS:
+#   brew install can-utils (if available)
+#
+# Note: depthai may require additional system libraries for OAK-D camera
+# See: https://docs.luxonis.com/en/latest/pages/tutorials/first_steps/
+

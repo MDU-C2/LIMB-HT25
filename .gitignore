@@ -426,5 +426,10 @@ oak-template/
 # EMG data files
 emg_sequences_ch*.npz
 **/emg/checkpoints/
+**/emg/data/
 
+# YOLO
+yolo11n.onnx*
 
+# Vision data files
+**/vision/tools/

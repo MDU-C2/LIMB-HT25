@@ -29,6 +29,13 @@ class TestDeserializePacketData(unittest.TestCase):
     imu_be_data = bytes(
         functools.reduce(lambda acc, i: [*acc, 0, i], range(2, 25), [0, 1]),
     )
+    # Equivalent to little endian 16-bit [-1, -2, ..., -24]
+    # [255, 255, 254, 255, ..., 232, 255]
+    imu_negative_le_data = bytes(
+        functools.reduce(
+            lambda acc, i: [*acc, i, 255], range(254, 231, -1), [255, 255]
+        ),
+    )
     piezo_le_data = bytes([1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0])
     piezo_be_data = bytes([0, 1, 0, 2, 0, 4, 0, 8, 0, 16, 0, 32, 0, 64, 0, 128])
 
@@ -78,6 +85,7 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.imu_bytes_per_value,
             values_per_sample=self.imu_values_per_sample,
             sensor_count=self.imu_sensor_count,
+            signed=True,
         )
         target = [
             [[1, 2, 3, 4, 5, 6], [13, 14, 15, 16, 17, 18]],
@@ -92,6 +100,7 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.imu_bytes_per_value,
             values_per_sample=self.imu_values_per_sample,
             sensor_count=self.imu_sensor_count,
+            signed=True,
         )
 
         # The high byte has values 1 to 24 while the low byte is always 0
@@ -108,6 +117,22 @@ class TestDeserializePacketData(unittest.TestCase):
         ]
         self.assertEqual([x.tolist() for x in result], target)
 
+    def test_negative_little_endian_imu(self) -> None:
+        """Test deserialize_packet_data with mock negative IMU data in little endian format."""
+        result = deserialize_packet_data(
+            memoryview(self.imu_negative_le_data),
+            bytes_per_value=self.imu_bytes_per_value,
+            values_per_sample=self.imu_values_per_sample,
+            sensor_count=self.imu_sensor_count,
+            signed=True,
+        )
+
+        target = [
+            [[-1, -2, -3, -4, -5, -6], [-13, -14, -15, -16, -17, -18]],
+            [[-7, -8, -9, -10, -11, -12], [-19, -20, -21, -22, -23, -24]],
+        ]
+        self.assertEqual([x.tolist() for x in result], target)
+
     def test_ill_formed_imu(self) -> None:
         """Test deserialize_packet_data with ill-formed IMU data."""
         with self.assertRaises(ValueError):
@@ -117,6 +142,7 @@ class TestDeserializePacketData(unittest.TestCase):
                 bytes_per_value=self.imu_bytes_per_value,
                 values_per_sample=self.imu_values_per_sample,
                 sensor_count=self.imu_sensor_count,
+                signed=True,
             )
 
     def test_imu_packet_sample_count_not_divisible_by_sensor_count(self) -> None:
@@ -128,6 +154,7 @@ class TestDeserializePacketData(unittest.TestCase):
                 bytes_per_value=self.imu_bytes_per_value,
                 values_per_sample=self.imu_values_per_sample,
                 sensor_count=self.imu_sensor_count + 1,
+                signed=True,
             )
 
     def test_little_endian_piezo(self) -> None:

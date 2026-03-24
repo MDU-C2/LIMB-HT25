@@ -71,6 +71,6 @@ if [ "$arg" = "loopback" ]; then
   echo "Loopback activated" >&2
 else
   # TODO: Figure out the properties we want the CAN interface to have.
-  ip link set can0 up type can bitrate 500000 dbitrate 1000000 berr-reporting on fd on
-  ip link set can1 up type can bitrate 500000 dbitrate 1000000 berr-reporting on fd on
+  ip link set can0 up type can bitrate 1000000 berr-reporting on restart-ms 100
+  ip link set can1 up type can bitrate 1000000 berr-reporting on restart-ms 100
 fi
