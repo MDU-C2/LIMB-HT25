@@ -21,7 +21,7 @@ enum {
   kImuBytesPerValue = 2,
   kImuValuesPerSample = 6,
   kImuBytesPerSample = kImuBytesPerValue * kImuValuesPerSample,
-  kImuSensorCount = 2,
+  kImuSensorCount = 1,
 
   kPiezoFrequency = 1000,
   kPiezoMsPerWindow = 100,
@@ -39,6 +39,8 @@ enum {
   // being sent.
   kPartOfWindowPerSend = 10,
   kSequenceNumberSize = 4,
+  kTimeStampSize = 8,
+  kFrameStartHeader = 2,
 
   kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,
   kEmgSamplesPerOverlap = kEmgMsPerOverlap * kEmgFrequency / 1000,
@@ -53,19 +55,17 @@ enum {
   kImuSamplesPerOverlap = kImuMsPerOverlap * kImuFrequency / 1000,
   kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
   kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
-//   kImuBufSize = (kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount) +
-//                 kSequenceNumberSize,
-  kImuBufSize = 38,
+  kImuBufSize = (kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount) +
+                kSequenceNumberSize + kTimeStampSize + kFrameStartHeader,
   kImuPacketSendRateHz = kImuFrequency / kImuSamplesToSend,
 
   kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
   kPiezoSamplesPerOverlap = kPiezoMsPerOverlap * kPiezoFrequency / 1000,
   kPiezoNewSamplesPerWindow = kPiezoSamplesPerWindow - kPiezoSamplesPerOverlap,
   kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
-//   kPiezoBufSize =
-//       (kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount) +
-//       kSequenceNumberSize,
-  kPiezoBufSize = 34,
+  kPiezoBufSize =
+      (kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount) +
+      kSequenceNumberSize + kFrameStartHeader + kTimeStampSize,
   kPiezoPacketSendRateHz = kPiezoFrequency / kPiezoSamplesToSend,
 };
 
@@ -104,12 +104,12 @@ bool TryNotifyPiezoSubscribers(void);
 // static_assert(kEmgBufSize <= kMaxAttDataSize,
 //               "The sensor buffer sizes shouldn't exceed the max ATT data size "
 //               "to avoid splitting the data into multiple packets.");
-// static_assert(kImuBufSize <= kMaxAttDataSize,
-//               "The sensor buffer sizes shouldn't exceed the max ATT data size "
-//               "to avoid splitting the data into multiple packets.");
-// static_assert(kPiezoBufSize <= kMaxAttDataSize,
-//               "The sensor buffer sizes shouldn't exceed the max ATT data size "
-//               "to avoid splitting the data into multiple packets.");
+static_assert(kImuBufSize <= kMaxAttDataSize,
+              "The sensor buffer sizes shouldn't exceed the max ATT data size "
+              "to avoid splitting the data into multiple packets.");
+static_assert(kPiezoBufSize <= kMaxAttDataSize,
+              "The sensor buffer sizes shouldn't exceed the max ATT data size "
+              "to avoid splitting the data into multiple packets.");
 #pragma GCC diagnostic pop
 
 // Since we make decisions based on time windows of sensor readings, we want to
@@ -129,13 +129,13 @@ bool TryNotifyPiezoSubscribers(void);
 //         kEmgNewSamplesPerWindow,
 //     LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
 //         kEmgNewSamplesPerWindow) ".");
-// static_assert(
-//     (kImuNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
-//         kImuNewSamplesPerWindow,
-//     LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
-//         kImuNewSamplesPerWindow) ".");
-// static_assert(
-//     (kPiezoNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
-//         kPiezoNewSamplesPerWindow,
-//     LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
-//         kPiezoNewSamplesPerWindow) ".");
+static_assert(
+    (kImuNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
+        kImuNewSamplesPerWindow,
+    LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
+        kImuNewSamplesPerWindow) ".");
+static_assert(
+    (kPiezoNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
+        kPiezoNewSamplesPerWindow,
+    LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
+        kPiezoNewSamplesPerWindow) ".");

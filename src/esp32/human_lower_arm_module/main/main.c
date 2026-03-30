@@ -32,12 +32,6 @@ void app_main(void)
         .enable_piezo = true
     };
 
-    // Enable dual IMU orientation tracking
-    imu_service_config_t imu_cfg = {
-        .enable_imu1 = true,
-        .enable_imu2 = true
-    };
-
     /**
      * 3. Define the Streaming Bitmask
      * This mask tells the BLE service which synchronization bits to monitor.
@@ -60,7 +54,7 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(100));
 
     // 5. Start IMU Service (I2C Scanning & 100Hz Task)
-    if (imu_service_start(sync_group, imu_cfg) != ESP_OK) {
+    if (imu_service_start(sync_group) != ESP_OK) {
         ESP_LOGE(TAG_MAIN, "Failed to start IMU Service!");
     } else {
         ESP_LOGI(TAG_MAIN, "IMU Service Running.");
