@@ -42,8 +42,8 @@ typedef struct {
  */
 #define IMU_CONFIG_DEFAULT() (imu_config_t) { \
     .i2c_port = I2C_NUM_0, \
-    .sda_pin = 5, \
-    .scl_pin = 4, \
+    .sda_pin = 4, \
+    .scl_pin = 5, \
     .i2c_freq_hz = 400000, \
     .sensor_addr = 0x6A, \
     .accel_range = 4, \
@@ -67,23 +67,17 @@ esp_err_t imu_init(const imu_config_t *config);
  */
 esp_err_t imu_deinit(void);
 
-
 /**
  * @brief Read IMU sensor data
  *
  * @param data Pointer to imu_data_t structure to store the data
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t imu_read_data(uint8_t sensor_addr, imu_data_t *data);
+esp_err_t imu_read_data(imu_data_t *data);
 
 /**
  * @brief Check if IMU sensor is present and responding
  *
  * @return true if sensor is detected, false otherwise
  */
-bool imu_is_present(uint8_t sensor_addr);
-
-//--------------
-
-// New function to configure a single IMU 
-esp_err_t imu_configure_sensor(uint8_t sensor_addr);    
+bool imu_is_present(void);
