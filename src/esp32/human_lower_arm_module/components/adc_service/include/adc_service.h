@@ -54,13 +54,6 @@ typedef struct {
     uint16_t data[ADC_PIEZO_MICRO_SIZE];   // Vibration/Pressure data (10 samples)
 } __attribute__((packed)) piezo_micro_packet_t;
 
-// Channel enablement configuration for ADC Manager
-typedef struct {
-    bool enable_emg1;
-    bool enable_emg2;
-    bool enable_piezo;
-} adc_service_config_t;
-
 // --- Public Interface ---
 
 /**
@@ -69,7 +62,7 @@ typedef struct {
  * @param config Structure specifying which channels to activate.
  * @return ESP_OK on success, or appropriate error code.
  */
-esp_err_t adc_service_init(EventGroupHandle_t event_group, adc_service_config_t config);
+esp_err_t adc_service_init(EventGroupHandle_t event_group);
 
 /**
  * @brief Copies the latest processed EMG micro-packet to the destination buffer.

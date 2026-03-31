@@ -24,14 +24,6 @@ void app_main(void)
         return;
     }
 
-    // 2. Service Configurations
-    // Enable all (EMG) and (Piezo) channels
-    adc_service_config_t adc_cfg = {
-        .enable_emg1 = true,
-        .enable_emg2 = true,
-        .enable_piezo = true
-    };
-
     /**
      * 3. Define the Streaming Bitmask
      * This mask tells the BLE service which synchronization bits to monitor.
@@ -62,7 +54,7 @@ void app_main(void)
 
     // 6. Start ADC Service (EMG & Piezo via DMA)
     // This starts the high-speed continuous sampling engine
-    if (adc_service_init(sync_group, adc_cfg) != ESP_OK) {
+    if (adc_service_init(sync_group) != ESP_OK) {
         ESP_LOGE(TAG_MAIN, "Failed to start ADC Service!");
     } else {
         ESP_LOGI(TAG_MAIN, "ADC Service Running.");

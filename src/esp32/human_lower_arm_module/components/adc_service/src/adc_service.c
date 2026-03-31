@@ -11,7 +11,6 @@ static const char *TAG = "ADC_SERVICE_STREAM";
 
 // --- Synchronization & State ---
 static EventGroupHandle_t s_adc_event_group;
-static EventBits_t s_active_mask;
 static portMUX_TYPE s_adc_mux = portMUX_INITIALIZER_UNLOCKED; 
 
 // --- Channels & Calibration ---
@@ -101,18 +100,12 @@ static void adc_task(void *pvParameters) {
     AdcMgrReadResults res = {0}; 
     
     // Map temporary buffers to active channels
-    if (s_active_mask & ADC_EMG1_READY_BIT) {
-        res.channel_buffers[s_physical_channels[0]].data = s_temp_data_emg;
-        res.channel_buffers[s_physical_channels[0]].capacity = ADC_READ_TEMP_CAPACITY;
-    }
-    if (s_active_mask & ADC_EMG2_READY_BIT) {
-        res.channel_buffers[s_physical_channels[1]].data = s_temp_data_emg_1;
-        res.channel_buffers[s_physical_channels[1]].capacity = ADC_READ_TEMP_CAPACITY;
-    }
-    if (s_active_mask & ADC_PIEZO_READY_BIT) {
-        res.channel_buffers[s_physical_channels[2]].data = s_temp_data_piezo;
-        res.channel_buffers[s_physical_channels[2]].capacity = ADC_READ_TEMP_CAPACITY;
-    }
+    res.channel_buffers[s_physical_channels[0]].data = s_temp_data_emg;
+    res.channel_buffers[s_physical_channels[0]].capacity = ADC_READ_TEMP_CAPACITY;
+    res.channel_buffers[s_physical_channels[1]].data = s_temp_data_emg_1;
+    res.channel_buffers[s_physical_channels[1]].capacity = ADC_READ_TEMP_CAPACITY;
+    res.channel_buffers[s_physical_channels[2]].data = s_temp_data_piezo;
+    res.channel_buffers[s_physical_channels[2]].capacity = ADC_READ_TEMP_CAPACITY;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(10); // 100Hz processing rate
@@ -132,7 +125,6 @@ static void adc_task(void *pvParameters) {
         // Fetch results from DMA through ADC Manager
         if (adc_mgr_read(&res, 0) == ESP_OK) {
             for (int i = 0; i < ADC_SERVICE_CHANNEL_COUNT; i++) {
-                if (!(s_active_mask & (1 << i))) continue;
                 AdcMgrChannelBuffer *buf = &res.channel_buffers[s_physical_channels[i]];
                 
                 for (uint32_t j = 0; j < buf->length; j++) {
@@ -144,28 +136,18 @@ static void adc_task(void *pvParameters) {
     }
 }
 
-esp_err_t adc_service_init(EventGroupHandle_t event_group, adc_service_config_t config) {
+esp_err_t adc_service_init(EventGroupHandle_t event_group) {
     s_adc_event_group = event_group;
-    s_active_mask = 0;
     AdcMgrChannelConfig configs[3];
     uint8_t count = 0;
 
     // Configure Sampling Rates (oversampling at 12kHz to be decimated/processed)
-    if (config.enable_emg1) {
-        configs[count].channel = s_physical_channels[0];
-        configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3;
-        s_active_mask |= ADC_EMG1_READY_BIT;
-    }
-    if (config.enable_emg2) {
-        configs[count].channel = s_physical_channels[1];
-        configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3;
-        s_active_mask |= ADC_EMG2_READY_BIT;
-    }
-    if (config.enable_piezo) {
-        configs[count].channel = s_physical_channels[2];
-        configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3; 
-        s_active_mask |= ADC_PIEZO_READY_BIT;
-    }
+    configs[count].channel = s_physical_channels[0];
+    configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3;
+    configs[count].channel = s_physical_channels[1];
+    configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3;
+    configs[count].channel = s_physical_channels[2];
+    configs[count++].sample_rate = ADC_EMG_SAMPLE_RATE_HZ * 3; 
 
     // Init the ADC Manager DMA engine
     esp_err_t err = adc_mgr_init((AdcMgrConfig){
@@ -177,16 +159,14 @@ esp_err_t adc_service_init(EventGroupHandle_t event_group, adc_service_config_t 
 
     // Create calibration handles and reset indices
     for (int i = 0; i < ADC_SERVICE_CHANNEL_COUNT; i++) {
-        if (s_active_mask & (1 << i)) {
-            adc_cali_curve_fitting_config_t cali_cfg = {
-                .unit_id = ADC_UNIT_1, 
-                .chan = s_physical_channels[i], 
-                .atten = ADC_ATTEN_DB_12, 
-                .bitwidth = ADC_BITWIDTH_DEFAULT
-            };
-            adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali_handle[i]);
-            s_channel_controls[i].current_index = 0;
-        }
+        adc_cali_curve_fitting_config_t cali_cfg = {
+            .unit_id = ADC_UNIT_1, 
+            .chan = s_physical_channels[i], 
+            .atten = ADC_ATTEN_DB_12, 
+            .bitwidth = ADC_BITWIDTH_DEFAULT
+        };
+        adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali_handle[i]);
+        s_channel_controls[i].current_index = 0;
     }
 
     // Launch processing task on Core 0
