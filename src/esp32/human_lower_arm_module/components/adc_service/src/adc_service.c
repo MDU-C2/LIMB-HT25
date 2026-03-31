@@ -168,15 +168,18 @@ static void adc_task(void *pvParameters) {
         }
 
         // Fetch results from DMA through ADC Manager
-        if (adc_mgr_read(&res, 0) == ESP_OK) {
-            for (int i = 0; i < ADC_SERVICE_CHANNEL_COUNT; i++) {
-                AdcMgrChannelBuffer *buf = &res.channel_buffers[s_physical_channels[i]];
-                
-                for (uint32_t j = 0; j < buf->length; j++) {
-                    process_new_sample(i, buf->data[j]);
-                }
-                buf->length = 0; // Clear length after processing
+        if (adc_mgr_read(&res, 0) != ESP_OK) {
+          ESP_LOGE(TAG, "Error reading from ADC");
+          continue;
+        }
+
+        for (int i = 0; i < ADC_SERVICE_CHANNEL_COUNT; i++) {
+            AdcMgrChannelBuffer *buf = &res.channel_buffers[s_physical_channels[i]];
+
+            for (uint32_t j = 0; j < buf->length; j++) {
+                process_new_sample(i, buf->data[j]);
             }
+            buf->length = 0; // Clear length after processing
         }
     }
 }
