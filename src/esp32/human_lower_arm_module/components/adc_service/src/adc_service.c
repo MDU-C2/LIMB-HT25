@@ -22,7 +22,10 @@ enum {
     kPiezoChannel = ADC_CHANNEL_3,
 };
 static const adc_channel_t s_physical_channels[ADC_SERVICE_CHANNEL_COUNT] = {kEmg1Channel, kEmg2Channel, kPiezoChannel};
-static adc_cali_handle_t s_adc_cali_handle[ADC_SERVICE_CHANNEL_COUNT] = {NULL};
+
+// This is a map from adc_channel_t to adc_cali_handle_t.
+// So s_adc_cali_handle[ADC_CHANNEL_2] will contain channel 2's calibration handle.
+static adc_cali_handle_t s_adc_cali_handle[SOC_ADC_MAX_CHANNEL_NUM] = {NULL};
 
 // --- Streaming Data (Micro-packets) ---
 static emg_micro_packet_t s_emg_packet;
@@ -108,13 +111,13 @@ static void process_piezo_sample(stream_control_t *state, uint16_t millivolt) {
  * * For EMG: Handles dual-channel interleaving. Sets event bit only when BOTH channels reach 40 samples.
  * For PIEZO: Implements a 4:1 decimation (from 4kHz to 1kHz).
  */
-static void process_new_sample(int local_index, uint16_t value) {
+static void process_new_sample(int local_index, adc_cali_handle_t cali_handle,  uint16_t value) {
     stream_control_t *state = &s_channel_controls[local_index];
     
     // Apply ADC Calibration (Raw to Voltage mV)
     int voltage_mv = 0;
-    if (s_adc_cali_handle[local_index] != NULL) {
-        adc_cali_raw_to_voltage(s_adc_cali_handle[local_index], value, &voltage_mv);
+    if (cali_handle != NULL) {
+        adc_cali_raw_to_voltage(cali_handle, value, &voltage_mv);
     } else {
         voltage_mv = value;
     }
@@ -174,10 +177,11 @@ static void adc_task(void *pvParameters) {
         }
 
         for (int i = 0; i < ADC_SERVICE_CHANNEL_COUNT; i++) {
-            AdcMgrChannelBuffer *buf = &res.channel_buffers[s_physical_channels[i]];
+            const adc_channel_t channel = s_physical_channels[i];
+            AdcMgrChannelBuffer *buf = &res.channel_buffers[channel];
 
             for (uint32_t j = 0; j < buf->length; j++) {
-                process_new_sample(i, buf->data[j]);
+                process_new_sample(i, s_adc_cali_handle[channel], buf->data[j]);
             }
             buf->length = 0; // Clear length after processing
         }
@@ -193,16 +197,18 @@ esp_err_t adc_service_init(EventGroupHandle_t event_group) {
 
     // Create calibration handles and reset indices
     for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
+        const adc_channel_t channel = kAdcChannelConfigs[i].channel;
+
         // TODO(johan): The calibration scheme functionality should
         // probably be moved to the ADC manager component so the
         // settings are guaranteed to be consistent.
         adc_cali_curve_fitting_config_t cali_cfg = {
             .unit_id = ADC_UNIT_1,
-            .chan = kAdcChannelConfigs[i].channel,
+            .chan = channel,
             .atten = ADC_ATTEN_DB_12,
             .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
         };
-        adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali_handle[i]);
+        adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali_handle[channel]);
         s_channel_controls[i].current_index = 0;
     }
 
