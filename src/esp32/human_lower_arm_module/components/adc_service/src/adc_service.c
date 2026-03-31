@@ -68,6 +68,41 @@ static uint8_t s_piezo_sample_counter = 0;
 static bool s_emg1_ready_flag = false;
 static bool s_emg2_ready_flag = false;
 
+static void process_emg_sample(stream_control_t *state, int local_index, uint16_t millivolt) {
+    // Interleaving: EMG1 fills first half (0-39), EMG2 fills second half (40-79)
+    if (local_index == 0) s_emg_packet.data[state->current_index] = millivolt;
+    else s_emg_packet.data[state->current_index + ADC_EMG_MICRO_SIZE] = millivolt;
+
+    state->current_index++;
+    if (state->current_index >= ADC_EMG_MICRO_SIZE) {
+        state->current_index = 0;
+        if (local_index == 0) s_emg1_ready_flag = true;
+        else s_emg2_ready_flag = true;
+
+        // Trigger notification only when both EMG channels are synchronized
+        if (s_emg1_ready_flag && s_emg2_ready_flag) {
+            s_emg_packet.header = 0xAABB;
+            s_emg_packet.seq = s_emg_seq++;
+            xEventGroupSetBits(s_adc_event_group, ADC_EMG_STREAM_BIT);
+            s_emg1_ready_flag = s_emg2_ready_flag = false;
+        }
+    }
+}
+
+static void process_piezo_sample(stream_control_t *state, uint16_t millivolt) {
+    // Decimating 4kHz input to 1kHz output
+    if (++s_piezo_sample_counter < 4) return;
+    s_piezo_sample_counter = 0;
+
+    s_piezo_packet.data[state->current_index++] = millivolt;
+    if (state->current_index >= ADC_PIEZO_MICRO_SIZE) {
+        state->current_index = 0;
+        s_piezo_packet.header = 0xEEFF;
+        s_piezo_packet.seq = s_piezo_seq++;
+        xEventGroupSetBits(s_adc_event_group, ADC_PIEZO_STREAM_BIT);
+    }
+}
+
 /**
  * @brief Processes a single raw sample, applies calibration, and fills micro-packets.
  * * For EMG: Handles dual-channel interleaving. Sets event bit only when BOTH channels reach 40 samples.
@@ -87,38 +122,11 @@ static void process_new_sample(int local_index, uint16_t value) {
 
     // --- EMG Logic (Channels 0 and 1) ---
     if (local_index == 0 || local_index == 1) {
-        // Interleaving: EMG1 fills first half (0-39), EMG2 fills second half (40-79)
-        if (local_index == 0) s_emg_packet.data[state->current_index] = val;
-        else s_emg_packet.data[state->current_index + ADC_EMG_MICRO_SIZE] = val;
-        
-        state->current_index++;
-        if (state->current_index >= ADC_EMG_MICRO_SIZE) {
-            state->current_index = 0;
-            if (local_index == 0) s_emg1_ready_flag = true;
-            else s_emg2_ready_flag = true;
-
-            // Trigger notification only when both EMG channels are synchronized
-            if (s_emg1_ready_flag && s_emg2_ready_flag) {
-                s_emg_packet.header = 0xAABB; 
-                s_emg_packet.seq = s_emg_seq++;
-                xEventGroupSetBits(s_adc_event_group, ADC_EMG_STREAM_BIT);
-                s_emg1_ready_flag = s_emg2_ready_flag = false;
-            }
-        }
+        process_emg_sample(state, local_index, val);
     } 
     // --- PIEZO Logic (Channel 2 with 4:1 Decimation) ---
     else if (local_index == 2) {
-        // Decimating 4kHz input to 1kHz output
-        if (++s_piezo_sample_counter < 4) return; 
-        s_piezo_sample_counter = 0;
-
-        s_piezo_packet.data[state->current_index++] = val;
-        if (state->current_index >= ADC_PIEZO_MICRO_SIZE) {
-            state->current_index = 0;
-            s_piezo_packet.header = 0xEEFF;
-            s_piezo_packet.seq = s_piezo_seq++;
-            xEventGroupSetBits(s_adc_event_group, ADC_PIEZO_STREAM_BIT);
-        }
+        process_piezo_sample(state, val);
     }
 }
 
