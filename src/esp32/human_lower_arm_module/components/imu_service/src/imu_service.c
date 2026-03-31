@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include <string.h>
 #include "esp_timer.h"
+#include "sensors_service.h"
 
 static const char *TAG = "IMU_SERVICE_STREAM";
 
@@ -21,13 +22,13 @@ static portMUX_TYPE s_imu_mux = portMUX_INITIALIZER_UNLOCKED;
  */
 static void imu_task(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1000 / IMU_SAMPLE_RATE_HZ); 
+    const TickType_t xFrequency = pdMS_TO_TICKS(1000 / kImuFrequency); 
 
     // Calibration/Conversion factors to map raw readings to fixed-point integers
     const float ACCEL_FIXED_FACTOR = 1.19641f;
     const float GYRO_FIXED_FACTOR = 0.15271f;
 
-    ESP_LOGI(TAG, "IMU Streaming Task Started at 100Hz");
+    ESP_LOGI(TAG, "IMU Streaming Task Started at %d Hz", kImuFrequency);
 
     while (1) {
         imu_data_t raw;

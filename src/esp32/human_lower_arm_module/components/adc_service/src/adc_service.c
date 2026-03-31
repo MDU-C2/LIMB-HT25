@@ -8,6 +8,7 @@
 #include "esp_timer.h"
 #include "hal/adc_types.h"
 #include "limb_utils.h"
+#include "sensors_service.h"
 
 static const char *TAG = "ADC_SERVICE_STREAM";
 
@@ -20,7 +21,6 @@ typedef enum {
     kEmgChannel = ADC_CHANNEL_2,
     kPiezoChannel = ADC_CHANNEL_3,
 } AdcChannel;
-static const adc_channel_t s_physical_channels[ADC_SERVICE_CHANNEL_COUNT] = {kEmgChannel, kPiezoChannel};
 
 // This is a map from adc_channel_t to adc_cali_handle_t.
 // So s_adc_cali_handle[ADC_CHANNEL_2] will contain channel 2's calibration handle.
@@ -36,11 +36,11 @@ static uint32_t s_piezo_seq = 0;
 const AdcMgrChannelConfig kAdcChannelConfigs[] = {
   {
     .channel = kEmgChannel,
-    .sample_rate = ADC_EMG_SAMPLE_RATE_HZ,
+    .sample_rate = kEmgFrequency,
   },
   {
     .channel = kPiezoChannel,
-    .sample_rate = ADC_PIEZO_SAMPLE_RATE_HZ,
+    .sample_rate = kPiezoFrequency,
   }
 };
 
@@ -66,11 +66,11 @@ typedef struct {
 static SampleBuffer s_channel_sample_buffers[SOC_ADC_MAX_CHANNEL_NUM] = {
     [kEmgChannel] = {
         .data = s_emg_packet.data,
-        .capacity = ADC_EMG_MICRO_SIZE,
+        .capacity = LIMB_ARR_LEN(s_emg_packet.data),
     },
     [kPiezoChannel] = {
         .data = s_piezo_packet.data,
-        .capacity = ADC_EMG_MICRO_SIZE,
+        .capacity = LIMB_ARR_LEN(s_piezo_packet.data),
     },
 };
 
@@ -144,11 +144,11 @@ static void adc_task(void *pvParameters) {
     }; 
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(10); // 100Hz processing rate
+    static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz && kEmgPacketSendRateHz == kPiezoPacketSendRateHz, "We assume all sensors send at the same rate");
+    const TickType_t xFrequency = pdMS_TO_TICKS(1000 / kEmgPacketSendRateHz);
 
     while (1) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        uint64_t now = esp_timer_get_time();
 
         // Fetch results from DMA through ADC Manager
         if (adc_mgr_read(&res, 0) != ESP_OK) {
@@ -156,8 +156,8 @@ static void adc_task(void *pvParameters) {
           continue;
         }
 
-        for (int i = 0; i < ADC_SERVICE_CHANNEL_COUNT; i++) {
-            const adc_channel_t channel = s_physical_channels[i];
+        for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
+            const adc_channel_t channel = kAdcChannelConfigs[i].channel;
             AdcMgrChannelBuffer *buf = &res.channel_buffers[channel];
 
             for (uint32_t j = 0; j < buf->length; j++) {

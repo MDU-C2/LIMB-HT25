@@ -6,10 +6,7 @@
 #include "imu.h" 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
-
-// --- Streaming Configuration ---
-// The IMU task runs at 100Hz, providing a fresh sample every 10ms
-#define IMU_SAMPLE_RATE_HZ      100   
+#include "sensors_service.h"
 
 // Event bit to notify the BLE Dispatcher that new IMU data is ready
 #define IMU_STREAM_BIT          (1 << 2) 
@@ -22,7 +19,7 @@
  */
 typedef struct {
     uint32_t seq;       // Packet sequence counter
-    int16_t imu_data[6]; // IMU: accel_x, y, z | gyro_x, y, z
+    int16_t imu_data[kImuSamplesToSend * kImuValuesPerSample]; // IMU: accel_x, y, z | gyro_x, y, z
 } __attribute__((packed)) imu_micro_packet_t;
 
 // --- Public API ---

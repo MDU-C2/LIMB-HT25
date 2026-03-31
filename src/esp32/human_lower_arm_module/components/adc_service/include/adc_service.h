@@ -5,19 +5,7 @@
 #include "hal/adc_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
-
-// --- Timing & Rate Definitions ---
-// Defines the time window for each data burst (10ms = 100Hz packet rate)
-#define MICRO_BATCH_MS 10 
-
-// Sampling rates for biopotential and mechanical signals
-#define ADC_EMG_SAMPLE_RATE_HZ 4000
-#define ADC_EMG_MICRO_SIZE (ADC_EMG_SAMPLE_RATE_HZ * MICRO_BATCH_MS / 1000) // 40 samples/channel
-
-#define ADC_PIEZO_SAMPLE_RATE_HZ 1000
-#define ADC_PIEZO_MICRO_SIZE (ADC_PIEZO_SAMPLE_RATE_HZ * MICRO_BATCH_MS / 1000) // 10 samples
-
-#define ADC_SERVICE_CHANNEL_COUNT 2
+#include "sensors_service.h"
 
 // --- Event Group Bits for BLE Dispatch ---
 // Notify the BLE task that a new micro-packet is ready to be streamed
@@ -32,7 +20,7 @@
  */
 typedef struct {
     uint32_t seq;       // Sequence counter for packet loss detection
-    uint16_t data[ADC_EMG_MICRO_SIZE]; // Interleaved EMG1 and EMG2 data (80 samples total)
+    uint16_t data[kEmgSamplesToSend * kEmgValuesPerSample];
 } __attribute__((packed)) emg_micro_packet_t;
 
 /**
@@ -40,7 +28,7 @@ typedef struct {
  */
 typedef struct {
     uint32_t seq;       
-    uint16_t data[ADC_PIEZO_MICRO_SIZE];   // Vibration/Pressure data (10 samples)
+    uint16_t data[kPiezoSamplesToSend * kPiezoValuesPerSample];
 } __attribute__((packed)) piezo_micro_packet_t;
 
 // --- Public Interface ---
