@@ -81,7 +81,6 @@ static void process_emg_sample(adc_channel_t channel, uint16_t millivolt) {
     if (sample_buffer->length >= sample_buffer->capacity) {
         sample_buffer->length = 0;
 
-        s_emg_packet.header = 0xAABB;
         s_emg_packet.seq = s_emg_seq++;
         xEventGroupSetBits(s_adc_event_group, ADC_EMG_STREAM_BIT);
     }
@@ -92,9 +91,8 @@ static void process_piezo_sample(adc_channel_t channel, uint16_t millivolt) {
     sample_buffer->data[sample_buffer->length++] = millivolt;
 
     if (sample_buffer->length >= sample_buffer->capacity) {
-
         sample_buffer->length = 0;
-        s_piezo_packet.header = 0xEEFF;
+
         s_piezo_packet.seq = s_piezo_seq++;
         xEventGroupSetBits(s_adc_event_group, ADC_PIEZO_STREAM_BIT);
     }
@@ -151,14 +149,6 @@ static void adc_task(void *pvParameters) {
     while (1) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         uint64_t now = esp_timer_get_time();
-
-        // Stamp the packet with the system time at the start of a new batch
-        if (s_channel_sample_buffers[kEmgChannel].length == 0) {
-            s_emg_packet.timestamp = now;
-        }
-        if (s_channel_sample_buffers[kPiezoChannel].length == 0) {
-            s_piezo_packet.timestamp = now;
-        }
 
         // Fetch results from DMA through ADC Manager
         if (adc_mgr_read(&res, 0) != ESP_OK) {

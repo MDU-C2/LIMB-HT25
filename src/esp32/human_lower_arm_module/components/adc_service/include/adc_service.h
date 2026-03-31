@@ -29,23 +29,17 @@
 
 /**
  * @brief EMG Micro-packet structure
- * Header: 0xAABB for frame synchronization
  */
 typedef struct {
-    uint16_t header;    // Frame start identifier
     uint32_t seq;       // Sequence counter for packet loss detection
-    uint64_t timestamp; // System time in microseconds (esp_timer_get_time)
     uint16_t data[ADC_EMG_MICRO_SIZE]; // Interleaved EMG1 and EMG2 data (80 samples total)
 } __attribute__((packed)) emg_micro_packet_t;
 
 /**
  * @brief Piezoelectric Micro-packet structure
- * Header: 0xEEFF for frame synchronization
  */
 typedef struct {
-    uint16_t header;    
     uint32_t seq;       
-    uint64_t timestamp; 
     uint16_t data[ADC_PIEZO_MICRO_SIZE];   // Vibration/Pressure data (10 samples)
 } __attribute__((packed)) piezo_micro_packet_t;
 

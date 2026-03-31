@@ -33,7 +33,6 @@ static void imu_task(void *pvParameters) {
         imu_data_t raw;
 
         // Initialize packet metadata
-        s_imu_packet.header = IMU_HEADER_MAGIC;
         s_imu_packet.seq = s_imu_seq;
 
         if (imu_read_data(&raw) == ESP_OK) {
@@ -45,7 +44,6 @@ static void imu_task(void *pvParameters) {
             s_imu_packet.imu_data[5] = (int16_t)(raw.gyro.z  * GYRO_FIXED_FACTOR);
 
             s_imu_seq++;
-            s_imu_packet.timestamp = esp_timer_get_time();
             xEventGroupSetBits(s_imu_event_group, IMU_STREAM_BIT);
         }
 

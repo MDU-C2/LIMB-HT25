@@ -39,16 +39,13 @@ enum {
   // being sent.
   kPartOfWindowPerSend = 10,
   kSequenceNumberSize = 4,
-  kTimeStampSize = 8,
-  kFrameStartHeader = 2,
 
   kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,
   kEmgSamplesPerOverlap = kEmgMsPerOverlap * kEmgFrequency / 1000,
   kEmgNewSamplesPerWindow = kEmgSamplesPerWindow - kEmgSamplesPerOverlap,
   kEmgSamplesToSend = kEmgNewSamplesPerWindow / kPartOfWindowPerSend,
-//   kEmgBufSize = (kEmgSamplesToSend * kEmgBytesPerSample * kEmgSensorCount) +
-//                 kSequenceNumberSize,
-  kEmgBufSize = 174,
+  kEmgBufSize = (kEmgSamplesToSend * kEmgBytesPerSample * kEmgSensorCount) +
+                kSequenceNumberSize,
   kEmgPacketSendRateHz = kEmgFrequency / kEmgSamplesToSend,
 
   kImuSamplesPerWindow = kImuMsPerWindow * kImuFrequency / 1000,
@@ -56,7 +53,7 @@ enum {
   kImuNewSamplesPerWindow = kImuSamplesPerWindow - kImuSamplesPerOverlap,
   kImuSamplesToSend = kImuNewSamplesPerWindow / kPartOfWindowPerSend,
   kImuBufSize = (kImuSamplesToSend * kImuBytesPerSample * kImuSensorCount) +
-                kSequenceNumberSize + kTimeStampSize + kFrameStartHeader,
+                kSequenceNumberSize,
   kImuPacketSendRateHz = kImuFrequency / kImuSamplesToSend,
 
   kPiezoSamplesPerWindow = kPiezoMsPerWindow * kPiezoFrequency / 1000,
@@ -65,7 +62,7 @@ enum {
   kPiezoSamplesToSend = kPiezoNewSamplesPerWindow / kPartOfWindowPerSend,
   kPiezoBufSize =
       (kPiezoSamplesToSend * kPiezoBytesPerSample * kPiezoSensorCount) +
-      kSequenceNumberSize + kFrameStartHeader + kTimeStampSize,
+      kSequenceNumberSize,
   kPiezoPacketSendRateHz = kPiezoFrequency / kPiezoSamplesToSend,
 };
 
@@ -101,9 +98,9 @@ bool TryNotifyPiezoSubscribers(void);
 // general buffer size constants, so it's fine.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wenum-compare"
-// static_assert(kEmgBufSize <= kMaxAttDataSize,
-//               "The sensor buffer sizes shouldn't exceed the max ATT data size "
-//               "to avoid splitting the data into multiple packets.");
+static_assert(kEmgBufSize <= kMaxAttDataSize,
+              "The sensor buffer sizes shouldn't exceed the max ATT data size "
+              "to avoid splitting the data into multiple packets.");
 static_assert(kImuBufSize <= kMaxAttDataSize,
               "The sensor buffer sizes shouldn't exceed the max ATT data size "
               "to avoid splitting the data into multiple packets.");
@@ -114,9 +111,9 @@ static_assert(kPiezoBufSize <= kMaxAttDataSize,
 
 // Since we make decisions based on time windows of sensor readings, we want to
 // send the same rate of packets for the different sensors.
-// static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz &&
-//                   kImuPacketSendRateHz == kPiezoPacketSendRateHz,
-//               "The send rates for the sensor readings should be the same.");
+static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz &&
+                  kImuPacketSendRateHz == kPiezoPacketSendRateHz,
+              "The send rates for the sensor readings should be the same.");
 
 // Helper to include the variable name in the static_assert message.
 #define LIMB_STRINGIFY(x) #x
@@ -124,11 +121,11 @@ static_assert(kPiezoBufSize <= kMaxAttDataSize,
 // The part of the window to send must be a common factor between the different
 // sensor samples sent per packet (i.e. there shouldn't be any truncation when
 // dividing by it).
-// static_assert(
-//     (kEmgNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
-//         kEmgNewSamplesPerWindow,
-//     LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
-//         kEmgNewSamplesPerWindow) ".");
+static_assert(
+    (kEmgNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
+        kEmgNewSamplesPerWindow,
+    LIMB_STRINGIFY(kPartOfWindowPerSend) " must be a factor of " LIMB_STRINGIFY(
+        kEmgNewSamplesPerWindow) ".");
 static_assert(
     (kImuNewSamplesPerWindow / kPartOfWindowPerSend * kPartOfWindowPerSend) ==
         kImuNewSamplesPerWindow,
