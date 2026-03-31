@@ -67,7 +67,6 @@ typedef struct {
 } stream_control_t;
 
 static stream_control_t s_channel_controls[ADC_SERVICE_CHANNEL_COUNT];
-static uint8_t s_piezo_sample_counter = 0;
 static bool s_emg1_ready_flag = false;
 static bool s_emg2_ready_flag = false;
 
@@ -93,10 +92,6 @@ static void process_emg_sample(stream_control_t *state, int local_index, uint16_
 }
 
 static void process_piezo_sample(stream_control_t *state, uint16_t millivolt) {
-    // Decimating 4kHz input to 1kHz output
-    if (++s_piezo_sample_counter < 4) return;
-    s_piezo_sample_counter = 0;
-
     s_piezo_packet.data[state->current_index++] = millivolt;
     if (state->current_index >= ADC_PIEZO_MICRO_SIZE) {
         state->current_index = 0;
@@ -109,7 +104,6 @@ static void process_piezo_sample(stream_control_t *state, uint16_t millivolt) {
 /**
  * @brief Processes a single raw sample, applies calibration, and fills micro-packets.
  * * For EMG: Handles dual-channel interleaving. Sets event bit only when BOTH channels reach 40 samples.
- * For PIEZO: Implements a 4:1 decimation (from 4kHz to 1kHz).
  */
 static void process_new_sample(int local_index, adc_cali_handle_t cali_handle,  uint16_t value) {
     stream_control_t *state = &s_channel_controls[local_index];
@@ -127,7 +121,6 @@ static void process_new_sample(int local_index, adc_cali_handle_t cali_handle,  
     if (local_index == 0 || local_index == 1) {
         process_emg_sample(state, local_index, val);
     } 
-    // --- PIEZO Logic (Channel 2 with 4:1 Decimation) ---
     else if (local_index == 2) {
         process_piezo_sample(state, val);
     }
