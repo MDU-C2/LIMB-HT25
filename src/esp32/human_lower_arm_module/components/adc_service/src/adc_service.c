@@ -16,12 +16,11 @@ static EventGroupHandle_t s_adc_event_group;
 static portMUX_TYPE s_adc_mux = portMUX_INITIALIZER_UNLOCKED; 
 
 // --- Channels & Calibration ---
-enum {
-    kEmg1Channel = ADC_CHANNEL_2,
-    kEmg2Channel = ADC_CHANNEL_0,
+typedef enum {
+    kEmgChannel = ADC_CHANNEL_2,
     kPiezoChannel = ADC_CHANNEL_3,
-};
-static const adc_channel_t s_physical_channels[ADC_SERVICE_CHANNEL_COUNT] = {kEmg1Channel, kEmg2Channel, kPiezoChannel};
+} AdcChannel;
+static const adc_channel_t s_physical_channels[ADC_SERVICE_CHANNEL_COUNT] = {kEmgChannel, kPiezoChannel};
 
 // This is a map from adc_channel_t to adc_cali_handle_t.
 // So s_adc_cali_handle[ADC_CHANNEL_2] will contain channel 2's calibration handle.
@@ -36,11 +35,7 @@ static uint32_t s_piezo_seq = 0;
 // --- ADC config ---
 const AdcMgrChannelConfig kAdcChannelConfigs[] = {
   {
-    .channel = kEmg1Channel,
-    .sample_rate = ADC_EMG_SAMPLE_RATE_HZ,
-  },
-  {
-    .channel = kEmg2Channel,
+    .channel = kEmgChannel,
     .sample_rate = ADC_EMG_SAMPLE_RATE_HZ,
   },
   {
@@ -58,7 +53,6 @@ const AdcMgrConfig kAdcMgrConfig = {
 // --- DMA Temporary Buffers (Reduced size to optimize RAM) ---
 #define ADC_READ_TEMP_CAPACITY 512 
 static uint16_t s_temp_data_emg[ADC_READ_TEMP_CAPACITY];
-static uint16_t s_temp_data_emg_1[ADC_READ_TEMP_CAPACITY];
 static uint16_t s_temp_data_piezo[ADC_READ_TEMP_CAPACITY];
 
 // --- Flow Control ---
@@ -70,12 +64,8 @@ typedef struct {
 
 // Map from adc_channel_t to the corresponding channel's sample buffer.
 static SampleBuffer s_channel_sample_buffers[SOC_ADC_MAX_CHANNEL_NUM] = {
-    [kEmg1Channel] = {
+    [kEmgChannel] = {
         .data = s_emg_packet.data,
-        .capacity = ADC_EMG_MICRO_SIZE,
-    },
-    [kEmg2Channel] = {
-        .data = s_emg_packet.data + ADC_EMG_MICRO_SIZE,
         .capacity = ADC_EMG_MICRO_SIZE,
     },
     [kPiezoChannel] = {
@@ -83,8 +73,6 @@ static SampleBuffer s_channel_sample_buffers[SOC_ADC_MAX_CHANNEL_NUM] = {
         .capacity = ADC_EMG_MICRO_SIZE,
     },
 };
-static bool s_emg1_ready_flag = false;
-static bool s_emg2_ready_flag = false;
 
 static void process_emg_sample(adc_channel_t channel, uint16_t millivolt) {
     SampleBuffer *sample_buffer = &s_channel_sample_buffers[channel];
@@ -93,16 +81,9 @@ static void process_emg_sample(adc_channel_t channel, uint16_t millivolt) {
     if (sample_buffer->length >= sample_buffer->capacity) {
         sample_buffer->length = 0;
 
-        if (channel == (adc_channel_t)kEmg1Channel) s_emg1_ready_flag = true;
-        else s_emg2_ready_flag = true;
-
-        // Trigger notification only when both EMG channels are synchronized
-        if (s_emg1_ready_flag && s_emg2_ready_flag) {
-            s_emg_packet.header = 0xAABB;
-            s_emg_packet.seq = s_emg_seq++;
-            xEventGroupSetBits(s_adc_event_group, ADC_EMG_STREAM_BIT);
-            s_emg1_ready_flag = s_emg2_ready_flag = false;
-        }
+        s_emg_packet.header = 0xAABB;
+        s_emg_packet.seq = s_emg_seq++;
+        xEventGroupSetBits(s_adc_event_group, ADC_EMG_STREAM_BIT);
     }
 }
 
@@ -123,7 +104,7 @@ static void process_piezo_sample(adc_channel_t channel, uint16_t millivolt) {
  * @brief Processes a single raw sample, applies calibration, and fills micro-packets.
  * * For EMG: Handles dual-channel interleaving. Sets event bit only when BOTH channels reach 40 samples.
  */
-static void process_new_sample(adc_channel_t channel, uint16_t value) {
+static void process_new_sample(AdcChannel channel, uint16_t value) {
     // Apply ADC Calibration (Raw to Voltage mV)
     adc_cali_handle_t cali_handle = s_adc_cali_handle[channel];
     int voltage_mv = 0;
@@ -134,12 +115,15 @@ static void process_new_sample(adc_channel_t channel, uint16_t value) {
     }
     uint16_t val = (uint16_t)voltage_mv;
 
-    // --- EMG Logic (Channels 0 and 1) ---
-    if (channel == (adc_channel_t)kEmg1Channel || channel == (adc_channel_t)kEmg2Channel) {
+    switch (channel) {
+      case kEmgChannel: {
         process_emg_sample(channel, val);
-    } 
-    else if (channel == (adc_channel_t)kPiezoChannel) {
+        break;
+      }
+      case kPiezoChannel: {
         process_piezo_sample(channel, val);
+        break;
+      }
     }
 }
 
@@ -150,12 +134,8 @@ static void adc_task(void *pvParameters) {
     // Map temporary buffers to active channels
     AdcMgrReadResults res = {
       .channel_buffers = {
-        [kEmg1Channel] = {
+        [kEmgChannel] = {
           .data = s_temp_data_emg,
-          .capacity = ADC_READ_TEMP_CAPACITY,
-        },
-        [kEmg2Channel] = {
-          .data = s_temp_data_emg_1,
           .capacity = ADC_READ_TEMP_CAPACITY,
         },
         [kPiezoChannel] = {
@@ -173,7 +153,7 @@ static void adc_task(void *pvParameters) {
         uint64_t now = esp_timer_get_time();
 
         // Stamp the packet with the system time at the start of a new batch
-        if (s_channel_sample_buffers[kEmg1Channel].length == 0 && s_channel_sample_buffers[kEmg2Channel].length == 0) {
+        if (s_channel_sample_buffers[kEmgChannel].length == 0) {
             s_emg_packet.timestamp = now;
         }
         if (s_channel_sample_buffers[kPiezoChannel].length == 0) {

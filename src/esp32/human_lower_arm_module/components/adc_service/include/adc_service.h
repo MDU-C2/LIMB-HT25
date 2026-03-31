@@ -17,17 +17,12 @@
 #define ADC_PIEZO_SAMPLE_RATE_HZ 1000
 #define ADC_PIEZO_MICRO_SIZE (ADC_PIEZO_SAMPLE_RATE_HZ * MICRO_BATCH_MS / 1000) // 10 samples
 
-#define ADC_SERVICE_CHANNEL_COUNT 3
+#define ADC_SERVICE_CHANNEL_COUNT 2
 
 // --- Event Group Bits for BLE Dispatch ---
 // Notify the BLE task that a new micro-packet is ready to be streamed
 #define ADC_EMG_STREAM_BIT    (1 << 0)
 #define ADC_PIEZO_STREAM_BIT  (1 << 1)
-
-// Initialization masks to verify hardware readiness
-#define ADC_EMG1_READY_BIT (1 << 0)
-#define ADC_EMG2_READY_BIT (1 << 1)
-#define ADC_PIEZO_READY_BIT (1 << 2)
 
 // --- Packed Data Structures (Wire Protocol) ---
 // __attribute__((packed)) ensures no compiler padding, matching the Python receiver's struct format.
@@ -40,7 +35,7 @@ typedef struct {
     uint16_t header;    // Frame start identifier
     uint32_t seq;       // Sequence counter for packet loss detection
     uint64_t timestamp; // System time in microseconds (esp_timer_get_time)
-    uint16_t data[ADC_EMG_MICRO_SIZE * 2]; // Interleaved EMG1 and EMG2 data (80 samples total)
+    uint16_t data[ADC_EMG_MICRO_SIZE]; // Interleaved EMG1 and EMG2 data (80 samples total)
 } __attribute__((packed)) emg_micro_packet_t;
 
 /**
