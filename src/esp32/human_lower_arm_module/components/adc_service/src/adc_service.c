@@ -63,22 +63,37 @@ static uint16_t s_temp_data_piezo[ADC_READ_TEMP_CAPACITY];
 
 // --- Flow Control ---
 typedef struct {
-    uint16_t current_index;
-} stream_control_t;
+    uint16_t *data;
+    uint16_t capacity;
+    uint16_t length;
+} SampleBuffer;
 
-static stream_control_t s_channel_controls[ADC_SERVICE_CHANNEL_COUNT];
+// Map from adc_channel_t to the corresponding channel's sample buffer.
+static SampleBuffer s_channel_sample_buffers[SOC_ADC_MAX_CHANNEL_NUM] = {
+    [kEmg1Channel] = {
+        .data = s_emg_packet.data,
+        .capacity = ADC_EMG_MICRO_SIZE,
+    },
+    [kEmg2Channel] = {
+        .data = s_emg_packet.data + ADC_EMG_MICRO_SIZE,
+        .capacity = ADC_EMG_MICRO_SIZE,
+    },
+    [kPiezoChannel] = {
+        .data = s_piezo_packet.data,
+        .capacity = ADC_EMG_MICRO_SIZE,
+    },
+};
 static bool s_emg1_ready_flag = false;
 static bool s_emg2_ready_flag = false;
 
-static void process_emg_sample(stream_control_t *state, int local_index, uint16_t millivolt) {
-    // Interleaving: EMG1 fills first half (0-39), EMG2 fills second half (40-79)
-    if (local_index == 0) s_emg_packet.data[state->current_index] = millivolt;
-    else s_emg_packet.data[state->current_index + ADC_EMG_MICRO_SIZE] = millivolt;
+static void process_emg_sample(adc_channel_t channel, uint16_t millivolt) {
+    SampleBuffer *sample_buffer = &s_channel_sample_buffers[channel];
+    sample_buffer->data[sample_buffer->length++] = millivolt;
 
-    state->current_index++;
-    if (state->current_index >= ADC_EMG_MICRO_SIZE) {
-        state->current_index = 0;
-        if (local_index == 0) s_emg1_ready_flag = true;
+    if (sample_buffer->length >= sample_buffer->capacity) {
+        sample_buffer->length = 0;
+
+        if (channel == (adc_channel_t)kEmg1Channel) s_emg1_ready_flag = true;
         else s_emg2_ready_flag = true;
 
         // Trigger notification only when both EMG channels are synchronized
@@ -91,10 +106,13 @@ static void process_emg_sample(stream_control_t *state, int local_index, uint16_
     }
 }
 
-static void process_piezo_sample(stream_control_t *state, uint16_t millivolt) {
-    s_piezo_packet.data[state->current_index++] = millivolt;
-    if (state->current_index >= ADC_PIEZO_MICRO_SIZE) {
-        state->current_index = 0;
+static void process_piezo_sample(adc_channel_t channel, uint16_t millivolt) {
+    SampleBuffer *sample_buffer = &s_channel_sample_buffers[channel];
+    sample_buffer->data[sample_buffer->length++] = millivolt;
+
+    if (sample_buffer->length >= sample_buffer->capacity) {
+
+        sample_buffer->length = 0;
         s_piezo_packet.header = 0xEEFF;
         s_piezo_packet.seq = s_piezo_seq++;
         xEventGroupSetBits(s_adc_event_group, ADC_PIEZO_STREAM_BIT);
@@ -105,10 +123,9 @@ static void process_piezo_sample(stream_control_t *state, uint16_t millivolt) {
  * @brief Processes a single raw sample, applies calibration, and fills micro-packets.
  * * For EMG: Handles dual-channel interleaving. Sets event bit only when BOTH channels reach 40 samples.
  */
-static void process_new_sample(int local_index, adc_cali_handle_t cali_handle,  uint16_t value) {
-    stream_control_t *state = &s_channel_controls[local_index];
-    
+static void process_new_sample(adc_channel_t channel, uint16_t value) {
     // Apply ADC Calibration (Raw to Voltage mV)
+    adc_cali_handle_t cali_handle = s_adc_cali_handle[channel];
     int voltage_mv = 0;
     if (cali_handle != NULL) {
         adc_cali_raw_to_voltage(cali_handle, value, &voltage_mv);
@@ -118,11 +135,11 @@ static void process_new_sample(int local_index, adc_cali_handle_t cali_handle,  
     uint16_t val = (uint16_t)voltage_mv;
 
     // --- EMG Logic (Channels 0 and 1) ---
-    if (local_index == 0 || local_index == 1) {
-        process_emg_sample(state, local_index, val);
+    if (channel == (adc_channel_t)kEmg1Channel || channel == (adc_channel_t)kEmg2Channel) {
+        process_emg_sample(channel, val);
     } 
-    else if (local_index == 2) {
-        process_piezo_sample(state, val);
+    else if (channel == (adc_channel_t)kPiezoChannel) {
+        process_piezo_sample(channel, val);
     }
 }
 
@@ -156,10 +173,10 @@ static void adc_task(void *pvParameters) {
         uint64_t now = esp_timer_get_time();
 
         // Stamp the packet with the system time at the start of a new batch
-        if (s_channel_controls[0].current_index == 0 && s_channel_controls[1].current_index == 0) {
+        if (s_channel_sample_buffers[kEmg1Channel].length == 0 && s_channel_sample_buffers[kEmg2Channel].length == 0) {
             s_emg_packet.timestamp = now;
         }
-        if (s_channel_controls[2].current_index == 0) {
+        if (s_channel_sample_buffers[kPiezoChannel].length == 0) {
             s_piezo_packet.timestamp = now;
         }
 
@@ -174,7 +191,7 @@ static void adc_task(void *pvParameters) {
             AdcMgrChannelBuffer *buf = &res.channel_buffers[channel];
 
             for (uint32_t j = 0; j < buf->length; j++) {
-                process_new_sample(i, s_adc_cali_handle[channel], buf->data[j]);
+                process_new_sample(channel, buf->data[j]);
             }
             buf->length = 0; // Clear length after processing
         }
@@ -202,7 +219,7 @@ esp_err_t adc_service_init(EventGroupHandle_t event_group) {
             .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
         };
         adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali_handle[channel]);
-        s_channel_controls[i].current_index = 0;
+        s_channel_sample_buffers[i].length = 0;
     }
 
     // Launch processing task on Core 0
