@@ -2,7 +2,6 @@
 #define ADC_SERVICE_H
 
 #include "esp_err.h"
-#include "hal/adc_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "sensors_service.h"

@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include "esp_err.h"
-#include "imu.h" 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "sensors_service.h"

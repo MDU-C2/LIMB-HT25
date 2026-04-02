@@ -5,7 +5,6 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include <string.h>
-#include "esp_timer.h"
 #include "sensors_service.h"
 
 static const char *TAG = "IMU_SERVICE_STREAM";
