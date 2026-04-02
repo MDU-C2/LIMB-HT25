@@ -51,7 +51,7 @@ void app_main(void) {
 
     // Announce presence
     vTaskDelay(pdMS_TO_TICKS(1000));
-    can_send(ID_MONITOR_STATUS, (uint8_t*)"ONLINE", 6);
+    can_send(ID_MONITOR_STATUS, (uint8_t*)"ONLINE", 6, 0);
     ESP_LOGI(TAG, "Monitor ONLINE - Starting traffic capture");
 
     while (1) {

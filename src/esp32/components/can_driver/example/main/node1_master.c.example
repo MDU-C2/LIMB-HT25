@@ -43,7 +43,7 @@ void app_main(void) {
     // Send start command
     vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for all nodes to initialize
     ESP_LOGI(TAG, ">> Sending START command to all nodes");
-    can_send(ID_MASTER_CMD, (uint8_t*)"START", 5);
+    can_send(ID_MASTER_CMD, (uint8_t*)"START", 5, 0);
 
     while (1) {
         cycle++;
@@ -63,11 +63,11 @@ void app_main(void) {
                         // Control logic: if temp > 30, turn on fan
                         if (temperature > 30 && !fan_state) {
                             ESP_LOGI(TAG, "High temperature! Turning on fan");
-                            can_send(ID_MASTER_FAN, (uint8_t*)"FAN_ON", 6);
+                            can_send(ID_MASTER_FAN, (uint8_t*)"FAN_ON", 6, 0);
                             fan_state = true;
                         } else if (temperature <= 25 && fan_state) {
                             ESP_LOGI(TAG, "Normal temperature. Turning off fan");
-                            can_send(ID_MASTER_FAN, (uint8_t*)"FAN_OFF", 7);
+                            can_send(ID_MASTER_FAN, (uint8_t*)"FAN_OFF", 7, 0);
                             fan_state = false;
                         }
                         break;
@@ -95,7 +95,7 @@ void app_main(void) {
         // Send periodic status request
         if (cycle % 5 == 0) {
             ESP_LOGI(TAG, ">> Requesting status from ACTUATOR");
-            can_send(ID_MASTER_CMD, (uint8_t*)"STATUS?", 7);
+            can_send(ID_MASTER_CMD, (uint8_t*)"STATUS?", 7, 0);
         }
 
         // Show summary

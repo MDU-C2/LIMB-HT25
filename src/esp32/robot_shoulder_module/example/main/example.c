@@ -86,7 +86,7 @@ static void can_tx([[maybe_unused]] void *arg) {
       {
         float angle = angles[i];
         esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                                 (uint8_t *)&angle, sizeof(angle));
+                                 (uint8_t *)&angle, sizeof(angle), 0);
         if (err != ESP_OK) {
           ESP_LOGW(TAG,
                    "Error calling can_send for shoulder up down actuation: %s",
@@ -96,7 +96,7 @@ static void can_tx([[maybe_unused]] void *arg) {
       {
         float angle = angles[LIMB_ARR_LEN(angles) - 1 - i];
         esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                                 (uint8_t *)&angle, sizeof(angle));
+                                 (uint8_t *)&angle, sizeof(angle), 0);
         if (err != ESP_OK) {
           ESP_LOGW(
               TAG,
@@ -111,7 +111,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float angle = 0;
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle));
+                               (uint8_t *)&angle, sizeof(angle), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder up/down actuation: %s",
@@ -121,7 +121,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float angle = 0;
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle));
+                               (uint8_t *)&angle, sizeof(angle), 0);
       if (err != ESP_OK) {
         ESP_LOGW(
             TAG,
@@ -141,7 +141,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float angle = 180;
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle));
+                               (uint8_t *)&angle, sizeof(angle), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder up/down actuation: %s",
@@ -150,7 +150,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     }
     vTaskDelay(pdMS_TO_TICKS(200));
     {
-      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_STOP, NULL, 0);
+      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_STOP, NULL, 0, 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder up/down stop message: %s",
@@ -160,7 +160,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float angle = 180;
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle));
+                               (uint8_t *)&angle, sizeof(angle), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder left/right actuation: %s",
@@ -169,7 +169,8 @@ static void can_tx([[maybe_unused]] void *arg) {
     }
     vTaskDelay(pdMS_TO_TICKS(200));
     {
-      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_STOP, NULL, 0);
+      esp_err_t err =
+          can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_STOP, NULL, 0, 0);
       if (err != ESP_OK) {
         ESP_LOGW(
             TAG,

@@ -1,74 +1,189 @@
 
 from multiprocessing import Process, Event
 from hardware.can.can_interface import CANInterface
-from window_buffer import WindowBuffer
-from packet_builder import PacketBuilder
+from hardware.ble.ble_interface import BLEInterface
+from .window_buffer import WindowBuffer
+from .packet_builder import PacketBuilder
 from shared.queues import DataQueue
 import time
+import numpy as np
+from typing import Dict, Optional
 
 # The difference between threading and multiprocessing:
 # Multiprocessing create separate OS processes, while threading creates separate threads within the same process.
 
 class InputLayer(Process):
-    """Input layer process: reads CAN and builds packets"""
+    """Input layer process: reads CAN, BLE and builds packets"""
 
-    def __init__(self, can_interface: CANInterface, 
+    def __init__(self, can_interface: CANInterface,
+                    ble_interface: BLEInterface, 
                     output_queue: DataQueue, 
-                    window_size: int = 100, 
-                    sample_rate: float = 100.0,
+                    window_size_ms: float = 200.0,
+                    overlap_ms: float = 0.0,
+                    emg_frequency: float = 4000.0,
+                    imu_frequency: float = 100.0,
+                    piezo_frequency: float = 100.0,
                     vision_source = None,
-                    pressure_source = None,
-                    piezo_source = None,
-                    motor_state_source = None):
+                    config: Optional[Dict] = None):
 
         super().__init__(name="InputLayer")
         self.running = Event() # Event to signal the process to stop
         self.can_interface = can_interface
-        self.window_buffer = WindowBuffer(window_size)
-        self.packet_builder = PacketBuilder(sequence_start=0)
-        self.sample_rate = sample_rate # Do we need this?
+        self.ble_interface = ble_interface
+        self.window_buffer = WindowBuffer(
+            window_size_ms=window_size_ms,
+            overlap_ms=overlap_ms,
+            emg_frequency=emg_frequency,
+            imu_frequency=imu_frequency,
+            piezo_frequency=piezo_frequency
+        )
+        self.packet_builder = PacketBuilder(sequence_start=0, vision_source=vision_source)
+        # Calculate effective sample rate (weighted average or use EMG as reference)
+        self.sample_rate = emg_frequency  # Use EMG frequency as reference for packet metadata
         self.output_queue = output_queue
+        self.vision_source = vision_source
 
-        self.packet_builder.set_sensor_sources(
-            vision_source=vision_source, 
-            pressure_source=pressure_source, 
-            piezo_source=piezo_source)
+        # Store latest sensor values (from CAN)
+        # Pressure: dictionary to accumulate individual finger values
+        # Keys: 'thumb', 'index', 'middle', 'ring', 'pinky'
+        self.pressure_values = {}  # Dict[str, float] - individual finger pressure values
+        self.latest_pressure = None      # List[float] - 5 finger values [thumb, index, middle, ring, pinky]
+        self.latest_motor_state = None   # MotorState object
+        self.latest_robot_imu = None     # Dict[str, np.ndarray] - {'data': [ax, ay, az, wx, wy, wz]}
+        
+        # Buffer for robot IMU data (gyro and accel come separately)
+        # Format: {source: {"gyro": [gx, gy, gz], "accel": [ax, ay, az]}}
+        self.robot_imu_buffer = {}  # Store latest gyro/accel by source (e.g., "robot_hand")
+        
+        # Track gripper state (from actuation commands we send)
+        self.gripper_state = {"open": True, "force": 0.0}
 
-        self.packet_builder.set_motor_state_source(motor_state_source)
+        # Potentiometer values for joint position feedback
+        self.potentiometer_values = {} # Dict[int, float] - joint index -> position
+        pot_mapping_config = config.get("potentiometer_mapping", {}) if config else {}
+        self.potentiometer_mapping = {
+            "shoulder_up_down": pot_mapping_config.get("shoulder_up_down", 0),
+            "shoulder_left_right": pot_mapping_config.get("shoulder_left_right", 1),
+            "elbow_up_down": pot_mapping_config.get("elbow_up_down", 2),
+            "upper_arm_rotation": pot_mapping_config.get("upper_arm_rotation", 3)
+        }
 
     def run(self):
         """Main process loop"""
         
         self.running.set() # Set the event to signal the process to start
         self.can_interface.start() # Start the can interface
+        self.ble_interface.start() # Start the ble interface
 
         while self.running.is_set():
-
-
-            # TODO: Update to correct attributes, e.g. msg.message_type instead of msg.type
+            
+            # Read BLE data (EMG, IMU, piezo)
+            ble_data = self.ble_interface.read()
+            for sample in ble_data:
+                if sample.message_type == "EMG":
+                    self.window_buffer.add_emg(sample.data["channels"], sample.timestamp)
+                elif sample.message_type == "IMU":
+                    self.window_buffer.add_imu(sample.data["data"], sample.timestamp)
+                elif sample.message_type == "PIEZO":
+                    # Add piezo to window buffer
+                    piezo_value = sample.data.get("value")
+                    if piezo_value is not None:
+                        self.window_buffer.add_piezo(piezo_value, sample.timestamp)
 
             # Read CAN messages (non-blocking)
-            can_messages = self.can_interface.read() # Maybe read all? Is it a list or a dict?
-            
-            # Process CAN messages
-            for msg in can_messages:
-                # Update window buffer with new data
-                # To add functions in each branch, to the window buffer?
+            can_messages = self.can_interface.read()
+            for msg in can_messages: 
+                # Skip messages with errors
+                if not msg.parsed_data or "error" in msg.parsed_data:
+                    continue
+                
+                msg_type = msg.message_type
+                if not msg_type:
+                    continue
 
-                # TODO: EMG and IMU and other sensors have different sample rates, do we need to handle this somehow?
+                # Handle robot IMU messages (separate gyro and accel)
+                if msg_type.endswith("_imu_gyro") or msg_type.endswith("_imu_accel"):
+                    source = msg.parsed_data.get("source", "unknown")
+                    if source not in self.robot_imu_buffer:
+                        self.robot_imu_buffer[source] = {}
+                    
+                    if msg_type.endswith("_imu_gyro"):
+                        self.robot_imu_buffer[source]["gyro"] = msg.parsed_data["data"]
+                    elif msg_type.endswith("_imu_accel"):
+                        self.robot_imu_buffer[source]["accel"] = msg.parsed_data["data"]
+                    
+                    # Combine gyro + accel when both are available (for robot hand IMU)
+                    # Robot hand IMU is used for fusion, so prioritize that
+                    if source == "robot_hand" and "gyro" in self.robot_imu_buffer[source] and "accel" in self.robot_imu_buffer[source]:
+                        gyro = self.robot_imu_buffer[source]["gyro"]
+                        accel = self.robot_imu_buffer[source]["accel"]
+                        # Format: [ax, ay, az, wx, wy, wz] - accel first, then gyro
+                        combined = accel + gyro
+                        self.latest_robot_imu = {"data": combined, "timestamp": msg.timestamp}
 
-                if msg.message_type == "EMG":
-                    self.window_buffer.add_emg(msg.data["channels"], msg.timestamp)
+                # Handle pressure sensor messages
+                elif msg_type.endswith("_pressure"):
+                    finger_name = msg.parsed_data.get("finger")
+                    pressure_value = msg.parsed_data.get("value")
+                    if finger_name and pressure_value is not None:
+                        self.pressure_values[finger_name] = pressure_value
+                        
+                        # Update latest_pressure list when we have all 5 fingers
+                        # Order: [thumb, index, middle, ring, pinky]
+                        finger_order = ['thumb', 'index', 'middle', 'ring', 'pinky']
+                        if all(f in self.pressure_values for f in finger_order):
+                            self.latest_pressure = [self.pressure_values[f] for f in finger_order]
 
-                elif msg.message_type == "IMU":
-                    self.window_buffer.add_imu(msg.data["data"], msg.timestamp)
+                # Handle potentiometer messages (could be used for joint positions)
+                # Note: Potentiometers may not directly map to joint positions, but can use them
+                # as a fallback if motor_status is not available
+                elif "potentiometer" in msg_type:
+                    # Potentiometers give position feedback for specific joints
+                    # Could potentially use these to reconstruct joint positions
+                    # For now, skip them as they may not map directly to 5-joint model
+                    source = msg.parsed_data.get("source")
+                    value = msg.parsed_data.get("value")
 
-                elif msg.message_type == "piezo":
-                    pass # TODO: Implement this
+                    if source and value is not None:
+                        # Map potentiometer souce to joint index
+                        joint_idx = self.potentiometer_mapping.get(source)
+                        if joint_idx is not None:
+                            self.potentiometer_values[joint_idx] = value
+
+                            # Update motor_state with joint positions from potentiometers
+                            self._update_motor_state_from_potentiometers(msg.timestamp)
+
+                    # Update motor_state with gripper state (from tracked state)
+                    # This happens after processing all CAN messages
+                    self._update_motor_state_gripper()
+                
+                # Update motor_state with gripper state (from our tracked state)
+                if self.latest_motor_state:
+                    self.latest_motor_state.gripper_state = self.gripper_state.copy()
+                else:
+                    # Create default motor state if it doesn't exist
+                    from shared.models.packet import MotorState
+                    self.latest_motor_state = MotorState(
+                        joint_positions=np.array([0.0] * 5),  # Default positions
+                        gripper_state=self.gripper_state.copy(),
+                        timestamp=time.time()
+                    )
 
             # Create packet (only when window buffer is full)
             if self.window_buffer.is_full():
-                packet = self.packet_builder.build(self.window_buffer, self.sample_rate)
+
+                # Update vision system to poll queues and get latest detections and pose estimates
+                if self.vision_source is not None:
+                    self.vision_source.update()    
+
+
+                packet = self.packet_builder.build(
+                    self.window_buffer,
+                    self.sample_rate,
+                    latest_pressure=self.latest_pressure,
+                    latest_motor_state=self.latest_motor_state,
+                    latest_robot_imu=self.latest_robot_imu
+                )
                 
                 # Send packet to the next layer via an async queue
                 self.output_queue.put(packet)
@@ -79,5 +194,50 @@ class InputLayer(Process):
         self.running.clear() # Clear the event to signal the process to stop
         self.can_interface.stop() # Stop the CAN interface
         self.window_buffer.clear() # Clear the window buffer
+
+    def _update_motor_state_from_potentiometers(self, timestamp: float):
+        """Update motor_state with joint positions from potentiometer readings."""
+        from shared.models.packet import MotorState
         
+        # Create joint positions array (5 joints)
+        joint_positions = np.array([0.0] * 5)
+        
+        # Fill in positions from potentiometers
+        for joint_idx in range(5):
+            if joint_idx in self.potentiometer_values:
+                joint_positions[joint_idx] = self.potentiometer_values[joint_idx]
+            # Joint 4 has no potentiometer - keep last value or use 0.0
+            # Could also use forward kinematics from other joints if available
+        
+        # Update or create motor state
+        if self.latest_motor_state:
+            # Update existing motor state
+            self.latest_motor_state.joint_positions = joint_positions
+            self.latest_motor_state.timestamp = timestamp
+        else:
+            # Create new motor state
+            self.latest_motor_state = MotorState(
+                joint_positions=joint_positions,
+                gripper_state=self.gripper_state.copy(),
+                timestamp=timestamp
+            )
+    
+    def _update_motor_state_gripper(self):
+        """Update gripper state in motor_state."""
+        if self.latest_motor_state:
+            self.latest_motor_state.gripper_state = self.gripper_state.copy()
+        else:
+            # Create default motor state if it doesn't exist
+            from shared.models.packet import MotorState
+            joint_positions = np.array([0.0] * 5)
+            # Try to fill from potentiometers if available
+            for joint_idx in range(5):
+                if joint_idx in self.potentiometer_values:
+                    joint_positions[joint_idx] = self.potentiometer_values[joint_idx]
+            
+            self.latest_motor_state = MotorState(
+                joint_positions=joint_positions,
+                gripper_state=self.gripper_state.copy(),
+                timestamp=time.time()
+            )
 

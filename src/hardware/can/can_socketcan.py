@@ -5,8 +5,6 @@ from typing import List, Optional
 from .can_interface import CANInterface, CANMessage
 from .can_message_parser import CANMessageParser
 
-# TODO: Add requirements file for python-can
-
 class SocketCANInterface(CANInterface):
     """
     CAN interface using Linux SocketCAN (for Jetson Orin).
@@ -28,16 +26,19 @@ class SocketCANInterface(CANInterface):
         self.error_count = 0
 
     def start(self) -> bool:
-        """Start the CAN bus."""
+        """Start the CAN bus with standard 11-bit CAN IDs only."""
         try:
             self.bus = can.Bus(
                 interface="socketcan",
                 channel=self.interface,
                 bitrate=self.bitrate,
-                receive_own_messages=False
+                receive_own_messages=False,
+                # Explicitly disable extended CAN IDs (29-bit)
+                # Only use standard 11-bit CAN IDs (0x000 to 0x7FF)
+                can_filters=None  # Accept all standard IDs
             )
             self.running = True
-            print(f"CAN interface {self.interface} started at {self.bitrate} bps.")
+            print(f"CAN interface {self.interface} started at {self.bitrate} bps (standard 11-bit IDs only).")
             return True
         except Exception as e:
             print(f"Failed to start CAN interface: {e}")
@@ -57,6 +58,13 @@ class SocketCANInterface(CANInterface):
             # TODO: Do I need to add self.running = False here?
             return False
 
+    # Receive and ignore all messages that are waiting in the CAN RX buffer.
+    def flush_rx(self) -> None:
+        if not self.running or not self.bus:
+            return
+        while self.bus.recv(timeout=0) is not None:
+            pass
+
     def read(self, timeout: Optional[float] = None) -> List[CANMessage]:
         """Read messages from the CAN bus (non-blocking or with timeout)"""
         if not self.running or not self.bus:
@@ -72,6 +80,11 @@ class SocketCANInterface(CANInterface):
                 if message is None:
                     break
                     
+                # Only process standard 11-bit CAN IDs (ignore extended IDs)
+                if message.is_extended_id:
+                    # Skip extended CAN messages
+                    continue
+                
                 # Convert python-can message to our CANMessage format
                 can_msg = CANMessage(
                     can_id=message.arbitration_id,
@@ -82,8 +95,8 @@ class SocketCANInterface(CANInterface):
                 # Parse message based on its ID
                 parsed = self.message_parser.parse(can_msg)
                 # Store parsed data as attributes (using setattr for compatibility)
-                setattr(can_msg, 'message_type', parsed.get("type"))
-                setattr(can_msg, 'parsed_data', parsed.get("data"))
+                setattr(can_msg, 'message_type', parsed.get("message_type"))
+                setattr(can_msg, 'parsed_data', parsed.get("parsed_data"))
 
                 messages.append(can_msg)
                 self.rx_count += 1
@@ -103,7 +116,7 @@ class SocketCANInterface(CANInterface):
 
 
     def send(self, can_id: int, data: bytes) -> bool:
-        """Send a message on the CAN bus."""
+        """Send a message on the CAN bus using standard 11-bit CAN IDs only."""
         if not self.running or not self.bus:
             return False
 
@@ -111,8 +124,18 @@ class SocketCANInterface(CANInterface):
             print(f"Warning: CAN data too long ({len(data)} bytes), truncating")
             data = data[:8]
 
+        # Ensure CAN ID is within standard 11-bit range (0x000 to 0x7FF)
+        if can_id > 0x7FF:
+            print(f"Warning: CAN ID 0x{can_id:03X} exceeds 11-bit standard range, masking to 0x{can_id & 0x7FF:03X}")
+            can_id = can_id & 0x7FF
+
         try:
-            message = can.Message(arbitration_id=can_id, data=data)
+            # Explicitly set is_extended_id=False to ensure standard 11-bit CAN IDs
+            message = can.Message(
+                arbitration_id=can_id,
+                data=data,
+                is_extended_id=False
+            )
             self.bus.send(message)
             self.tx_count += 1
             return True
