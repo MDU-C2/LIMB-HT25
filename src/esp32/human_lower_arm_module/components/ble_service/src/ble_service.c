@@ -94,9 +94,9 @@ static void ble_sync_send_task(void *pvParameters) {
                      emg_count, imu_count, piezo_count);
             ESP_LOGI("DIAG", "---------------------");
             // Log last samples to verify signal integrity
-            ESP_LOGI("DIAG", "Last Data -> EMG1:%u | EMG2:%u | PIEZO:%u", 
-                     s_temp_emg.data[39], s_temp_emg.data[79], s_temp_piezo.data[9]);
-            
+            ESP_LOGI("DIAG", "Last Data -> EMG1:%u | PIEZO:%u",
+                     s_temp_emg.data[39], s_temp_piezo.data[9]);
+
             ESP_LOGI("DIAG", "IMU -> AccZ:%d | GyroZ:%d", s_temp_imu.imu_data[2], s_temp_imu.imu_data[5]);
             ESP_LOGI("DIAG", "*******************");
             
