@@ -69,7 +69,7 @@ static const ServoConfig kUpDownServoConfig = {
             .max_adc_value = 3087,
             // The red wire is ground and black is Vin.
             .min_potentiometer_angle = {170},
-            .max_potentiometer_angle = {200},
+            .max_potentiometer_angle = {250},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
         },
@@ -130,7 +130,7 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
             // Red is Vin and black is ground.
             .min_potentiometer_angle = {50},
             .max_potentiometer_angle = {130},
-            .min_potentiometer_angle_as_joint_angle = {0.F},
+            .min_potentiometer_angle_as_joint_angle = {-40.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
         },
 };
