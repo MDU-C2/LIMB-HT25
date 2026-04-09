@@ -43,6 +43,12 @@ static bool s_imu_initialized = false;
  */
 static esp_err_t imu_register_read(uint8_t reg_addr, uint8_t* data,
                                    size_t len) {
+  // Before reading any data, we need to tell the IMU from which register to
+  // read. We do that by starting the data transfer with writing the
+  // register's address, after which any data we read during the same data
+  // transfer will be from that register (table 14 in the LSM6DSO32
+  // datasheet). These two steps are combined into one with the
+  // i2c_master_write_read_device function.
   return i2c_master_write_read_device(
       s_imu_config.i2c_port, s_imu_config.sensor_addr, &reg_addr, 1, data, len,
       pdMS_TO_TICKS(I2C_MASTER_TIMEOUT_MS));
@@ -52,6 +58,11 @@ static esp_err_t imu_register_read(uint8_t reg_addr, uint8_t* data,
  * @brief Write a byte to a LSM6DSO32 sensor register
  */
 static esp_err_t imu_register_write_byte(uint8_t reg_addr, uint8_t data) {
+  // Before writing any data, we need to tell the IMU which register the data
+  // should be written to. We do this by making sure the first byte that is
+  // written in the data transfer is the register's address. This results in
+  // any subsequent bytes written in the same data transfer to be written to
+  // the specified register (table 12 in the LSM6DSO32 datasheet).
   uint8_t write_buf[2] = {reg_addr, data};
   return i2c_master_write_to_device(
       s_imu_config.i2c_port, s_imu_config.sensor_addr, write_buf,
@@ -85,7 +96,7 @@ static esp_err_t i2c_master_init(void) {
 static esp_err_t lsm6dso32_configure(void) {
   esp_err_t ret;
 
-  // Configure accelerometer
+  // Configure accelerometer (section 9.12 in the LSM6DSO32 datasheet).
   ret = imu_register_write_byte(
       LSM6DSO32_CTRL1_XL,
       (s_imu_config.accel_odr << 4) | s_imu_config.accel_range);
@@ -94,7 +105,7 @@ static esp_err_t lsm6dso32_configure(void) {
     return ret;
   }
 
-  // Configure gyroscope
+  // Configure gyroscope (section 9.13 in the LSM6DSO32 datasheet).
   ret =
       imu_register_write_byte(LSM6DSO32_CTRL2_G, (s_imu_config.gyro_odr << 4) |
                                                      s_imu_config.gyro_range);
