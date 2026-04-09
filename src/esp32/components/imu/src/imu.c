@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "driver/i2c.h"
+#include "endian.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -201,21 +202,25 @@ esp_err_t imu_read_data(imu_data_t* data) {
   // both the gyro and accelerometer data with one read call (9.28-9.33 in
   // the LSM6DSO32 datasheet).
 
-  uint8_t raw_data[12];  // Gyro(6) + Accel(6) = 12 bytes
+  // To avoid strict aliasing issues when reading the 16-bit values from the
+  // buffer, we can let the buffer contain 6 `int16_t`s from the get-go
+  // rather than 12 `uint8_t`s.
+  int16_t raw_data[6];  // Gyro(6) + Accel(6) = 12 bytes or 6 16-bit ints.
 
   // Read gyroscope and accelerometer data (12 bytes)
-  ESP_RETURN_ON_ERROR(
-      imu_register_read(LSM6DSO32_OUTX_L_G, raw_data, sizeof(raw_data)), TAG,
-      "Failed to read gyro and accelerometer data");
+  ESP_RETURN_ON_ERROR(imu_register_read(LSM6DSO32_OUTX_L_G, (uint8_t*)raw_data,
+                                        sizeof(raw_data)),
+                      TAG, "Failed to read gyro and accelerometer data");
 
-  // Convert gyroscope data (16-bit, ±250 dps range by default)
-  data->gyro.x = (int16_t)((raw_data[1] << 8) | raw_data[0]);
-  data->gyro.y = (int16_t)((raw_data[3] << 8) | raw_data[2]);
-  data->gyro.z = (int16_t)((raw_data[5] << 8) | raw_data[4]);
-
-  data->accel.x = (int16_t)((raw_data[7] << 8) | raw_data[6]);
-  data->accel.y = (int16_t)((raw_data[9] << 8) | raw_data[8]);
-  data->accel.z = (int16_t)((raw_data[11] << 8) | raw_data[10]);
+  // The registers are ordered such that they are read as little endian
+  // 16-bit integers. As such, we can use le16toh to convert them from
+  // little endian to the host endianness.
+  data->gyro.x = le16toh(raw_data[0]);
+  data->gyro.y = le16toh(raw_data[1]);
+  data->gyro.z = le16toh(raw_data[2]);
+  data->accel.x = le16toh(raw_data[3]);
+  data->accel.y = le16toh(raw_data[4]);
+  data->accel.z = le16toh(raw_data[5]);
 
   return ESP_OK;
 }
