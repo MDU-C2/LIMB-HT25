@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "driver/i2c.h"
+#include "esp_check.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -191,22 +192,21 @@ esp_err_t imu_read_data(imu_data_t* data) {
     return ESP_ERR_INVALID_STATE;
   }
 
+  // Reading gyro and accelerometer data requires us to read from multiple
+  // registers. However, because IF_INC is enabled in the CTRL3_C register,
+  // the register address being read from is incremented for every new byte
+  // that is read during a multi-byte read (9.14 in the LSM6DSO32 datasheet).
+  // Since the relevant data registers span the address range 0x22-0x2D, we
+  // can simply read 12 bytes starting from address 0x22 (OUTX_L_G) to get
+  // both the gyro and accelerometer data with one read call (9.28-9.33 in
+  // the LSM6DSO32 datasheet).
+
   uint8_t raw_data[12];  // Gyro(6) + Accel(6) = 12 bytes
-  esp_err_t ret;
 
-  // Read gyroscope data (6 bytes)
-  ret = imu_register_read(LSM6DSO32_OUTX_L_G, raw_data, 6);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to read gyroscope data");
-    return ret;
-  }
-
-  // Read accelerometer data (6 bytes)
-  ret = imu_register_read(LSM6DSO32_OUTX_L_A, raw_data + 6, 6);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to read accelerometer data");
-    return ret;
-  }
+  // Read gyroscope and accelerometer data (12 bytes)
+  ESP_RETURN_ON_ERROR(
+      imu_register_read(LSM6DSO32_OUTX_L_G, raw_data, sizeof(raw_data)), TAG,
+      "Failed to read gyro and accelerometer data");
 
   // Convert gyroscope data (16-bit, ±250 dps range by default)
   data->gyro.x = (int16_t)((raw_data[1] << 8) | raw_data[0]);
