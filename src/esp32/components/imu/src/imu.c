@@ -114,8 +114,24 @@ static esp_err_t lsm6dso32_configure(void) {
     return ret;
   }
 
-  // Configure control register 3 (enable IF_INC for auto-increment)
-  ret = imu_register_write_byte(LSM6DSO32_CTRL3_C, 0x04);
+  // Configure control register 3
+  // (section 9.14 in the LSM6DSO32 datasheet).
+  //
+  // Enabling IF_INC automatically switches to reading from the register at
+  // the next address for every byte read during a multi-byte read (this is
+  // enabled by default, but just in case we set it explicitly). This allows
+  // us to read all xyz values from both the accelerometer and the gyroscope
+  // with a single read call.
+  //
+  // Enabling BDU makes sure that the most significant and least significant
+  // bytes of the output registers read during multi-byte reads actually belong
+  // to the same sample by preventing updates to the output register while it
+  // is being read.
+  enum {
+    BDU = 0x40,     // 0b0100'0000.
+    IF_INC = 0x04,  // 0b0000'0100
+  };
+  ret = imu_register_write_byte(LSM6DSO32_CTRL3_C, BDU | IF_INC);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to configure CTRL3_C");
     return ret;
