@@ -26,9 +26,9 @@ Furthermore, it sends the CAN messages:
 The servo motors are both of the model JX Servo PDI-HV2060MG. For the LIMB project, both servo motors have
 had their internal potentiometers removed and replaced with $2.5\ \text{k}\Omega$ resistors FIXME: MORE DETAILS.
 This has the effect of making the servo motor think its potentiometer is always centered, in our case corresponding
-to a pulse width of $1500\  \text{\mu{}s}$. By writing a pulse width higher or lower than $1500\ \text{\mu{}s}$, the servo
+to a pulse width of $1500\ \mu\text{s}$. By writing a pulse width higher or lower than $1500\ \mu\text{s}$, the servo
 will infinitely rotate either clockwise or counterclockwise. The magnitude of the difference between the pulse
-width used and $1500\  \text{\mu{}s}$ determines the speed of rotation.
+width used and $1500\ \mu\text{s}$ determines the speed of rotation.
 
 # Stepper motor
 
