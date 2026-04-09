@@ -1,78 +1,73 @@
-/**
- * @file main.c
- * @brief Main application file for 'human_arm' project.
- *
- * This main function only starts the specialized components.
- */
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h" 
 #include "esp_log.h"
-#include "nvs_flash.h" 
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 
 // --- Project Component Includes ---
-#include "emg_service.h"
+#include "adc_service.h" 
 #include "imu_service.h"
 #include "ble_service.h" 
 
-// --- Global Variables ---
 static const char *TAG_MAIN = "APP_MAIN";
 
-// Synchronization Primitives
-static EventGroupHandle_t s_sync_event_group;
-const int EMG_DATA_READY_BIT = BIT0;
-const int IMU_DATA_READY_BIT = BIT1;
-
-
-// =========================================================================
-// == APP_MAIN: Initialization
-// =========================================================================
 void app_main(void)
 {
-    ESP_LOGI(TAG_MAIN, "Starting APP_MAIN...");
+    ESP_LOGI(TAG_MAIN, "Initializing Micro-Streaming System...");
 
-    // Initialize Non-Volatile Storage (required by BLE)
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    // Initialize RTOS Synchronization Primitives
-    s_sync_event_group = xEventGroupCreate();
-    if (!s_sync_event_group) {
-        ESP_LOGE(TAG_MAIN, "Failed to create sync event group!"); 
+    /**
+     * 1. Central Synchronization: Create the Event Group
+     * This group coordinates ADC (EMG/Piezo), IMU, and BLE tasks.
+     * It allows low-latency signaling between producers and the BLE consumer.
+     */
+    EventGroupHandle_t sync_group = xEventGroupCreate();
+    if (sync_group == NULL) {
+        ESP_LOGE(TAG_MAIN, "Critical Error: Could not create Event Group!");
         return;
     }
-    ESP_LOGI(TAG_MAIN, "Sync Event Group created.");
 
-    // ===================================================
-    // == Start Component Services
-    // ===================================================
+    /**
+     * 3. Define the Streaming Bitmask
+     * This mask tells the BLE service which synchronization bits to monitor.
+     * We listen to three independent data streams: EMG, PIEZO, and IMU.
+     */
+    EventBits_t streaming_mask = (ADC_EMG_STREAM_BIT | ADC_PIEZO_STREAM_BIT | IMU_STREAM_BIT);
 
-    // --- Start EMG Service---
-    if (emg_service_start_task(s_sync_event_group, EMG_DATA_READY_BIT) != ESP_OK) {
-        ESP_LOGE(TAG_MAIN, "Failed to start EMG service!");
+    /**
+     * 4. Start BLE Dispatcher Service
+     * Initializing BLE first ensures the stack and GATT characteristics are ready 
+     * before sensor data starts flowing.
+     */
+    if (ble_service_start(sync_group, streaming_mask) != ESP_OK) {
+        ESP_LOGE(TAG_MAIN, "Failed to start BLE Service!");
     } else {
-        ESP_LOGI(TAG_MAIN, "EMG Service started successfully.");
+        ESP_LOGI(TAG_MAIN, "BLE Service Running: Listening for Micro-Streaming events.");
     }
+
+    // Small delay to ensure BLE stack stability before sensor interrupts fire
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // 5. Start IMU Service (I2C Scanning & 100Hz Task)
+    if (imu_service_start(sync_group) != ESP_OK) {
+        ESP_LOGE(TAG_MAIN, "Failed to start IMU Service!");
+    } else {
+        ESP_LOGI(TAG_MAIN, "IMU Service Running.");
+    }
+
+    // 6. Start ADC Service (EMG & Piezo via DMA)
+    // This starts the high-speed continuous sampling engine
+    if (adc_service_init(sync_group) != ESP_OK) {
+        ESP_LOGE(TAG_MAIN, "Failed to start ADC Service!");
+    } else {
+        ESP_LOGI(TAG_MAIN, "ADC Service Running.");
+    }
+
+    ESP_LOGI(TAG_MAIN, "System fully operational.");
     
-    // --- Start IMU Service ---
-    if (imu_service_start_task(s_sync_event_group, IMU_DATA_READY_BIT) != ESP_OK) {
-        ESP_LOGE(TAG_MAIN, "Failed to start IMU service!");
-    } else {
-        ESP_LOGI(TAG_MAIN, "IMU Service started successfully.");
+    /**
+     * Main Monitoring Loop
+     * Keep the main task alive to monitor system health and memory leaks.
+     */
+    while(1) {
+        
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
-
-    // --- Start BLE Service ---
-    const EventBits_t all_bits = (EMG_DATA_READY_BIT | IMU_DATA_READY_BIT);
-    if (ble_service_start(s_sync_event_group, all_bits) != ESP_OK) {
-        ESP_LOGE(TAG_MAIN, "Failed to start BLE service!");
-    } else {
-        ESP_LOGI(TAG_MAIN, "BLE Service started successfully.");
-    }
-
-    ESP_LOGI(TAG_MAIN, "app_main finished setup. All service tasks are running.");
 }

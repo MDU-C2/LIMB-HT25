@@ -8,24 +8,24 @@
 // sizes for the different characteristics.
 enum {
   kEmgFrequency = 4000,
-  kEmgMsPerWindow = 200,
-  kEmgMsPerOverlap = 50,
+  kEmgMsPerWindow = 100,
+  kEmgMsPerOverlap = 0,
   kEmgBytesPerValue = 2,
   kEmgValuesPerSample = 1,
   kEmgBytesPerSample = kEmgBytesPerValue * kEmgValuesPerSample,
-  kEmgSensorCount = 2,
+  kEmgSensorCount = 1,
 
   kImuFrequency = 100,
-  kImuMsPerWindow = 200,
-  kImuMsPerOverlap = 50,
+  kImuMsPerWindow = 100,
+  kImuMsPerOverlap = 0,
   kImuBytesPerValue = 2,
   kImuValuesPerSample = 6,
   kImuBytesPerSample = kImuBytesPerValue * kImuValuesPerSample,
-  kImuSensorCount = 2,
+  kImuSensorCount = 1,
 
-  kPiezoFrequency = 100,
-  kPiezoMsPerWindow = 200,
-  kPiezoMsPerOverlap = 50,
+  kPiezoFrequency = 1000,
+  kPiezoMsPerWindow = 100,
+  kPiezoMsPerOverlap = 0,
   kPiezoBytesPerValue = 2,
   kPiezoValuesPerSample = 1,
   kPiezoBytesPerSample = kPiezoBytesPerValue * kPiezoValuesPerSample,
@@ -37,7 +37,7 @@ enum {
   // The amount of the new samples in a window that should be buffered before
   // being sent. E.g. 30 means one 30th of the new samples are buffered before
   // being sent.
-  kPartOfWindowPerSend = 15,
+  kPartOfWindowPerSend = 10,
   kSequenceNumberSize = 4,
 
   kEmgSamplesPerWindow = kEmgMsPerWindow * kEmgFrequency / 1000,

@@ -190,11 +190,11 @@ static int GapEventHandler(struct ble_gap_event *event,
     };
 
     case BLE_GAP_EVENT_NOTIFY_TX: {
-      ESP_LOGI(kGapTag,
-               "notify event; conn_handle=%d attr_handle=%d "
-               "status=%d is_indication=%d",
-               event->notify_tx.conn_handle, event->notify_tx.attr_handle,
-               event->notify_tx.status, event->notify_tx.indication);
+      // ESP_LOGI(kGapTag,
+      //          "notify event; conn_handle=%d attr_handle=%d "
+      //          "status=%d is_indication=%d",
+      //          event->notify_tx.conn_handle, event->notify_tx.attr_handle,
+      //          event->notify_tx.status, event->notify_tx.indication);
       return 0;
     };
 
