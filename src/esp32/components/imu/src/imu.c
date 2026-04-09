@@ -84,14 +84,18 @@ static esp_err_t lsm6dso32_configure(void) {
   esp_err_t ret;
 
   // Configure accelerometer
-  ret = imu_register_write_byte(LSM6DSO32_CTRL1_XL, s_imu_config.accel_odr);
+  ret = imu_register_write_byte(
+      LSM6DSO32_CTRL1_XL,
+      (s_imu_config.accel_odr << 4) | s_imu_config.accel_range);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to configure accelerometer");
     return ret;
   }
 
   // Configure gyroscope
-  ret = imu_register_write_byte(LSM6DSO32_CTRL2_G, s_imu_config.gyro_odr);
+  ret =
+      imu_register_write_byte(LSM6DSO32_CTRL2_G, (s_imu_config.gyro_odr << 4) |
+                                                     s_imu_config.gyro_range);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to configure gyroscope");
     return ret;

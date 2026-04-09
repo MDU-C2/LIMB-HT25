@@ -25,10 +25,10 @@ imu_config_t custom_config = {
     .scl_pin = 5,
     .i2c_freq_hz = 400000,
     .sensor_addr = 0x6A,
-    .accel_range = 4,      // 4g range
-    .gyro_range = 250,     // 250 dps range
-    .accel_odr = 0x50,
-    .gyro_odr = 0x50,
+    .accel_range = IMU_FS_XL_4_G,   // +-4 g range
+    .gyro_range = IMU_FS_G_250_DPS, // +-250 dps range
+    .accel_odr = IMU_ODR_XL_208_HZ,
+    .gyro_odr = IMU_ODR_G_416_HZ,
 };
 imu_init(&custom_config);
 
