@@ -37,6 +37,8 @@ static const char* TAG = "IMU";
 // Static configuration storage
 static ImuConfig s_imu_config;
 static bool s_imu_initialized = false;
+static float s_accel_lsb_value = 0.F;
+static float s_gyro_lsb_value = 0.F;
 
 /**
  * @brief Read a sequence of bytes from LSM6DSO32 sensor registers
@@ -143,6 +145,84 @@ static esp_err_t lsm6dso32_configure(void) {
   return ESP_OK;
 }
 
+/**
+ * @brief Returns the appropriate LSB value for the provided accelerometer
+ * range
+ */
+static float imu_accel_range_to_lsb(
+    ImuAccelerometerFullScaleRange accel_range) {
+  // The raw data is expressed in terms of Least Significant Bits (LSBs), which
+  // for the accelerometer represents some amount of mg, where g is standard
+  // gravity (9.80665 m/s^2). The amount depends on the sensitivity, with the
+  // below values representing mg/LSB for the supported sensitivities (Table 3
+  // in the LSM6DSO32 datasheet).
+  static const float LSB_4_G = 0.122F;
+  static const float LSB_8_G = 0.244F;
+  static const float LSB_16_G = 0.488F;
+  static const float LSB_32_G = 0.976F;
+
+  switch (accel_range) {
+    case IMU_FS_XL_4_G: {
+      return LSB_4_G;
+    }
+    case IMU_FS_XL_8_G: {
+      return LSB_8_G;
+    }
+    case IMU_FS_XL_16_G: {
+      return LSB_16_G;
+    }
+    case IMU_FS_XL_32_G: {
+      return LSB_32_G;
+    }
+  }
+
+  ESP_LOGE(TAG,
+           "Invalid accel range passed to imu_accel_range_to_lsb: %d, "
+           "defaulting to +-4 g",
+           accel_range);
+  return LSB_4_G;
+}
+
+/**
+ * @brief Returns the appropriate LSB value for the provided gyroscope
+ * range
+ */
+static float imu_gyro_range_to_lsb(ImuGyroscopeFullScaleRange gyro_range) {
+  // The raw data is expressed in terms of Least Significant Bits (LSBs), which
+  // for the gyroscope represent some amount of mdps. The amount depends on the
+  // sensitivity, with the below values representing mdps/LSB for the supported
+  // sensitivities (Table 3 in the LSM6DSO32 datasheet).
+  static const float LSB_125_DPS = 4.375F;
+  static const float LSB_250_DPS = 8.75F;
+  static const float LSB_500_DPS = 17.50F;
+  static const float LSB_1000_DPS = 35.F;
+  static const float LSB_2000_DPS = 70.F;
+
+  switch (gyro_range) {
+    case IMU_FS_G_125_DPS: {
+      return LSB_125_DPS;
+    }
+    case IMU_FS_G_250_DPS: {
+      return LSB_250_DPS;
+    }
+    case IMU_FS_G_500_DPS: {
+      return LSB_500_DPS;
+    }
+    case IMU_FS_G_1000_DPS: {
+      return LSB_1000_DPS;
+    }
+    case IMU_FS_G_2000_DPS: {
+      return LSB_2000_DPS;
+    }
+  }
+
+  ESP_LOGE(TAG,
+           "Invalid gyro range passed to imu_gyro_range_to_lsb: %d, "
+           "defaulting to 250 dps",
+           gyro_range);
+  return LSB_250_DPS;
+}
+
 esp_err_t imu_init(const ImuConfig* config) {
   if (config == NULL) {
     ESP_LOGE(TAG, "Configuration cannot be NULL");
@@ -187,6 +267,10 @@ esp_err_t imu_init(const ImuConfig* config) {
     i2c_driver_delete(s_imu_config.i2c_port);
     return ret;
   }
+
+  // Cache the LSB values for the accelerometer and gyroscope.
+  s_accel_lsb_value = imu_accel_range_to_lsb(s_imu_config.accel_range);
+  s_gyro_lsb_value = imu_gyro_range_to_lsb(s_imu_config.gyro_range);
 
   s_imu_initialized = true;
   ESP_LOGI(TAG, "IMU initialized successfully");
@@ -266,3 +350,33 @@ bool imu_is_present(void) {
   return (who_am_i == LSM6DSO32_WHO_AM_I_VALUE);
 }
 
+float imu_to_mg(int16_t raw_accel_value) {
+  return raw_accel_value * s_accel_lsb_value;
+}
+
+float imu_to_mdps(int16_t raw_gyro_value) {
+  return raw_gyro_value * s_gyro_lsb_value;
+}
+
+ImuAccelVector imu_to_mg_vector(ImuRawAccelVector raw_accel_vector) {
+  return (ImuAccelVector){
+      .x = imu_to_mg(raw_accel_vector.x),
+      .y = imu_to_mg(raw_accel_vector.y),
+      .z = imu_to_mg(raw_accel_vector.z),
+  };
+}
+
+ImuGyroVector imu_to_mdps_vector(ImuRawGyroVector raw_gyro_vector) {
+  return (ImuGyroVector){
+      .pitch = imu_to_mdps(raw_gyro_vector.pitch),
+      .roll = imu_to_mdps(raw_gyro_vector.roll),
+      .yaw = imu_to_mdps(raw_gyro_vector.yaw),
+  };
+}
+
+ImuData imu_to_mg_and_mdps(ImuRawData raw_data) {
+  return (ImuData){
+      .gyro = imu_to_mdps_vector(raw_data.gyro),
+      .accel = imu_to_mg_vector(raw_data.accel),
+  };
+}

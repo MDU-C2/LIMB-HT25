@@ -84,6 +84,32 @@ typedef struct {
 } ImuRawData;
 
 /**
+ * @brief IMU accelerometer sample in mg.
+ */
+typedef struct {
+  float x;
+  float y;
+  float z;
+} ImuAccelVector;
+
+/**
+ * @brief IMU gyroscope sample in mdps.
+ */
+typedef struct {
+  float pitch;
+  float roll;
+  float yaw;
+} ImuGyroVector;
+
+/**
+ * @brief Complete IMU sensor data.
+ */
+typedef struct {
+  ImuAccelVector accel;  // Accelerometer data in mg.
+  ImuGyroVector gyro;    // Gyroscope data in mdps.
+} ImuData;
+
+/**
  * @brief IMU configuration structure
  */
 typedef struct {
@@ -140,3 +166,38 @@ esp_err_t imu_read_data(ImuRawData* data);
  * @return true if sensor is detected, false otherwise
  */
 bool imu_is_present(void);
+
+/**
+ * @brief Convert raw IMU data to mg and mdps.
+ * @return The converted IMU data.
+ */
+ImuData imu_to_mg_and_mdps(ImuRawData raw_data);
+
+/**
+ * @brief Converts an ImuRawAccelVector into an ImuAccelVector of mg (milli
+ * standard gravity, with standard gravity being 9.80665 m/s^2).
+ * @return An ImuAccelVector containing the mg equivalent of the provided
+ * raw_accel_vector.
+ */
+ImuAccelVector imu_to_mg_vector(ImuRawAccelVector raw_accel_vector);
+
+/**
+ * @brief Converts an ImuRawGyroVector into an ImuGyroVector of millidegrees per
+ * second.
+ * @return An ImuGyroVector containing the mdps equivalent of the provided
+ * raw_gyro_vector.
+ */
+ImuGyroVector imu_to_mdps_vector(ImuRawGyroVector raw_gyro_vector);
+
+/**
+ * @brief Converts an accelerometer sample into mg (milli standard gravity, with
+ * standard gravity being 9.80665 m/s^2).
+ * @return Converted raw acceleration value in mg.
+ */
+float imu_to_mg(int16_t raw_accel_value);
+
+/**
+ * @brief Converts a gyroscope sample into millidegrees per second.
+ * @return Converted raw gyro value in mdps.
+ */
+float imu_to_mdps(int16_t raw_gyro_value);
