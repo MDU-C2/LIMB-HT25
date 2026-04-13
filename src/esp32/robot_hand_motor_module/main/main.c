@@ -8,6 +8,12 @@
 
 static const char *TAG = "SERVOS";
 
+enum {
+    CAN_TX_PIN = 3,
+    CAN_RX_PIN = 4,
+    CAN_BAUDRATE = 1000000,
+};
+
 void app_main() 
 {
     ESP_LOGI(TAG, "Starting servo control application");
@@ -28,7 +34,7 @@ void app_main()
     // start_calibration_mode();
 
     //init CAN CX---------------
-    // can_init(3, 4, 125000, NULL);
+    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
     uint8_t msg_rx[8];
     uint32_t rx_id;
     uint8_t rx_len = 1; 
