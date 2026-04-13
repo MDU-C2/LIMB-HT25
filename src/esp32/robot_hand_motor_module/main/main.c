@@ -1,3 +1,4 @@
+#include "esp_err.h"
 #include "esp_log.h"
 #include "HS422_led.h"
 #include "can_driver.h"
@@ -34,7 +35,13 @@ void app_main()
     // start_calibration_mode();
 
     //init CAN CX---------------
-    can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
+    {
+        esp_err_t err = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
+        if (err) {
+            ESP_LOGE(TAG, "Couldn't start can driver: %s", esp_err_to_name(err));
+            return;
+        }
+    }
     uint8_t msg_rx[8];
     uint32_t rx_id;
     uint8_t rx_len = 1; 
