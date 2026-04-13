@@ -35,7 +35,7 @@ float Kd = 0.2;
 int servo_angle = 180; 
 wstats_t resultss = {0.0f, 0.0f};
 
-#define CAN_TX_GPIO 9
+#define CAN_TX_GPIO 5
 #define CAN_RX_GPIO 8
 #define CAN_BAUDRATE 1000000
 
