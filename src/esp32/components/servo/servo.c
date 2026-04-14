@@ -151,8 +151,9 @@ void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
     return;
   }
 
-  velocity.dps = LIMB_CLAMP(velocity.dps, -ctx->cfg.max_velocity_negative.dps,
-                            ctx->cfg.max_velocity_positive.dps);
+  velocity.dps =
+      LIMB_CLAMP(velocity.dps, -ctx->cfg.max_speed_decreasing_angle.dps,
+                 ctx->cfg.max_speed_increasing_angle.dps);
 
   velocity.dps *= ctx->cfg.gear_ratio;
   if (ctx->cfg.direction == SERVO_DIR_REVERSE) {
@@ -204,10 +205,12 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
   }
 
   // Aim for the target velocity, but constrain it to the max velocity.
-  const AngularVelocity constrained_target_velocity_positive = {MIN(
-      ctx->target_angular_velocity.dps, ctx->cfg.max_velocity_positive.dps)};
-  const AngularVelocity constrained_target_velocity_negative = {MIN(
-      ctx->target_angular_velocity.dps, ctx->cfg.max_velocity_negative.dps)};
+  const AngularVelocity constrained_target_speed_increasing_angle = {
+      MIN(ctx->target_angular_velocity.dps,
+          ctx->cfg.max_speed_increasing_angle.dps)};
+  const AngularVelocity constrained_target_speed_decreasing_angle = {
+      MIN(ctx->target_angular_velocity.dps,
+          ctx->cfg.max_speed_decreasing_angle.dps)};
 
   const MotorRampingArgs args = {
       .current_angle = current_angle,
@@ -215,8 +218,8 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_angular_velocity,
       .max_acceleration = ctx->cfg.max_accel,
-      .max_velocity_negative = constrained_target_velocity_negative,
-      .max_velocity_positive = constrained_target_velocity_positive,
+      .max_speed_decreasing_angle = constrained_target_speed_decreasing_angle,
+      .max_speed_increasing_angle = constrained_target_speed_increasing_angle,
       .timestep_ms = ms_until_next_period,
   };
   const AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);

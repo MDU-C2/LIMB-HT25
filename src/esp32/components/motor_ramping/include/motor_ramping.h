@@ -11,8 +11,12 @@ typedef struct {
   PotentiometerAngle deadband;
   AngularVelocity current_velocity;
   AngularAcceleration max_acceleration;
-  AngularVelocity max_velocity_negative;
-  AngularVelocity max_velocity_positive;
+  // The max speed that the motor should be allowed to move at in the direction
+  // that decreases the potentiometer angle.
+  AngularVelocity max_speed_decreasing_angle;
+  // The max speed that the motor should be allowed to move at in the direction
+  // that increases the potentiometer angle.
+  AngularVelocity max_speed_increasing_angle;
   // The amount of time between updates to the motor state.
   uint32_t timestep_ms;
 } MotorRampingArgs;

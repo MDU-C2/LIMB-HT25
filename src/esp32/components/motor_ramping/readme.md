@@ -26,8 +26,10 @@ void update_motor(PotentiometerAngle current_pos, PotentiometerAngle target_pos,
       .deadband = (PotentiometerAngle){2.0F},
       .current_velocity = current_vel,
       .max_acceleration = (AngularAcceleration){8.0F},
-      .max_velocity_negative = (AngularVelocity){2.0F},
-      .max_velocity_positive = (AngularVelocity){6.0F},
+      // The max speed that the angle can decrease at.
+      .max_speed_decreasing_angle = (AngularVelocity){2.0F},
+      // The max speed that the angle can increase at.
+      .max_speed_increasing_angle = (AngularVelocity){6.0F},
       .timestep_ms = delta_time_ms,
   };
 
