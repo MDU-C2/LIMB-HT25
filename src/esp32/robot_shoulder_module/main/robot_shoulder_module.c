@@ -323,18 +323,18 @@ static void motors_update_task([[maybe_unused]] void* args) {
                  joint_angle.degree, target_joint_angle.degree, velocity.dps);
       }
 
-      // esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
-      //                          (uint8_t*)&joint_angle.degree,
-      //                          sizeof(joint_angle.degree), 0);
-      // static uint32_t can_errors_count = 0;
-      // if (err != ESP_OK) {
-      //   if (can_errors_count++ % 100 == 0) {
-      //     ESP_LOGW(TAG,
-      //              "Error sending shoulder up/down angle over CAN: %s, total
-      //              " "error count: %u", esp_err_to_name(err),
-      //              can_errors_count);
-      //   }
-      // }
+      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER,
+                               (uint8_t*)&joint_angle.degree,
+                               sizeof(joint_angle.degree), 0);
+      static uint32_t can_errors_count = 0;
+      if (err != ESP_OK) {
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending shoulder up/down angle over CAN: %s, total "
+                   "error count: %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
+      }
     }
 
     // Send left/right potentiometer status update.
@@ -362,19 +362,18 @@ static void motors_update_task([[maybe_unused]] void* args) {
                  joint_angle.degree, target_joint_angle.degree, velocity.dps);
       }
 
-      // esp_err_t err =
-      // can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
-      //                          (uint8_t*)&joint_angle.degree,
-      //                          sizeof(joint_angle.degree), 0);
-      // static uint32_t can_errors_count = 0;
-      // if (err != ESP_OK) {
-      //   if (can_errors_count++ % 100 == 0) {
-      //     ESP_LOGW(TAG,
-      //              "Error sending shoulder left/right angle over CAN: %s, "
-      //              "total error count: %u",
-      //              esp_err_to_name(err), can_errors_count);
-      //   }
-      // }
+      esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER,
+                               (uint8_t*)&joint_angle.degree,
+                               sizeof(joint_angle.degree), 0);
+      static uint32_t can_errors_count = 0;
+      if (err != ESP_OK) {
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending shoulder left/right angle over CAN: %s, "
+                   "total error count: %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
+      }
     }
 
     // Send upper arm rotation potentiometer status update.
@@ -407,59 +406,20 @@ static void motors_update_task([[maybe_unused]] void* args) {
                  moving ? "Yes" : "No");
       }
 
-      // esp_err_t err = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER,
-      //                          (uint8_t*)&joint_angle.degree,
-      //                          sizeof(joint_angle.degree), 0);
-      // static uint32_t can_errors_count = 0;
-      // if (err != ESP_OK) {
-      //   if (can_errors_count++ % 100 == 0) {
-      //     ESP_LOGW(TAG,
-      //              "Error sending upper arm rotation angle over CAN: %s,
-      //              total " "error count: %u", esp_err_to_name(err),
-      //              can_errors_count);
-      //   }
-      // }
+      esp_err_t err = can_send(CAN_ID_ROBOT_UPPER_ARM_ROTATION_POTENTIOMETER,
+                               (uint8_t*)&joint_angle.degree,
+                               sizeof(joint_angle.degree), 0);
+      static uint32_t can_errors_count = 0;
+      if (err != ESP_OK) {
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending upper arm rotation angle over CAN: %s, total "
+                   " error count : %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
+      }
     }
   }
-
-  vTaskDelete(NULL);
-}
-
-void arm_demo_task([[maybe_unused]] void* args) {
-  TickType_t current_tick = xTaskGetTickCount();
-
-  // We need to do this in the test task.
-
-  // Starting position
-  servo_set_target_angle(s_up_down_servo_handle, (JointAngle){15});
-  servo_set_target_angle(s_left_right_servo_handle, (JointAngle){20});
-  stepper_set_target_angle(s_upper_arm_rotation_stepper_handle,
-                           (JointAngle){40});
-
-  xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(10000));
-
-  // Starting angle for cup
-  servo_set_target_angle(s_up_down_servo_handle, (JointAngle){25});
-  servo_set_target_angle(s_left_right_servo_handle, (JointAngle){0});
-  stepper_set_target_angle(s_upper_arm_rotation_stepper_handle,
-                           (JointAngle){20});
-
-  xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(22000));
-
-  // 3. twist lifted cup
-  // Servos stay the same, stepper changes
-  servo_set_target_angle(s_up_down_servo_handle, (JointAngle){25});
-  servo_set_target_angle(s_left_right_servo_handle, (JointAngle){0});
-  stepper_set_target_angle(s_upper_arm_rotation_stepper_handle,
-                           (JointAngle){70});
-
-  xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(37000));
-
-  // Back to starting position
-  servo_set_target_angle(s_up_down_servo_handle, (JointAngle){15});
-  servo_set_target_angle(s_left_right_servo_handle, (JointAngle){20});
-  stepper_set_target_angle(s_upper_arm_rotation_stepper_handle,
-                           (JointAngle){40});
 
   vTaskDelete(NULL);
 }
@@ -467,18 +427,18 @@ void arm_demo_task([[maybe_unused]] void* args) {
 void app_main(void) {
   // CAN initialization.
   {
-    // CanMsgFilter can_filter = {
-    //     .id = CAN_RECIPIENT_ROBOT_SHOULDER,
-    //     .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY,
-    //                                       CAN_RECIPIENT_FILTER_EXACT,
-    //                                       CAN_GENERIC_FILTER_ANY),
-    // };
+    CanMsgFilter can_filter = {
+        .id = CAN_RECIPIENT_ROBOT_SHOULDER,
+        .ignore_mask = create_filter_mask(CAN_MESSAGE_TYPE_FILTER_ANY,
+                                          CAN_RECIPIENT_FILTER_EXACT,
+                                          CAN_GENERIC_FILTER_ANY),
+    };
 
-    // esp_err_t err = can_init(CAN_TX_GPIO, CAN_RX_GPIO, 1000000, &can_filter);
-    // if (err != ESP_OK) {
-    //   ESP_LOGE(TAG, "Error calling can_init: %s", esp_err_to_name(err));
-    //   return;
-    // }
+    esp_err_t err = can_init(CAN_TX_GPIO, CAN_RX_GPIO, 1000000, &can_filter);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error calling can_init: %s", esp_err_to_name(err));
+      return;
+    }
   }
 
   // ADC initialization.
@@ -543,8 +503,7 @@ void app_main(void) {
     }
   }
 
-  // xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
+  xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
   xTaskCreate(motors_update_task, "Motors update task", 1024 * 2 * 2, NULL, 6,
               NULL);
-  xTaskCreate(arm_demo_task, "Arm demo task", 1024 * 2 * 2, NULL, 5, NULL);
 }
