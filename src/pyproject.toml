@@ -1,0 +1,21 @@
+[project]
+name = "LIMB"
+version = "1.0.0"
+description = "The LIMB project"
+requires-python = "==3.10.18"
+dependencies = [
+    # This is the last version before v1.0.0, which doesn't work on the AGX Orin
+    # due to some segfault happening in BlueZ for whatever reason.
+    "bleak==0.22.3",
+
+    "depthai>=3.0",
+    "matplotlib>=3.7.0",
+    "numpy==1.24.0",
+    "opencv-python>=4.8.0",
+    "pandas>=2.0.0",
+    "python-can>=4.0.0",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.3.0",
+    "scipy>=1.10.0",
+    "torch>=2.0.0",
+]
