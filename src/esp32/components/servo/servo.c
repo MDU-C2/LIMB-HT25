@@ -211,7 +211,7 @@ void servo_apply_pulse_width_as_velocity(ServoHandle handle,
 PotentiometerAngle servo_get_current_angle(ServoHandle handle) {
   const ServoContext *ctx = servo_get_context(handle);
   portENTER_CRITICAL(&ctx->spinlock);
-  PotentiometerAngle angle = ctx->target_angle;
+  PotentiometerAngle angle = ctx->current_angle;
   portEXIT_CRITICAL(&ctx->spinlock);
   return angle;
 }
