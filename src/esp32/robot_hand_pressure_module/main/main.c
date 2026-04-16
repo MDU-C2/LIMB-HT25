@@ -35,9 +35,9 @@ float Kd = 0.2;
 int servo_angle = 180; 
 wstats_t resultss = {0.0f, 0.0f};
 
-#define CAN_TX_GPIO 9
+#define CAN_TX_GPIO 5
 #define CAN_RX_GPIO 8
-#define CAN_BAUDRATE 125000 
+#define CAN_BAUDRATE 1000000
 
 void loop_control(void);
 
@@ -82,7 +82,7 @@ void loop_control(void) {
                 servo_angle = 180;
                 uint8_t open_msg = (uint8_t)servo_angle;
                 // NOTE: We're using the thumb activation as a hack. Sorry.
-                can_send(CAN_ID_ROBOT_THUMB_ACTUATION, &open_msg, 1);
+                can_send(CAN_ID_ROBOT_THUMB_ACTUATION, &open_msg, 1, 0);
             }
         }    
         
@@ -202,7 +202,7 @@ void loop_control(void) {
             // Static variable to ensure the CAN message only sends ONCE
             servo_angle = 10;
             can_msg_data = (uint8_t)servo_angle;
-            can_send(CAN_ID_ROBOT_THUMB_ACTUATION, &can_msg_data, 1);
+            can_send(CAN_ID_ROBOT_THUMB_ACTUATION, &can_msg_data, 1, 0);
 
             vTaskDelay(pdMS_TO_TICKS(5000));
             break;

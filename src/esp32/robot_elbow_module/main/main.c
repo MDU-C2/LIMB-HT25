@@ -173,34 +173,34 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
       imu_can_msg_buf[0] = imu_data.gyro.x;
       imu_can_msg_buf[1] = imu_data.gyro.y;
       imu_can_msg_buf[2] = imu_data.gyro.z;
-      // esp_err_t err =
-      //     can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO, (uint8_t *)imu_can_msg_buf,
-      //              sizeof(imu_can_msg_buf), 0);
-      // static int can_errors_count = 0;
-      // if (err != ESP_OK) {
-      //   if (can_errors_count++ % 100 == 0) {
-      //     ESP_LOGW(TAG,
-      //              "Error sending IMU gyro over CAN: %s, total error count:
-      //              %u", esp_err_to_name(err), can_errors_count);
-      //   }
-      // }
+      esp_err_t err =
+          can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO, (uint8_t *)imu_can_msg_buf,
+                   sizeof(imu_can_msg_buf), 0);
+      static int can_errors_count = 0;
+      if (err != ESP_OK) {
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(TAG,
+                   "Error sending IMU gyro over CAN: %s, total error count: %u",
+                   esp_err_to_name(err), can_errors_count);
+        }
+      }
     }
     {
       imu_can_msg_buf[0] = imu_data.accel.x;
       imu_can_msg_buf[1] = imu_data.accel.y;
       imu_can_msg_buf[2] = imu_data.accel.z;
-      // esp_err_t err =
-      //     can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL, (uint8_t *)imu_can_msg_buf,
-      //              sizeof(imu_can_msg_buf), 0);
-      // static int can_errors_count = 0;
-      // if (err != ESP_OK) {
-      //   if (can_errors_count++ % 100 == 0) {
-      //     ESP_LOGW(
-      //         TAG,
-      //         "Error sending IMU accel over CAN: %s, total error count: %u",
-      //         esp_err_to_name(err), can_errors_count);
-      //   }
-      // }
+      esp_err_t err =
+          can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL, (uint8_t *)imu_can_msg_buf,
+                   sizeof(imu_can_msg_buf), 0);
+      static int can_errors_count = 0;
+      if (err != ESP_OK) {
+        if (can_errors_count++ % 100 == 0) {
+          ESP_LOGW(
+              TAG,
+              "Error sending IMU accel over CAN: %s, total error count: %u",
+              esp_err_to_name(err), can_errors_count);
+        }
+      }
     }
   }
 }
@@ -225,18 +225,18 @@ static void stepper_task([[maybe_unused]] void *pvParameter) {
         stepper_get_current_angle(s_elbow_stepper_handle);
     JointAngle current_angle =
         to_joint_angle(&s_elbow_stepper_cfg.potentiometer, current_pot_angle);
-    // esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER,
-    //                          (uint8_t *)&current_angle.degree,
-    //                          sizeof(current_angle.degree), 0);
-    // static int can_errors_count = 0;
-    // if (err != ESP_OK) {
-    //   if (can_errors_count++ % 100 == 0) {
-    //     ESP_LOGW(
-    //         TAG,
-    //         "Error sending elbow status over CAN: %s, total error count: %u",
-    //         esp_err_to_name(err), can_errors_count);
-    //   }
-    // }
+    esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER,
+                             (uint8_t *)&current_angle.degree,
+                             sizeof(current_angle.degree), 0);
+    static int can_errors_count = 0;
+    if (err != ESP_OK) {
+      if (can_errors_count++ % 100 == 0) {
+        ESP_LOGW(
+            TAG,
+            "Error sending elbow status over CAN: %s, total error count: %u",
+            esp_err_to_name(err), can_errors_count);
+      }
+    }
 
     static uint32_t status_counter = 0;
     enum {
@@ -319,29 +319,29 @@ void app_main(void) {
                                           CAN_RECIPIENT_FILTER_EXACT,
                                           CAN_GENERIC_FILTER_ANY),
     };
-    // esp_err_t err = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE,
-    // &can_filter); if (err != ESP_OK) {
-    //   ESP_LOGE(TAG, "Failed to initialize CAN driver: %s",
-    //            esp_err_to_name(err));
-    //   return;
-    // }
-    // ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN,
-    //          CAN_RX_PIN, CAN_BAUDRATE);
+    esp_err_t err = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, &can_filter);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to initialize CAN driver: %s",
+               esp_err_to_name(err));
+      return;
+    }
+    ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN,
+             CAN_RX_PIN, CAN_BAUDRATE);
   }
 
   // Initialize IMU.
   {
-    // imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
-    // imu_cfg.sda_pin = IMU_SDA_PIN;
-    // imu_cfg.scl_pin = IMU_SCL_PIN;
-    // esp_err_t err = imu_init(&imu_cfg);
-    // if (err) {
-    //   ESP_LOGE(TAG, "Failed to initialize IMU driver: %s",
-    //            esp_err_to_name(err));
-    //   return;
-    // }
-    // ESP_LOGI(TAG, "IMU initialized (SDA=%d, SCL=%d)", imu_cfg.sda_pin,
-    //          imu_cfg.scl_pin);
+    imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
+    imu_cfg.sda_pin = IMU_SDA_PIN;
+    imu_cfg.scl_pin = IMU_SCL_PIN;
+    esp_err_t err = imu_init(&imu_cfg);
+    if (err) {
+      ESP_LOGE(TAG, "Failed to initialize IMU driver: %s",
+               esp_err_to_name(err));
+      return;
+    }
+    ESP_LOGI(TAG, "IMU initialized (SDA=%d, SCL=%d)", imu_cfg.sda_pin,
+             imu_cfg.scl_pin);
   }
 
   // Initialize ADC.
@@ -384,54 +384,29 @@ void app_main(void) {
   };
 
   {
-    // BaseType_t err = xTaskCreate(can_rx_task, "can_rx", TASK_STACK_DEPTH,
-    // NULL,
-    //                              TASK_CAN_RX_PRIORITY, NULL);
-    // if (err != pdPASS) {
-    //   ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
-    //   return;
-    // }
+    BaseType_t err = xTaskCreate(can_rx_task, "can_rx", TASK_STACK_DEPTH, NULL,
+                                 TASK_CAN_RX_PRIORITY, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
+      return;
+    }
 
-    // err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
-    //                   TASK_IMU_PRIORITY, NULL);
-    // if (err != pdPASS) {
-    //   ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
-    //   return;
-    // }
+    err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
+                      TASK_IMU_PRIORITY, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
+      return;
+    }
 
-    BaseType_t err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH,
+    err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH,
                                  NULL, TASK_STEPPER_UPDATE_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
       return;
     }
 
-    TickType_t current_tick = xTaskGetTickCount();
-
-    // Starting position
-    stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){50});
-
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(10000));
-
-    // Initial position:
-    stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){37});
-
-    // Lift cup position
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(17000));
-    stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){60});
-
-    // Lower cup position
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(22000));
-    stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){40});
-
-    // Lift cup after being done.
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(34000));
-    stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){60});
-    return;
-
     // Lower priority than stepper_task.
-    // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH,
-    // NULL,
+    // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH, NULL,
     //                   TASK_STEPPER_TEST_PRIORITY, NULL);
     // if (err != pdPASS) {
     //   ESP_LOGE(TAG, "Failed to create stepper_test task, err code: %d");

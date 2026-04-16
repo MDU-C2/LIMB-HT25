@@ -1,3 +1,4 @@
+#include "esp_err.h"
 #include "esp_log.h"
 #include "HS422_led.h"
 #include "can_driver.h"
@@ -7,6 +8,12 @@
 #include "portmacro.h"
 
 static const char *TAG = "SERVOS";
+
+enum {
+    CAN_TX_PIN = 3,
+    CAN_RX_PIN = 4,
+    CAN_BAUDRATE = 1000000,
+};
 
 void app_main() 
 {
@@ -28,7 +35,13 @@ void app_main()
     // start_calibration_mode();
 
     //init CAN CX---------------
-    // can_init(3, 4, 125000, NULL);
+    {
+        esp_err_t err = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
+        if (err) {
+            ESP_LOGE(TAG, "Couldn't start can driver: %s", esp_err_to_name(err));
+            return;
+        }
+    }
     uint8_t msg_rx[8];
     uint32_t rx_id;
     uint8_t rx_len = 1; 
@@ -40,30 +53,7 @@ void app_main()
     // Variables estáticas para almacenar los 5 valores de milivoltios recibidos
     
     ESP_LOGI(TAG, "Starting servo test loop...");
-    // ESP_LOGI(TAG, "number %d", rx_len);
-    TickType_t current_tick = xTaskGetTickCount();
 
-    // Ready to pick cup up
-    servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, 35);
-
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(15000));
-
-    // Grip
-    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-        servo_write_deg_channel(i, 10);  // Start at center position
-    }
-
-    // place cup down
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(22000));
-    servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, 52);
-
-    // Release
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(32000));
-    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-        servo_write_deg_channel(i, 180);  // Start at center position
-    }
-    return;
-    
     while(1) {
 
         if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
