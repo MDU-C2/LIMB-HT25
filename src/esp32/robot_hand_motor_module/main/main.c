@@ -53,30 +53,7 @@ void app_main()
     // Variables estáticas para almacenar los 5 valores de milivoltios recibidos
     
     ESP_LOGI(TAG, "Starting servo test loop...");
-    // ESP_LOGI(TAG, "number %d", rx_len);
-    TickType_t current_tick = xTaskGetTickCount();
 
-    // Ready to pick cup up
-    servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, 35);
-
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(15000));
-
-    // Grip
-    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-        servo_write_deg_channel(i, 10);  // Start at center position
-    }
-
-    // place cup down
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(22000));
-    servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, 52);
-
-    // Release
-    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(32000));
-    for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-        servo_write_deg_channel(i, 180);  // Start at center position
-    }
-    return;
-    
     while(1) {
 
         if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
