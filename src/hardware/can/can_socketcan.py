@@ -1,7 +1,10 @@
 
 import can
 import time
+from types import TracebackType
 from typing import List, Optional
+from typing_extensions import Self
+
 from .can_interface import CANInterface, CANMessage
 from .can_message_parser import CANMessageParser
 
@@ -24,6 +27,20 @@ class SocketCANInterface(CANInterface):
         self.rx_count = 0
         self.tx_count = 0
         self.error_count = 0
+
+    def __enter__(self) -> Self:
+        """Automatically start the CAN bus when using a `with` statement."""
+        self.start()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Automatically stop the CAN bus when exiting a `with` statement."""
+        self.stop()
 
     def start(self) -> bool:
         """Start the CAN bus with standard 11-bit CAN IDs only."""

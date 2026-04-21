@@ -316,6 +316,36 @@ def test_statistics():
     return True
 
 
+def test_context_manager():
+    """Test context manager (__enter__/__exit__) functionality."""
+    print_section("Test 7: Context Manager")
+
+    print("\n1. Testing context manager entry and exit...")
+    context_interface = None
+
+    with SocketCANInterface(interface="can0", bitrate=1000000) as can_interface:
+        context_interface = can_interface
+        if can_interface.is_running():
+            print("   ✓ Interface started successfully in __enter__")
+        else:
+            print("   ✗ Failed to start interface in __enter__")
+            print("   Make sure:")
+            print("     - CAN interface is set up (run scripts/agx_setup_can.sh)")
+            print("     - Interface is up: ip link set can0 up")
+            print("     - python-can is installed: pip install python-can")
+            return False
+
+    print("\n2. Verifying interface stopped after context exit...")
+    assert context_interface is not None, "Context interface should be set"
+    if not context_interface.is_running():
+        print("   ✓ Interface stopped successfully in __exit__")
+    else:
+        print("   ✗ Interface should be stopped after context exit")
+        return False
+
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -334,6 +364,7 @@ def main():
         ("Loopback Mode", test_loopback),
         ("Error Handling", test_error_handling),
         ("Statistics", test_statistics),
+        ("Context Manager", test_context_manager),
     ]
     
     results = []
