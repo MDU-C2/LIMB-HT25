@@ -32,7 +32,7 @@ enum {
 };
 
 #define ALPHA 0.1F
-#define DEADBAND_DEG 1.5F
+#define DEADBAND_DEG 2.5F
 
 // We support a static amount of servo motors, so we statically allocate space
 // for them.
