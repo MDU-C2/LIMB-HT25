@@ -25,8 +25,8 @@ typedef struct {
 
 enum {
   SERVO_MAX_DUTY = ((1U << LEDC_TIMER_13_BIT) - 1),
-  // We assume that the frequency used by the servo is 50 Hz.
-  SERVO_FREQUENCY = 50,
+  // We assume that the frequency used by the servo is 330 Hz.
+  SERVO_FREQUENCY = 330,
   SERVO_PERIOD_US = 1000000UL / SERVO_FREQUENCY,
 };
 
