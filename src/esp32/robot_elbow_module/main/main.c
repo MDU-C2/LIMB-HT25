@@ -207,10 +207,9 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
 
 static void stepper_task([[maybe_unused]] void *pvParameter) {
   TickType_t last_wake_time = xTaskGetTickCount();
-  const TickType_t period_ms = pdMS_TO_TICKS(10);  // 10ms = 100Hz update rate
 
   while (1) {
-    const uint16_t dt_ms = 10;  // 10ms in seconds
+    const uint16_t dt_ms = 10;
 
     adc_mgr_read(&s_adc_mgr_read_results, 0);
     s_latest_potentiometer_adc_value = moving_average16(
@@ -262,7 +261,7 @@ static void stepper_task([[maybe_unused]] void *pvParameter) {
                target_angle.degree, velocity.dps, moving ? "Yes" : "No");
     }
 
-    xTaskDelayUntil(&last_wake_time, period_ms);
+    xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(dt_ms));
   }
 }
 
