@@ -131,7 +131,7 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
             // Red is Vin and black is ground.
             .min_potentiometer_angle = {50},
             .max_potentiometer_angle = {130},
-            .min_potentiometer_angle_as_joint_angle = {-40.F},
+            .min_potentiometer_angle_as_joint_angle = {-50.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
         },
 };
