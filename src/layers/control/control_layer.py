@@ -52,6 +52,7 @@ class ControlLayer(Process):
         self.hand_cup_distance_threshold = thresholds_config.get("hand_cup_distance", 0.2)  # meters
         self.placement_distance_threshold = thresholds_config.get("placement_distance", 0.1)  # meters
         self.motor_step_size = motor_primitives_config.get("step_size", 0.05)  # meters
+        self.default_joint_velocity_dps = motor_primitives_config.get("default_joint_velocity_dps", 10.0)
         
         # Workspace limits (in meters)
         self.workspace_limits = {
@@ -167,7 +168,10 @@ class ControlLayer(Process):
         if arm_command:
             joint_positions = arm_command.get("joint_positions")
             if joint_positions:
-                commands["arm"] = {"joint_positions": joint_positions}
+                commands["arm"] = {
+                    "joint_positions": joint_positions,
+                    "joint_velocities": arm_command.get("joint_velocities"),
+                }
 
         # ------------------------------ 2. Apply safety limits ------------------------------
         motors = packet.motors
@@ -186,10 +190,11 @@ class ControlLayer(Process):
         if "arm" in commands:
             arm_cmd = commands["arm"]
             joint_positions = arm_cmd.get("joint_positions")
+            joint_velocities = arm_cmd.get("joint_velocities")
 
             if joint_positions:
                 # Encode and send each joint command separately
-                encoded_commands = self._encode_arm_command(joint_positions)
+                encoded_commands = self._encode_arm_command(joint_positions, joint_velocities)
                 if encoded_commands:
                     success_count = 0
                     for can_id, data in encoded_commands:
@@ -706,7 +711,11 @@ class ControlLayer(Process):
         result = self.can_parser.encode("robot_hand_set_grip_state", {"state": state_byte, "force": force})
         return result
     
-    def _encode_arm_command(self, joint_positions: List[float]) -> Optional[List[Tuple[int, bytes]]]:
+    def _encode_arm_command(
+        self,
+        joint_positions: List[float],
+        joint_velocities: Optional[List[float]] = None,
+    ) -> Optional[List[Tuple[int, bytes]]]:
         """
         Encode the arm command as separate actuation messages for each joint.
         
@@ -731,13 +740,21 @@ class ControlLayer(Process):
         }
 
         encoded_commands = []
+        has_valid_joint_velocities = (
+            joint_velocities is not None and len(joint_velocities) == len(joint_positions)
+        )
+
         for joint_idx, position in enumerate(joint_positions):
             msg_type = joint_to_actuation.get(joint_idx)
-            
+
             position_deg = float(np.degrees(position))
-            
+            velocity_dps = joint_velocities[joint_idx] if has_valid_joint_velocities else self.default_joint_velocity_dps
+
             if msg_type:
-                result = self.can_parser.encode(msg_type, {"value": position_deg})
+                result = self.can_parser.encode(
+                    msg_type,
+                    {"angle": position_deg, "velocity": velocity_dps},
+                )
                 if result:
                     encoded_commands.append(result)
                 else:

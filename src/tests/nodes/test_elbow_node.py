@@ -73,7 +73,7 @@ class ElbowNodeTester:
         self.running = False
         print("CAN stopped.")
 
-    def send_actuation_command(self, value: float) -> bool:
+    def send_actuation_command(self, angle: float, velocity: float = 5.0) -> bool:
         """
         Send an actuation command to the elbow node.
         """
@@ -81,7 +81,10 @@ class ElbowNodeTester:
             print("CAN interface not running.")
             return False
 
-        encoded = self.can_parser.encode("robot_elbow_up_down_actuation", {"value": value})
+        encoded = self.can_parser.encode(
+            "robot_elbow_up_down_actuation",
+            {"angle": angle, "velocity": velocity},
+        )
         if not encoded:
             print("Failed to encode actuation command.")
             return False
@@ -90,9 +93,9 @@ class ElbowNodeTester:
         success = self.can_interface.send(can_id, data)
 
         if success:
-            print(f"Sent actuation command: {value}")
+            print(f"Sent actuation command: angle={angle}, velocity={velocity}")
         else:
-            print(f"Failed to send actuation command: {value}")
+            print(f"Failed to send actuation command: angle={angle}, velocity={velocity}")
 
         return success
     
@@ -145,7 +148,7 @@ class ElbowNodeTester:
         print("TEST 1: Actuation Commands")
         print("="*60)
         
-        test_values = [0.0, 0.5, 1.0, -0.5, -1.0, 0.0]
+        test_values = [0.0, 10.0, 20.0, 10.0, 0.0]
         
         for value in test_values:
             print(f"\nSending actuation: {value}")

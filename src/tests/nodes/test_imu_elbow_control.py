@@ -126,8 +126,11 @@ class IMUElbowController:
         if not self.running:
             return False
         
-        # Encode using parser (value is in degrees)
-        encoded = self.can_parser.encode("robot_elbow_up_down_actuation", {"value": angle_deg})
+        # Encode using parser (angle in degrees, velocity in degrees/s)
+        encoded = self.can_parser.encode(
+            "robot_elbow_up_down_actuation",
+            {"angle": angle_deg, "velocity": 5.0},
+        )
         if not encoded:
             print(f"✗ Failed to encode elbow command")
             return False
