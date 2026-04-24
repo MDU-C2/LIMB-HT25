@@ -1,3 +1,4 @@
+#include "endian.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "HS422_led.h"
@@ -6,6 +7,7 @@
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "portmacro.h"
+#include "imu.h"
 
 static const char *TAG = "SERVOS";
 
@@ -14,6 +16,35 @@ enum {
     CAN_RX_PIN = 4,
     CAN_BAUDRATE = 1000000,
 };
+
+static void imu_task([[maybe_unused]] void *pvParameter) {
+    const uint16_t period_ms = 1000;
+    TickType_t current_tick = xTaskGetTickCount();
+    while (true) {
+        xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(period_ms));
+        imu_data_t data = {0};
+        esp_err_t err = imu_read_data(&data);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Error reading IMU data: %s", esp_err_to_name(err));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "Read IMU accel [%d, %d, %d], gyro [%d, %d, %d]",
+                 data.accel.x, data.accel.y, data.accel.z, data.gyro.x, data.gyro.y, data.gyro.z);
+
+        // We store the data in 16-bit arrays to allow us to use `htole16` to ensure
+        // the values are sent as little-endian while avoiding breaking strict aliasing
+        // when casting to a different pointer type.
+        {
+            const uint16_t can_data[] = {htole16(data.accel.x), htole16(data.accel.y), htole16(data.accel.z)};
+            ESP_ERROR_CHECK_WITHOUT_ABORT(can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL, (const uint8_t*)can_data, sizeof(can_data), 0));
+        }
+        {
+            const uint16_t can_data[] = {htole16(data.gyro.x), htole16(data.gyro.y), htole16(data.gyro.z)};
+            ESP_ERROR_CHECK_WITHOUT_ABORT(can_send(CAN_ID_ROBOT_HAND_IMU_GYRO, (const uint8_t*)can_data, sizeof(can_data), 0));
+        }
+    }
+}
 
 void app_main() 
 {
@@ -24,6 +55,17 @@ void app_main()
     ESP_LOGI(TAG, "Initializing servos...");
     servo_led_init();
     // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    {
+        ESP_LOGI(TAG, "Initializing IMUs...");
+        imu_config_t imu_config = IMU_CONFIG_DEFAULT();
+        imu_config.sda_pin = GPIO_NUM_0;
+        imu_config.scl_pin = GPIO_NUM_1;
+        ESP_ERROR_CHECK_WITHOUT_ABORT(imu_init(&imu_config));
+        if (!imu_is_present()) {
+            ESP_LOGW(TAG, "IMU isn't present");
+        }
+    }
     
     // Initialize rotary encoder
     // ESP_LOGI(TAG, "Initializing rotary encoder...");
@@ -42,7 +84,21 @@ void app_main()
             return;
         }
     }
+
+    {
+        BaseType_t err =
+            xTaskCreate(imu_task, "imu_task", 1024 * 2 * 2,
+                        NULL, 6, NULL);
+        if (err != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create imu task, err code: %d", err);
+            can_deinit();
+            imu_deinit();
+            abort();
+        }
+    }
+
     uint8_t msg_rx[8];
+
     uint32_t rx_id;
     uint8_t rx_len = 1; 
     
