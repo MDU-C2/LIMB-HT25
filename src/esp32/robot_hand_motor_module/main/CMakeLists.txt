@@ -8,5 +8,5 @@ idf_component_register(
     
     # Dependencias de este componente
     # El componente usa twai, ledc y gpio, que están en el driver del ESP-IDF.
-    REQUIRES log can_driver
+    REQUIRES log can_driver imu
 )
