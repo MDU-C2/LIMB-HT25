@@ -58,21 +58,30 @@ typedef enum : uint8_t {
 } ImuGyroscopeFullScaleRange;
 
 /**
- * @brief IMU data structure
+ * @brief IMU raw accelerometer sample mg/LSB.
  */
 typedef struct {
   int16_t x;
   int16_t y;
   int16_t z;
-} imu_vector_t;
+} ImuRawAccelVector;
 
 /**
- * @brief Complete IMU sensor data
+ * @brief IMU raw gyroscope sample in mdps/LSB.
  */
 typedef struct {
-  imu_vector_t accel;  // Accelerometer data in m/s²
-  imu_vector_t gyro;   // Gyroscope data in rad/s
-} imu_data_t;
+  int16_t pitch;
+  int16_t roll;
+  int16_t yaw;
+} ImuRawGyroVector;
+
+/**
+ * @brief Complete IMU sensor raw data
+ */
+typedef struct {
+  ImuRawAccelVector accel;  // Accelerometer data in mg/LSB
+  ImuRawGyroVector gyro;    // Gyroscope data in mdps/LSB
+} ImuRawData;
 
 /**
  * @brief IMU configuration structure
@@ -89,13 +98,13 @@ typedef struct {
   ImuGyroscopeFullScaleRange gyro_range;
   ImuAccelerometerOutputDataRate accel_odr;
   ImuGyroscopeOutputDataRate gyro_odr;
-} imu_config_t;
+} ImuConfig;
 
 /**
  * @brief Default IMU configuration
  */
 #define IMU_CONFIG_DEFAULT()                                                  \
-  (imu_config_t) {                                                            \
+  (ImuConfig) {                                                               \
     .i2c_port = I2C_NUM_0, .sda_pin = 4, .scl_pin = 5, .i2c_freq_hz = 400000, \
     .sensor_addr = 0x6A, .accel_range = IMU_FS_XL_4_G,                        \
     .gyro_range = IMU_FS_G_250_DPS, .accel_odr = IMU_ODR_XL_208_HZ,           \
@@ -108,7 +117,7 @@ typedef struct {
  * @param config Configuration structure for the IMU
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t imu_init(const imu_config_t* config);
+esp_err_t imu_init(const ImuConfig* config);
 
 /**
  * @brief Deinitialize the IMU component
@@ -120,10 +129,10 @@ esp_err_t imu_deinit(void);
 /**
  * @brief Read IMU sensor data
  *
- * @param data Pointer to imu_data_t structure to store the data
+ * @param data Pointer to ImuRawData structure to store the data
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t imu_read_data(imu_data_t* data);
+esp_err_t imu_read_data(ImuRawData* data);
 
 /**
  * @brief Check if IMU sensor is present and responding

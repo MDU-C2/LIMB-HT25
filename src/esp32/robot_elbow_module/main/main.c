@@ -149,7 +149,7 @@ static void can_rx_task([[maybe_unused]] void *pvParameter) {
 }
 
 static void imu_task([[maybe_unused]] void *pvParameter) {
-  imu_data_t imu_data;  // (imu_vector_t) accel and (imu_vector_t) gyro
+  ImuRawData raw_data;
 
   // The buffer is used for the xyz values of both the gyro and the accel
   // messages.
@@ -162,7 +162,7 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
 
     // Read IMU data.
     {
-      esp_err_t err = imu_read_data(&imu_data);
+      esp_err_t err = imu_read_data(&raw_data);
       if (err != ESP_OK) {
         ESP_LOGW(TAG, "Error reading IMU: %s", esp_err_to_name(err));
         continue;
@@ -170,9 +170,9 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
     }
 
     {
-      imu_can_msg_buf[0] = imu_data.gyro.x;
-      imu_can_msg_buf[1] = imu_data.gyro.y;
-      imu_can_msg_buf[2] = imu_data.gyro.z;
+      imu_can_msg_buf[0] = raw_data.gyro.pitch;
+      imu_can_msg_buf[1] = raw_data.gyro.roll;
+      imu_can_msg_buf[2] = raw_data.gyro.yaw;
       esp_err_t err =
           can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO, (uint8_t *)imu_can_msg_buf,
                    sizeof(imu_can_msg_buf), 0);
@@ -186,9 +186,9 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
       }
     }
     {
-      imu_can_msg_buf[0] = imu_data.accel.x;
-      imu_can_msg_buf[1] = imu_data.accel.y;
-      imu_can_msg_buf[2] = imu_data.accel.z;
+      imu_can_msg_buf[0] = raw_data.accel.x;
+      imu_can_msg_buf[1] = raw_data.accel.y;
+      imu_can_msg_buf[2] = raw_data.accel.z;
       esp_err_t err =
           can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL, (uint8_t *)imu_can_msg_buf,
                    sizeof(imu_can_msg_buf), 0);
@@ -330,7 +330,7 @@ void app_main(void) {
 
   // Initialize IMU.
   {
-    imu_config_t imu_cfg = IMU_CONFIG_DEFAULT();
+    ImuConfig imu_cfg = IMU_CONFIG_DEFAULT();
     imu_cfg.sda_pin = IMU_SDA_PIN;
     imu_cfg.scl_pin = IMU_SCL_PIN;
     esp_err_t err = imu_init(&imu_cfg);

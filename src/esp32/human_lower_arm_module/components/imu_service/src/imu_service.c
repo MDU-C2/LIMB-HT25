@@ -30,18 +30,18 @@ static void imu_task(void *pvParameters) {
     ESP_LOGI(TAG, "IMU Streaming Task Started at %d Hz", kImuFrequency);
 
     while (1) {
-        imu_data_t raw;
+        ImuRawData raw_data;
 
         // Initialize packet metadata
         s_imu_packet.seq = s_imu_seq;
 
-        if (imu_read_data(&raw) == ESP_OK) {
-            s_imu_packet.imu_data[0] = (int16_t)(raw.accel.x * ACCEL_FIXED_FACTOR);
-            s_imu_packet.imu_data[1] = (int16_t)(raw.accel.y * ACCEL_FIXED_FACTOR);
-            s_imu_packet.imu_data[2] = (int16_t)(raw.accel.z * ACCEL_FIXED_FACTOR);
-            s_imu_packet.imu_data[3] = (int16_t)(raw.gyro.x  * GYRO_FIXED_FACTOR);
-            s_imu_packet.imu_data[4] = (int16_t)(raw.gyro.y  * GYRO_FIXED_FACTOR);
-            s_imu_packet.imu_data[5] = (int16_t)(raw.gyro.z  * GYRO_FIXED_FACTOR);
+        if (imu_read_data(&raw_data) == ESP_OK) {
+            s_imu_packet.imu_data[0] = (int16_t)(raw_data.accel.x * ACCEL_FIXED_FACTOR);
+            s_imu_packet.imu_data[1] = (int16_t)(raw_data.accel.y * ACCEL_FIXED_FACTOR);
+            s_imu_packet.imu_data[2] = (int16_t)(raw_data.accel.z * ACCEL_FIXED_FACTOR);
+            s_imu_packet.imu_data[3] = (int16_t)(raw_data.gyro.pitch  * GYRO_FIXED_FACTOR);
+            s_imu_packet.imu_data[4] = (int16_t)(raw_data.gyro.roll  * GYRO_FIXED_FACTOR);
+            s_imu_packet.imu_data[5] = (int16_t)(raw_data.gyro.yaw  * GYRO_FIXED_FACTOR);
 
             s_imu_seq++;
             xEventGroupSetBits(s_imu_event_group, IMU_STREAM_BIT);
@@ -60,7 +60,7 @@ esp_err_t imu_service_start(EventGroupHandle_t event_group) {
     s_imu_event_group = event_group;
 
     // Hardware I2C Initialization
-    imu_config_t imu_hw_config = IMU_CONFIG_DEFAULT();
+    ImuConfig imu_hw_config = IMU_CONFIG_DEFAULT();
     imu_hw_config.sda_pin = GPIO_NUM_4;
     imu_hw_config.scl_pin = GPIO_NUM_5;
     if (imu_init(&imu_hw_config) != ESP_OK) return ESP_FAIL;

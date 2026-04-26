@@ -35,7 +35,7 @@ static const char* TAG = "IMU";
 #define I2C_MASTER_TIMEOUT_MS 1000
 
 // Static configuration storage
-static imu_config_t s_imu_config;
+static ImuConfig s_imu_config;
 static bool s_imu_initialized = false;
 
 /**
@@ -143,7 +143,7 @@ static esp_err_t lsm6dso32_configure(void) {
   return ESP_OK;
 }
 
-esp_err_t imu_init(const imu_config_t* config) {
+esp_err_t imu_init(const ImuConfig* config) {
   if (config == NULL) {
     ESP_LOGE(TAG, "Configuration cannot be NULL");
     return ESP_ERR_INVALID_ARG;
@@ -209,7 +209,7 @@ esp_err_t imu_deinit(void) {
   return ESP_OK;
 }
 
-esp_err_t imu_read_data(imu_data_t* data) {
+esp_err_t imu_read_data(ImuRawData* data) {
   if (data == NULL) {
     ESP_LOGE(TAG, "Data pointer cannot be NULL");
     return ESP_ERR_INVALID_ARG;
@@ -242,9 +242,9 @@ esp_err_t imu_read_data(imu_data_t* data) {
   // The registers are ordered such that they are read as little endian
   // 16-bit integers. As such, we can use le16toh to convert them from
   // little endian to the host endianness.
-  data->gyro.x = le16toh(raw_data[0]);
-  data->gyro.y = le16toh(raw_data[1]);
-  data->gyro.z = le16toh(raw_data[2]);
+  data->gyro.pitch = le16toh(raw_data[0]);
+  data->gyro.roll = le16toh(raw_data[1]);
+  data->gyro.yaw = le16toh(raw_data[2]);
   data->accel.x = le16toh(raw_data[3]);
   data->accel.y = le16toh(raw_data[4]);
   data->accel.z = le16toh(raw_data[5]);

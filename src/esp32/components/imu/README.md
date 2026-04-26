@@ -15,11 +15,11 @@ LSM6DSO32 IMU sensor driver for ESP32-C3. Provides accelerometer and gyroscope d
 #include "imu.h"
 
 // Initialize with default config
-imu_config_t config = IMU_CONFIG_DEFAULT();
+ImuConfig config = IMU_CONFIG_DEFAULT();
 imu_init(&config);
 
 // Or customize configuration
-imu_config_t custom_config = {
+ImuConfig custom_config = {
     .i2c_port = I2C_NUM_0,
     .sda_pin = 4,
     .scl_pin = 5,
@@ -35,11 +35,11 @@ imu_init(&custom_config);
 // Check if sensor is present
 if (imu_is_present()) {
     // Read sensor data
-    imu_data_t data;
+    ImuRawData data;
     imu_read_data(&data);
     
     // Access accelerometer: data.accel.x, data.accel.y, data.accel.z
-    // Access gyroscope: data.gyro.x, data.gyro.y, data.gyro.z
+    // Access gyroscope: data.gyro.pitch, data.gyro.roll, data.gyro.yaw
 }
 
 // Cleanup
