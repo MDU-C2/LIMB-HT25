@@ -57,6 +57,14 @@ typedef enum : uint8_t {
   IMU_FS_G_2000_DPS = 12,  // 0b1100
 } ImuGyroscopeFullScaleRange;
 
+// Section 5.1.1 in the LSM6DSO32 datasheet.
+// The I2C device address (the primary address should be used unless the
+// LSM6DSO32's SDO/SA0 pin is connected to the supply voltage).
+typedef enum {
+  IMU_ADDRESS_PRIMARY = 0x6A,    // 0b0110'1010.
+  IMU_ADDRESS_SECONDARY = 0x6B,  // 0b0110'1011.
+} ImuAddress;
+
 /**
  * @brief IMU raw accelerometer sample mg/LSB.
  */
@@ -113,11 +121,11 @@ typedef struct {
  * @brief IMU configuration structure
  */
 typedef struct {
-  i2c_port_t i2c_port;   // I2C port number
-  uint8_t sda_pin;       // GPIO number for SDA
-  uint8_t scl_pin;       // GPIO number for SCL
-  uint32_t i2c_freq_hz;  // I2C clock frequency in Hz
-  uint8_t sensor_addr;   // I2C address of the sensor (default: 0x6A)
+  i2c_port_t i2c_port;     // I2C port number
+  uint8_t sda_pin;         // GPIO number for SDA
+  uint8_t scl_pin;         // GPIO number for SCL
+  uint32_t i2c_freq_hz;    // I2C clock frequency in Hz
+  ImuAddress sensor_addr;  // I2C address of the sensor
   // Accelerometer measurement range (+-N mg)
   ImuAccelerometerFullScaleRange accel_range;
   // Gyroscope measurement range (+-N mdps)
@@ -132,7 +140,7 @@ typedef struct {
 #define IMU_CONFIG_DEFAULT()                                                  \
   (ImuConfig) {                                                               \
     .i2c_port = I2C_NUM_0, .sda_pin = 4, .scl_pin = 5, .i2c_freq_hz = 400000, \
-    .sensor_addr = 0x6A, .accel_range = IMU_FS_XL_4_G,                        \
+    .sensor_addr = IMU_ADDRESS_PRIMARY, .accel_range = IMU_FS_XL_4_G,         \
     .gyro_range = IMU_FS_G_250_DPS, .accel_odr = IMU_ODR_XL_208_HZ,           \
     .gyro_odr = IMU_ODR_G_208_HZ,                                             \
   }

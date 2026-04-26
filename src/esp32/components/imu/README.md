@@ -37,7 +37,8 @@ ImuConfig custom_config = {
     .sda_pin = GPIO_NUM_4,
     .scl_pin = GPIO_NUM_5,
     .i2c_freq_hz = 400000,
-    .sensor_addr = 0x6A,
+     // Use the secondary address only if the SDO/SA0 pin is connected to the supply voltage.
+    .sensor_addr = IMU_ADDRESS_SECONDARY,
     .accel_range = IMU_FS_XL_4_G,   // +-4 g range
     .gyro_range = IMU_FS_G_250_DPS, // +-250 dps range
     .accel_odr = IMU_ODR_XL_208_HZ,
