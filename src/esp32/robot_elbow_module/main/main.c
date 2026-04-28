@@ -168,9 +168,9 @@ static void can_rx_task([[maybe_unused]] void *pvParameter) {
 static void imu_task([[maybe_unused]] void *pvParameter) {
   ImuRawData raw_data;
 
-  // The buffer is used for the xyz values of both the gyro and the accel
-  // messages.
-  uint16_t imu_can_msg_buf[3] = {0};
+  uint32_t can_error_count = 0;
+  uint32_t can_error_count_since_last_log = 0;
+  esp_err_t err = ESP_OK;
 
   TickType_t current_tick = xTaskGetTickCount();
   while (1) {
@@ -178,46 +178,69 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
     xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(10));
 
     // Read IMU data.
-    {
-      esp_err_t err = imu_read_data(&raw_data);
-      if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Error reading IMU: %s", esp_err_to_name(err));
-        continue;
-      }
+    err = imu_read_data(&raw_data);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Error reading IMU: %s", esp_err_to_name(err));
+      continue;
     }
 
-    {
-      imu_can_msg_buf[0] = raw_data.gyro.pitch;
-      imu_can_msg_buf[1] = raw_data.gyro.roll;
-      imu_can_msg_buf[2] = raw_data.gyro.yaw;
-      esp_err_t err =
-          can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO, (uint8_t *)imu_can_msg_buf,
-                   sizeof(imu_can_msg_buf), 0);
-      static int can_errors_count = 0;
-      if (err != ESP_OK) {
-        if (can_errors_count++ % 100 == 0) {
-          ESP_LOGW(TAG,
-                   "Error sending IMU gyro over CAN: %s, total error count: %u",
-                   esp_err_to_name(err), can_errors_count);
-        }
-      }
+    const ImuData data = imu_to_mg_and_mdps(raw_data);
+
+    // We first copy the floats we want to send to a buffer so we can reverse
+    // the bytes if necessary to guarantee that we send them in little-endian
+    // byte order.
+    float can_buf[1] = {0};
+
+    can_buf[0] = htolef(data.gyro.pitch);
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_PITCH, (uint8_t *)can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
     }
-    {
-      imu_can_msg_buf[0] = raw_data.accel.x;
-      imu_can_msg_buf[1] = raw_data.accel.y;
-      imu_can_msg_buf[2] = raw_data.accel.z;
-      esp_err_t err =
-          can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL, (uint8_t *)imu_can_msg_buf,
-                   sizeof(imu_can_msg_buf), 0);
-      static int can_errors_count = 0;
-      if (err != ESP_OK) {
-        if (can_errors_count++ % 100 == 0) {
-          ESP_LOGW(
-              TAG,
-              "Error sending IMU accel over CAN: %s, total error count: %u",
-              esp_err_to_name(err), can_errors_count);
-        }
-      }
+
+    can_buf[0] = htolef(data.gyro.roll);
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_ROLL, (uint8_t *)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.gyro.yaw);
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_YAW, (uint8_t *)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.accel.x);
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_X, (uint8_t *)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.accel.y);
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Y, (uint8_t *)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.accel.z);
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Z, (uint8_t *)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    enum {
+      kMinCanErrorCountPerLogging = 100,
+    };
+    if (can_error_count_since_last_log > kMinCanErrorCountPerLogging) {
+      can_error_count += can_error_count_since_last_log;
+      can_error_count_since_last_log = 0;
+      ESP_LOGW(TAG, "CAN errors: %d, last_error: %s", can_error_count,
+               esp_err_to_name(err));
     }
   }
 }
