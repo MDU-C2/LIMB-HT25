@@ -1,4 +1,3 @@
-#include "endian.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "HS422_led.h"
@@ -9,6 +8,7 @@
 #include "limb_utils.h"
 #include "portmacro.h"
 #include "imu.h"
+#include "limb_utils.h"
 
 static const char *TAG = "SERVOS";
 
@@ -19,30 +19,74 @@ enum {
 };
 
 static void imu_task([[maybe_unused]] void *pvParameter) {
+    uint32_t can_error_count = 0;
+    esp_err_t err = ESP_OK;
+    uint32_t can_error_count_since_last_log = 0;
+
     const uint16_t period_ms = 1000;
     TickType_t current_tick = xTaskGetTickCount();
     while (true) {
         xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(period_ms));
         ImuRawData raw_data = {0};
-        esp_err_t err = imu_read_data(&raw_data);
+        err = imu_read_data(&raw_data);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "Error reading IMU data: %s", esp_err_to_name(err));
             continue;
         }
 
-        ESP_LOGI(TAG, "Read IMU accel [%d, %d, %d], gyro [%d, %d, %d]",
-                 raw_data.accel.x, raw_data.accel.y, raw_data.accel.z, raw_data.gyro.pitch, raw_data.gyro.roll, raw_data.gyro.yaw);
+        ImuData data = imu_to_mg_and_mdps(raw_data);
 
-        // We store the data in 16-bit arrays to allow us to use `htole16` to ensure
-        // the values are sent as little-endian while avoiding breaking strict aliasing
-        // when casting to a different pointer type.
-        {
-            const uint16_t can_data[] = {htole16(raw_data.accel.x), htole16(raw_data.accel.y), htole16(raw_data.accel.z)};
-            ESP_ERROR_CHECK_WITHOUT_ABORT(can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL, (const uint8_t*)can_data, sizeof(can_data), 0));
+        ESP_LOGI(TAG, "Read IMU accel [%d, %d, %d], gyro [%d, %d, %d]",
+                 data.accel.x, data.accel.y, data.accel.z, data.gyro.pitch, data.gyro.roll, data.gyro.yaw);
+
+        // We first copy the floats we want to send to a buffer so we can reverse
+        // the bytes if necessary to guarantee that we send them in little-endian
+        // byte order.
+        float can_buf[1] = {0};
+
+        can_buf[0] = htolef(data.gyro.pitch);
+        err = can_send(CAN_ID_ROBOT_HAND_IMU_GYRO_PITCH, (const uint8_t*)can_buf, sizeof(can_buf), 0);
+        if (err != ESP_OK) {
+            ++can_error_count_since_last_log;
         }
-        {
-            const uint16_t can_data[] = {htole16(raw_data.gyro.pitch), htole16(raw_data.gyro.roll), htole16(raw_data.gyro.yaw)};
-            ESP_ERROR_CHECK_WITHOUT_ABORT(can_send(CAN_ID_ROBOT_HAND_IMU_GYRO, (const uint8_t*)can_data, sizeof(can_data), 0));
+
+        can_buf[0] = htolef(data.gyro.roll);
+        err = can_send(CAN_ID_ROBOT_HAND_IMU_GYRO_ROLL, (const uint8_t*)can_buf, sizeof(can_buf), 0);
+        if (err != ESP_OK) {
+            ++can_error_count_since_last_log;
+        }
+
+        can_buf[0] = htolef(data.gyro.yaw);
+        err = can_send(CAN_ID_ROBOT_HAND_IMU_GYRO_YAW, (const uint8_t*)can_buf, sizeof(can_buf), 0);
+        if (err != ESP_OK) {
+            ++can_error_count_since_last_log;
+        }
+
+        can_buf[0] = htolef(data.accel.x);
+        err = can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL_X, (const uint8_t*)can_buf, sizeof(can_buf), 0);
+        if (err != ESP_OK) {
+            ++can_error_count_since_last_log;
+        }
+
+        can_buf[0] = htolef(data.accel.y);
+        err = can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL_Y, (const uint8_t*)can_buf, sizeof(can_buf), 0);
+        if (err != ESP_OK) {
+            ++can_error_count_since_last_log;
+        }
+
+        can_buf[0] = htolef(data.accel.z);
+        err = can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL_Z, (const uint8_t*)can_buf, sizeof(can_buf), 0);
+        if (err != ESP_OK) {
+            ++can_error_count_since_last_log;
+        }
+
+        enum  {
+            kMinCanErrorCountPerLogging = 100,
+        };
+        if (can_error_count_since_last_log > kMinCanErrorCountPerLogging) {
+            can_error_count += can_error_count_since_last_log;
+            can_error_count_since_last_log = 0;
+            ESP_LOGW(TAG, "CAN errors: %d, last_error: %s", can_error_count, esp_err_to_name(err));
         }
     }
 }
