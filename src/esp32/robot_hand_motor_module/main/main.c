@@ -22,25 +22,25 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
     TickType_t current_tick = xTaskGetTickCount();
     while (true) {
         xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(period_ms));
-        imu_data_t data = {0};
-        esp_err_t err = imu_read_data(&data);
+        ImuRawData raw_data = {0};
+        esp_err_t err = imu_read_data(&raw_data);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "Error reading IMU data: %s", esp_err_to_name(err));
             continue;
         }
 
         ESP_LOGI(TAG, "Read IMU accel [%d, %d, %d], gyro [%d, %d, %d]",
-                 data.accel.x, data.accel.y, data.accel.z, data.gyro.x, data.gyro.y, data.gyro.z);
+                 raw_data.accel.x, raw_data.accel.y, raw_data.accel.z, raw_data.gyro.pitch, raw_data.gyro.roll, raw_data.gyro.yaw);
 
         // We store the data in 16-bit arrays to allow us to use `htole16` to ensure
         // the values are sent as little-endian while avoiding breaking strict aliasing
         // when casting to a different pointer type.
         {
-            const uint16_t can_data[] = {htole16(data.accel.x), htole16(data.accel.y), htole16(data.accel.z)};
+            const uint16_t can_data[] = {htole16(raw_data.accel.x), htole16(raw_data.accel.y), htole16(raw_data.accel.z)};
             ESP_ERROR_CHECK_WITHOUT_ABORT(can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL, (const uint8_t*)can_data, sizeof(can_data), 0));
         }
         {
-            const uint16_t can_data[] = {htole16(data.gyro.x), htole16(data.gyro.y), htole16(data.gyro.z)};
+            const uint16_t can_data[] = {htole16(raw_data.gyro.pitch), htole16(raw_data.gyro.roll), htole16(raw_data.gyro.yaw)};
             ESP_ERROR_CHECK_WITHOUT_ABORT(can_send(CAN_ID_ROBOT_HAND_IMU_GYRO, (const uint8_t*)can_data, sizeof(can_data), 0));
         }
     }
@@ -58,7 +58,7 @@ void app_main()
 
     {
         ESP_LOGI(TAG, "Initializing IMUs...");
-        imu_config_t imu_config = IMU_CONFIG_DEFAULT();
+        ImuConfig imu_config = IMU_CONFIG_DEFAULT();
         imu_config.sda_pin = GPIO_NUM_0;
         imu_config.scl_pin = GPIO_NUM_1;
         ESP_ERROR_CHECK_WITHOUT_ABORT(imu_init(&imu_config));
