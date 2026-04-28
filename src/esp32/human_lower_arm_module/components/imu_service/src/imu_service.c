@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include <string.h>
 #include "sensors_service.h"
+#include "limb_utils.h"
 
 static const char *TAG = "IMU_SERVICE_STREAM";
 
@@ -23,10 +24,6 @@ static void imu_task(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(1000 / kImuFrequency); 
 
-    // Calibration/Conversion factors to map raw readings to fixed-point integers
-    const float ACCEL_FIXED_FACTOR = 1.19641f;
-    const float GYRO_FIXED_FACTOR = 0.15271f;
-
     ESP_LOGI(TAG, "IMU Streaming Task Started at %d Hz", kImuFrequency);
 
     while (1) {
@@ -35,13 +32,16 @@ static void imu_task(void *pvParameters) {
         // Initialize packet metadata
         s_imu_packet.seq = s_imu_seq;
 
+
         if (imu_read_data(&raw_data) == ESP_OK) {
-            s_imu_packet.imu_data[0] = (int16_t)(raw_data.accel.x * ACCEL_FIXED_FACTOR);
-            s_imu_packet.imu_data[1] = (int16_t)(raw_data.accel.y * ACCEL_FIXED_FACTOR);
-            s_imu_packet.imu_data[2] = (int16_t)(raw_data.accel.z * ACCEL_FIXED_FACTOR);
-            s_imu_packet.imu_data[3] = (int16_t)(raw_data.gyro.pitch  * GYRO_FIXED_FACTOR);
-            s_imu_packet.imu_data[4] = (int16_t)(raw_data.gyro.roll  * GYRO_FIXED_FACTOR);
-            s_imu_packet.imu_data[5] = (int16_t)(raw_data.gyro.yaw  * GYRO_FIXED_FACTOR);
+            const ImuData data = imu_to_mg_and_mdps(raw_data);
+
+            s_imu_packet.imu_data[0] = htolef(data.accel.x);
+            s_imu_packet.imu_data[1] = htolef(data.accel.y);
+            s_imu_packet.imu_data[2] = htolef(data.accel.z);
+            s_imu_packet.imu_data[3] = htolef(data.gyro.pitch);
+            s_imu_packet.imu_data[4] = htolef(data.gyro.roll);
+            s_imu_packet.imu_data[5] = htolef(data.gyro.yaw);
 
             s_imu_seq++;
             xEventGroupSetBits(s_imu_event_group, IMU_STREAM_BIT);

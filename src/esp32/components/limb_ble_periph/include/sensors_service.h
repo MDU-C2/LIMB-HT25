@@ -18,7 +18,7 @@ enum {
   kImuFrequency = 100,
   kImuMsPerWindow = 100,
   kImuMsPerOverlap = 0,
-  kImuBytesPerValue = 2,
+  kImuBytesPerValue = 4,
   kImuValuesPerSample = 6,
   kImuBytesPerSample = kImuBytesPerValue * kImuValuesPerSample,
   kImuSensorCount = 1,

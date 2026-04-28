@@ -13,12 +13,11 @@
 /**
  * @brief IMU Micro-packet structure (Streaming Protocol)
  * Contains synchronized samples from the IMU.
- * Total size: 2 (header) + 4 (seq) + 8 (timestamp) + 12 (IMU1) = 26 bytes.
- * Values are sent as int16_t (scaled by 1000) for transmission efficiency.
+ * Total size: 4 (seq) + 24 (IMU1) = 28 bytes.
  */
 typedef struct {
     uint32_t seq;       // Packet sequence counter
-    int16_t imu_data[kImuSamplesToSend * kImuValuesPerSample]; // IMU: accel_x, y, z | gyro_x, y, z
+    float imu_data[kImuSamplesToSend * kImuValuesPerSample]; // IMU: accel_x, y, z | gyro_pitch, roll, yaw
 } __attribute__((packed)) imu_micro_packet_t;
 
 // --- Public API ---
