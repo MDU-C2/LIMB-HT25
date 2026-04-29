@@ -20,7 +20,11 @@ import os
 
 # Add path for sensor packet serialization
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../ble_central'))
-from sensor_packet_serialization import decode_packet, deserialize_packet_data
+from sensor_packet_serialization import (
+    ValueDataType,
+    decode_packet,
+    deserialize_packet_data,
+)
 
 # BLE UUIDs
 SERVICE_UUID = "23011525-1212-efde-1523-785feabcd122"
@@ -520,7 +524,7 @@ async def read_and_print_imu_ble(device_name="LIMBServer", method='estimate', vi
                 bytes_per_value=IMU_BYTES_PER_VALUE,
                 values_per_sample=IMU_VALUES_PER_SAMPLE,
                 sensor_count=IMU_SENSOR_COUNT,
-                signed=True,
+                value_data_type=ValueDataType.SIGNED_INTEGER,
             )
             
             # Process first sensor's first sample (we only have 1 sensor)

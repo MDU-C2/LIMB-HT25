@@ -1,9 +1,9 @@
 """Test deserialize_packet_data with mock EMG, IMU, and piezo packet data."""
 
-import functools
+import struct
 import unittest
 
-from sensor_packet_serialization import deserialize_packet_data
+from sensor_packet_serialization import ValueDataType, deserialize_packet_data
 
 
 class TestDeserializePacketData(unittest.TestCase):
@@ -12,7 +12,7 @@ class TestDeserializePacketData(unittest.TestCase):
     emg_bytes_per_value = 2
     emg_values_per_sample = 1
     emg_sensor_count = 2
-    imu_bytes_per_value = 2
+    imu_bytes_per_value = 4
     imu_values_per_sample = 6
     imu_sensor_count = 2
     piezo_bytes_per_value = 2
@@ -21,20 +21,22 @@ class TestDeserializePacketData(unittest.TestCase):
 
     emg_le_data = bytes([1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0])
     emg_be_data = bytes([0, 1, 0, 2, 0, 4, 0, 8, 0, 16, 0, 32, 0, 64, 0, 128])
-    # [1, 0, 2, 0, ..., 24, 0]
-    imu_le_data = bytes(
-        functools.reduce(lambda acc, i: [*acc, i, 0], range(2, 25), [1, 0]),
+    imu_le_data = struct.pack("<24f", *[float(value) for value in range(1, 25)])
+    imu_scaled_le_data = struct.pack(
+        "<24f",
+        *[float(value * 256) for value in range(1, 25)],
     )
-    # [0, 1, 0, 2, 0, ..., 0, 24]
-    imu_be_data = bytes(
-        functools.reduce(lambda acc, i: [*acc, 0, i], range(2, 25), [0, 1]),
+    imu_negative_le_data = struct.pack(
+        "<24f",
+        *[float(-value) for value in range(1, 25)],
     )
-    # Equivalent to little endian 16-bit [-1, -2, ..., -24]
-    # [255, 255, 254, 255, ..., 232, 255]
-    imu_negative_le_data = bytes(
-        functools.reduce(
-            lambda acc, i: [*acc, i, 255], range(254, 231, -1), [255, 255]
-        ),
+    imu_be_data = struct.pack(
+        ">24f",
+        *[float(value) for value in range(1, 25)],
+    )
+    imu_negative_be_data = struct.pack(
+        ">24f",
+        *[float(-value) for value in range(1, 25)],
     )
     piezo_le_data = bytes([1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0])
     piezo_be_data = bytes([0, 1, 0, 2, 0, 4, 0, 8, 0, 16, 0, 32, 0, 64, 0, 128])
@@ -46,6 +48,7 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.emg_bytes_per_value,
             values_per_sample=self.emg_values_per_sample,
             sensor_count=self.emg_sensor_count,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         target = [
             [[1], [3], [5], [7]],
@@ -60,6 +63,7 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.emg_bytes_per_value,
             values_per_sample=self.emg_values_per_sample,
             sensor_count=self.emg_sensor_count,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         target = [
             [[256], [1024], [4096], [16384]],
@@ -76,6 +80,7 @@ class TestDeserializePacketData(unittest.TestCase):
                 bytes_per_value=self.emg_bytes_per_value,
                 values_per_sample=self.emg_values_per_sample,
                 sensor_count=self.emg_sensor_count,
+                value_data_type=ValueDataType.UNSIGNED_INTEGER,
             )
 
     def test_little_endian_imu(self) -> None:
@@ -85,7 +90,7 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.imu_bytes_per_value,
             values_per_sample=self.imu_values_per_sample,
             sensor_count=self.imu_sensor_count,
-            signed=True,
+            value_data_type=ValueDataType.FLOATING_POINT,
         )
         target = [
             [[1, 2, 3, 4, 5, 6], [13, 14, 15, 16, 17, 18]],
@@ -93,18 +98,17 @@ class TestDeserializePacketData(unittest.TestCase):
         ]
         self.assertEqual([x.tolist() for x in result], target)
 
-    def test_big_endian_imu(self) -> None:
-        """Test deserialize_packet_data with mock IMU data in big endian format."""
+    def test_scaled_little_endian_imu(self) -> None:
+        """Test deserialize_packet_data with scaled float IMU data in little endian format."""
         result = deserialize_packet_data(
-            memoryview(self.imu_be_data),
+            memoryview(self.imu_scaled_le_data),
             bytes_per_value=self.imu_bytes_per_value,
             values_per_sample=self.imu_values_per_sample,
             sensor_count=self.imu_sensor_count,
-            signed=True,
+            value_data_type=ValueDataType.FLOATING_POINT,
         )
 
-        # The high byte has values 1 to 24 while the low byte is always 0
-        # (meaning we start at 256 and count in steps of 256).
+        # Each value is the sequence 1..24 scaled by 256.
         target = [
             [
                 [256, 512, 768, 1024, 1280, 1536],
@@ -124,12 +128,46 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.imu_bytes_per_value,
             values_per_sample=self.imu_values_per_sample,
             sensor_count=self.imu_sensor_count,
-            signed=True,
+            value_data_type=ValueDataType.FLOATING_POINT,
         )
 
         target = [
             [[-1, -2, -3, -4, -5, -6], [-13, -14, -15, -16, -17, -18]],
             [[-7, -8, -9, -10, -11, -12], [-19, -20, -21, -22, -23, -24]],
+        ]
+        self.assertEqual([x.tolist() for x in result], target)
+
+    def test_big_endian_imu(self) -> None:
+        """Test deserialize_packet_data with big endian float IMU byte order."""
+        result = deserialize_packet_data(
+            memoryview(self.imu_be_data),
+            bytes_per_value=self.imu_bytes_per_value,
+            values_per_sample=self.imu_values_per_sample,
+            sensor_count=self.imu_sensor_count,
+            value_data_type=ValueDataType.FLOATING_POINT,
+        )
+
+        expected_flat = list(struct.unpack("<24f", self.imu_be_data))
+        target = [
+            [expected_flat[i : i + self.imu_values_per_sample] for i in (0, 12)],
+            [expected_flat[i : i + self.imu_values_per_sample] for i in (6, 18)],
+        ]
+        self.assertEqual([x.tolist() for x in result], target)
+
+    def test_negative_big_endian_imu(self) -> None:
+        """Test deserialize_packet_data with negative big endian float IMU byte order."""
+        result = deserialize_packet_data(
+            memoryview(self.imu_negative_be_data),
+            bytes_per_value=self.imu_bytes_per_value,
+            values_per_sample=self.imu_values_per_sample,
+            sensor_count=self.imu_sensor_count,
+            value_data_type=ValueDataType.FLOATING_POINT,
+        )
+
+        expected_flat = list(struct.unpack("<24f", self.imu_negative_be_data))
+        target = [
+            [expected_flat[i : i + self.imu_values_per_sample] for i in (0, 12)],
+            [expected_flat[i : i + self.imu_values_per_sample] for i in (6, 18)],
         ]
         self.assertEqual([x.tolist() for x in result], target)
 
@@ -142,7 +180,7 @@ class TestDeserializePacketData(unittest.TestCase):
                 bytes_per_value=self.imu_bytes_per_value,
                 values_per_sample=self.imu_values_per_sample,
                 sensor_count=self.imu_sensor_count,
-                signed=True,
+                value_data_type=ValueDataType.FLOATING_POINT,
             )
 
     def test_imu_packet_sample_count_not_divisible_by_sensor_count(self) -> None:
@@ -154,7 +192,7 @@ class TestDeserializePacketData(unittest.TestCase):
                 bytes_per_value=self.imu_bytes_per_value,
                 values_per_sample=self.imu_values_per_sample,
                 sensor_count=self.imu_sensor_count + 1,
-                signed=True,
+                value_data_type=ValueDataType.FLOATING_POINT,
             )
 
     def test_little_endian_piezo(self) -> None:
@@ -164,6 +202,7 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.piezo_bytes_per_value,
             values_per_sample=self.piezo_values_per_sample,
             sensor_count=self.piezo_sensor_count,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         target = [
             [[1], [2], [3], [4], [5], [6], [7], [8]],
@@ -177,6 +216,7 @@ class TestDeserializePacketData(unittest.TestCase):
             bytes_per_value=self.piezo_bytes_per_value,
             values_per_sample=self.piezo_values_per_sample,
             sensor_count=self.piezo_sensor_count,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         target = [
             [[256], [512], [1024], [2048], [4096], [8192], [16384], [32768]],
@@ -192,6 +232,7 @@ class TestDeserializePacketData(unittest.TestCase):
                 bytes_per_value=self.piezo_bytes_per_value,
                 values_per_sample=self.piezo_values_per_sample,
                 sensor_count=self.piezo_sensor_count,
+                value_data_type=ValueDataType.UNSIGNED_INTEGER,
             )
 
 

@@ -7,7 +7,11 @@ import time
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from .ble_interface import BLEInterface, BLESample
-from ble_central.sensor_packet_serialization import decode_packet, deserialize_packet_data # TODO: Check if we should move this to hardware folder?
+from ble_central.sensor_packet_serialization import (
+    ValueDataType,
+    decode_packet,
+    deserialize_packet_data,
+)  # TODO: Check if we should move this to hardware folder?
 
 
 
@@ -22,7 +26,7 @@ EMG_BYTES_PER_VALUE = 2
 EMG_VALUES_PER_SAMPLE = 1
 EMG_SENSOR_COUNT = 1
 
-IMU_BYTES_PER_VALUE = 2
+IMU_BYTES_PER_VALUE = 4
 IMU_VALUES_PER_SAMPLE = 6
 IMU_SENSOR_COUNT = 1
 
@@ -196,6 +200,7 @@ class BleakBLEInterface(BLEInterface):
                 bytes_per_value=EMG_BYTES_PER_VALUE,
                 values_per_sample=EMG_VALUES_PER_SAMPLE,
                 sensor_count=EMG_SENSOR_COUNT,
+                value_data_type=ValueDataType.UNSIGNED_INTEGER,
             )
 
             timestamp = time.time()
@@ -225,7 +230,7 @@ class BleakBLEInterface(BLEInterface):
                 bytes_per_value=IMU_BYTES_PER_VALUE,
                 values_per_sample=IMU_VALUES_PER_SAMPLE,
                 sensor_count=IMU_SENSOR_COUNT,
-                signed=True,
+                value_data_type=ValueDataType.FLOATING_POINT,
             )
 
             timestamp = time.time()
@@ -256,6 +261,7 @@ class BleakBLEInterface(BLEInterface):
                 bytes_per_value=PIEZO_BYTES_PER_VALUE,
                 values_per_sample=PIEZO_VALUES_PER_SAMPLE,
                 sensor_count=PIEZO_SENSOR_COUNT,
+                value_data_type=ValueDataType.UNSIGNED_INTEGER,
             )
             
             timestamp = time.time()

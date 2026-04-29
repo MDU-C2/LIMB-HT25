@@ -12,7 +12,11 @@ from bleak import (
     BleakScanner,
 )
 
-from sensor_packet_serialization import decode_packet, deserialize_packet_data
+from sensor_packet_serialization import (
+    ValueDataType,
+    decode_packet,
+    deserialize_packet_data,
+)
 
 if TYPE_CHECKING:
     from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -31,8 +35,8 @@ EMG_MS_PER_OVERLAP = 50
 EMG_SAMPLES_PER_WINDOW = int(EMG_FREQUENCY * EMG_MS_PER_WINDOW / 1000)
 EMG_SAMPLES_PER_OVERLAP = int(EMG_FREQUENCY * EMG_MS_PER_OVERLAP / 1000)
 
-IMU_SENSOR_COUNT = 2
-IMU_BYTES_PER_VALUE = 2
+IMU_SENSOR_COUNT = 1
+IMU_BYTES_PER_VALUE = 4
 IMU_VALUES_PER_SAMPLE = 6
 IMU_FREQUENCY = 100
 IMU_MS_PER_WINDOW = 200
@@ -199,6 +203,7 @@ def set_up_notify_handler(
             bytes_per_value=EMG_BYTES_PER_VALUE,
             values_per_sample=EMG_VALUES_PER_SAMPLE,
             sensor_count=EMG_SENSOR_COUNT,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         global first_emg_sequence_number
         global latest_emg_sequence_number
@@ -228,7 +233,7 @@ def set_up_notify_handler(
             bytes_per_value=IMU_BYTES_PER_VALUE,
             values_per_sample=IMU_VALUES_PER_SAMPLE,
             sensor_count=IMU_SENSOR_COUNT,
-            signed=True,
+            value_data_type=ValueDataType.FLOATING_POINT,
         )
         global first_imu_sequence_number
         global latest_imu_sequence_number
@@ -258,6 +263,7 @@ def set_up_notify_handler(
             bytes_per_value=PIEZO_BYTES_PER_VALUE,
             values_per_sample=PIEZO_VALUES_PER_SAMPLE,
             sensor_count=PIEZO_SENSOR_COUNT,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         global first_piezo_sequence_number
         global latest_piezo_sequence_number
