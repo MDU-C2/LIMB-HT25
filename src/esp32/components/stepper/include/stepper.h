@@ -88,6 +88,10 @@ const stepper_control_config_t *stepper_get_cfg(
 void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
                     uint16_t latest_potentiometer_adc_value);
 
+// Set target angular velocity (degrees per second)
+void stepper_set_target_velocity(stepper_control_handle_t handle,
+                                 AngularVelocity target_velocity);
+
 // Set target angle (degrees)
 void stepper_set_target_angle(stepper_control_handle_t handle,
                               JointAngle target_angle);

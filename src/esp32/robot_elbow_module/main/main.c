@@ -143,9 +143,11 @@ static void can_rx_task([[maybe_unused]] void *pvParameter) {
 
         JointAngle target_angle = {
             deserialize_float(msg_rx, kFromLittleEndian)};
-        float target_velocity =
-            deserialize_float(msg_rx + sizeof(float), kFromLittleEndian);
+        AngularVelocity target_velocity = {
+            deserialize_float(msg_rx + sizeof(float), kFromLittleEndian)};
         stepper_set_target_angle(s_elbow_stepper_handle, target_angle);
+        stepper_set_target_velocity(s_elbow_stepper_handle,
+                                    target_velocity);
         ESP_LOGI(TAG,
                  "Received elbow actuation: angle=%f degrees, velocity=%f dps",
                  target_angle.degree, target_velocity.dps);
