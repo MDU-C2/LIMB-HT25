@@ -61,13 +61,16 @@ void app_main(void) {
   servo_apply_pulse_width_as_velocity(servo_handle, 1500);
   servo_stop_
 
-  // Option 2. Set a target velocity followed by calling the update function
-  // periodically. This will move the servo towards the target angle using the
-  // velocity and acceleration you specified in the configuration, with
-  // trapezoidal ramping. If the update function isn't called periodically for
-  // some reason, the motor will keep moving at its latest set velocity, so
-  // make sure your task doesn't get too delayed or prevented from running at
-  // all.
+  // Option 2. Set a target angle and velocity followed by calling the update
+  // function periodically. This will move the servo towards the target angle
+  // using the provided velocity (clamped to the max velocities specified in
+  // the configuration) and the acceleration you specified in the
+  // configuration, with trapezoidal ramping. The velocity will be clamped to
+  // the max velocity specified in the configuration. If the update function
+  // isn't called periodically for some reason, the motor will keep moving at
+  // its latest set velocity, so make sure your task doesn't get too delayed
+  // or prevented from running at all.
+  servo_set_target_velocity(servo_handle, (AngularVelocity){5.f});
   servo_set_target_angle(servo_handle, (JointAngle){15.F});
 
   enum {

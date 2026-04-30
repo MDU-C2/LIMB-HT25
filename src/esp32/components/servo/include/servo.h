@@ -69,6 +69,9 @@ esp_err_t servo_init(const ServoConfig *servo_config,
 bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                   uint16_t potentiometer_value);
 
+// Set target angular velocity (degrees per second)
+void servo_set_target_velocity(ServoHandle handle, AngularVelocity target_velocity);
+
 // Sets the target angle that `servo_update` aims for.
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);
 

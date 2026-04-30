@@ -17,6 +17,7 @@ static const char *const TAG = "Servo";
 typedef struct {
   portMUX_TYPE spinlock;
   ServoConfig cfg;
+  AngularVelocity target_angular_velocity;
   AngularVelocity current_angular_velocity;
   PotentiometerAngle target_angle;
   PotentiometerAngle current_angle;
@@ -109,6 +110,14 @@ static ServoContext *servo_get_context(ServoHandle handle) {
   return &s_servo_contexts[handle];
 }
 
+void servo_set_target_velocity(ServoHandle handle,
+                               AngularVelocity target_velocity) {
+  ServoContext *context = servo_get_context(handle);
+  portENTER_CRITICAL(&context->spinlock);
+  context->target_angular_velocity = target_velocity;
+  portEXIT_CRITICAL(&context->spinlock);
+}
+
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle) {
   ServoContext *context = servo_get_context(handle);
   PotentiometerAngle target_potentiometer_angle =
@@ -130,6 +139,7 @@ void stop_motor(ServoHandle handle) {
 
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->current_angular_velocity.dps = 0.F;
+  ctx->target_angular_velocity.dps = 0.F;
   portEXIT_CRITICAL(&ctx->spinlock);
 }
 
@@ -172,14 +182,20 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
   const PotentiometerAngle current_angle =
       potentiometer_adc_to_angle(&ctx->cfg.potentiometer, potentiometer_value);
 
+  // Aim for the target velocity, but constrain it to the max velocity.
+  const AngularVelocity constrained_target_velocity_positive = {MIN(
+      ctx->target_angular_velocity.dps, ctx->cfg.max_velocity_positive.dps)};
+  const AngularVelocity constrained_target_velocity_negative = {MIN(
+      ctx->target_angular_velocity.dps, ctx->cfg.max_velocity_negative.dps)};
+
   const MotorRampingArgs args = {
       .current_angle = current_angle,
       .target_angle = ctx->target_angle,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_angular_velocity,
       .max_acceleration = ctx->cfg.max_accel,
-      .max_velocity_negative = ctx->cfg.max_velocity_negative,
-      .max_velocity_positive = ctx->cfg.max_velocity_positive,
+      .max_velocity_negative = constrained_target_velocity_negative,
+      .max_velocity_positive = constrained_target_velocity_positive,
       .timestep_ms = ms_until_next_period,
   };
   const AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);

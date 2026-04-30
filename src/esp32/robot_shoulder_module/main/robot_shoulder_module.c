@@ -239,11 +239,12 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         }
         JointAngle joint_angle = {
             deserialize_float(can_buf, kFromLittleEndian)};
-        float target_velocity =
-            deserialize_float(can_buf + sizeof(float), kFromLittleEndian);
+        AngularVelocity target_velocity = {
+            deserialize_float(can_buf + sizeof(float), kFromLittleEndian)};
         ESP_LOGI(TAG, "Received up/down actuation: angle=%f, velocity=%f dps",
                  joint_angle.degree, target_velocity.dps);
         servo_set_target_angle(s_up_down_servo_handle, joint_angle);
+        servo_set_target_velocity(s_up_down_servo_handle, target_velocity);
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION: {
@@ -259,12 +260,13 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         }
         JointAngle joint_angle = {
             deserialize_float(can_buf, kFromLittleEndian)};
-        float target_velocity =
-            deserialize_float(can_buf + sizeof(float), kFromLittleEndian);
+        AngularVelocity target_velocity = {
+            deserialize_float(can_buf + sizeof(float), kFromLittleEndian)};
         ESP_LOGI(TAG,
                  "Received left/right actuation: angle=%f, velocity=%f dps",
                  joint_angle.degree, target_velocity.dps);
         servo_set_target_angle(s_left_right_servo_handle, joint_angle);
+        servo_set_target_velocity(s_left_right_servo_handle, target_velocity);
         break;
       }
       case CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION: {
@@ -280,14 +282,16 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         }
         JointAngle joint_angle = {
             deserialize_float(can_buf, kFromLittleEndian)};
-        float target_velocity =
-            deserialize_float(can_buf + sizeof(float), kFromLittleEndian);
+        AngularVelocity target_velocity = {
+            deserialize_float(can_buf + sizeof(float), kFromLittleEndian)};
         ESP_LOGI(
             TAG,
             "Received upper-arm rotation actuation: angle=%f, velocity=%f dps",
             joint_angle.degree, target_velocity.dps);
         stepper_set_target_angle(s_upper_arm_rotation_stepper_handle,
                                  joint_angle);
+        stepper_set_target_velocity(s_upper_arm_rotation_stepper_handle,
+                                    target_velocity);
         break;
       }
       default: {
