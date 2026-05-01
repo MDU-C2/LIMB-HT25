@@ -3,12 +3,12 @@ This document shows the basic data layout for the different types of
 CAN messages.
 
 ## Motor actuations
-Little endian 4-byte float angle.
+Little endian 4-byte float angle and little endian 4-byte float velocity.
 
 ### Byte representation of CAN message data field (8 bytes)
-| byte  |  0 |      1 |      2 |  3 | 4 | 5 | 6 | 7 |
-| ----- | -- | ------ | ------ | -- | - | - | - | - |
-| value | lo | mid lo | mid hi | hi | 0 | 0 | 0 | 0 |
+| byte  |  0       |      1       |      2       |  3       | 4           | 5               | 6               | 7      |
+| ----- | --       | ------       | ------       | --       | -           | -               | -               | -      |
+| value | ang lo   | ang mid lo   | ang mid hi   | ang hi   | vel lo      | vel mid lo      | vel mid hi      | vel hi |
 
 ## Potentiometers
 Little endian 4-byte float angle.
