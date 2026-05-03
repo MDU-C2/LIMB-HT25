@@ -88,7 +88,7 @@ def index_to_name(index):
         raise "Error converting index to name"
 
 def angles_to_messages(angles):
-    return [can_message_parser.encode(index_to_name(i), {"value": angle}) for i, angle in enumerate(angles)]
+    return [can_message_parser.encode(index_to_name(i), {"angle": angle, "velocity": 20. }) for i, angle in enumerate(angles)]
 
 can_messages_to_send_sequence = [
     angles_to_messages(angles) for angles in joint_angles_sequence
