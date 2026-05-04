@@ -1,0 +1,3 @@
+[submodule "dmp"]
+	path = dmp
+	url = https://github.com/oscaragren/DMP-arm.git
