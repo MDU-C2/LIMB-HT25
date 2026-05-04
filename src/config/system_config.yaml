@@ -98,6 +98,7 @@ control_layer:
   # Motor primitives
   motor_primitives:
     step_size: 0.05 # Step size per movement command (meters)
+    default_joint_velocity_dps: 10.0
 
   # Workspace limits (in meters)
   workspace_limits:

@@ -23,17 +23,17 @@ class CANMessageParser:
         0x165: {"type": "robot_ring_stop", "format": None},
         0x166: {"type": "robot_pinky_stop", "format": None},
 
-        # Actuation messages
-        0x220: {"type": "robot_shoulder_up_down_actuation", "format": "<f"},  # float32: position/velocity
-        0x221: {"type": "robot_shoulder_left_right_actuation", "format": "<f"},
-        0x222: {"type": "robot_upper_arm_rotation_actuation", "format": "<f"},
-        0x240: {"type": "robot_elbow_up_down_actuation", "format": "<f"},
-        0x260: {"type": "robot_lower_arm_rotation_actuation", "format": "<f"},
-        0x261: {"type": "robot_thumb_actuation", "format": "<f"},
-        0x262: {"type": "robot_index_actuation", "format": "<f"},
-        0x263: {"type": "robot_middle_actuation", "format": "<f"},
-        0x264: {"type": "robot_ring_actuation", "format": "<f"},
-        0x265: {"type": "robot_pinky_actuation", "format": "<f"},
+        # Actuation messages: [angle (float32), velocity (float32)]
+        0x220: {"type": "robot_shoulder_up_down_actuation", "format": "<2f"},
+        0x221: {"type": "robot_shoulder_left_right_actuation", "format": "<2f"},
+        0x222: {"type": "robot_upper_arm_rotation_actuation", "format": "<2f"},
+        0x240: {"type": "robot_elbow_up_down_actuation", "format": "<2f"},
+        0x260: {"type": "robot_lower_arm_rotation_actuation", "format": "<2f"},
+        0x261: {"type": "robot_thumb_actuation", "format": "<2f"},
+        0x262: {"type": "robot_index_actuation", "format": "<2f"},
+        0x263: {"type": "robot_middle_actuation", "format": "<2f"},
+        0x264: {"type": "robot_ring_actuation", "format": "<2f"},
+        0x265: {"type": "robot_pinky_actuation", "format": "<2f"},
         0x266: {"type": "robot_hand_set_grip_state", "format": "<Bf"},  # [state (uint8), force (float32)]
 
         # Potentiometer messages
@@ -168,7 +168,8 @@ class CANMessageParser:
                 }
             else:
                 return {
-                    "value": parsed[0], # single float value
+                    "angle": parsed[0],
+                    "velocity": parsed[1],
                     "source": msg_type.replace("robot_", "").replace("_actuation", "")
                 }
         
@@ -202,7 +203,7 @@ class CANMessageParser:
             if msg_type == "robot_hand_set_grip_state":
                 values = (data["state"], data["force"])
             elif "actuation" in msg_type:
-                values = (data["value"],)
+                values = (data["angle"], data["velocity"])
             elif "pressure" in msg_type:
                 values = (data["value"],)
             elif "potentiometer" in msg_type:

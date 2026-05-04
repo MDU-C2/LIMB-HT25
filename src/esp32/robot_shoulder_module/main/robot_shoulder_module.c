@@ -228,26 +228,70 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION: {
-        assert(can_buf_len == 4);
-        JointAngle joint_angle = {*(float*)can_buf};
-        ESP_LOGI(TAG, "Received up/down joint angle %f", joint_angle.degree);
+        enum {
+          kExpectedPayloadSize = 2 * sizeof(float),
+        };
+        if (can_buf_len != kExpectedPayloadSize) {
+          ESP_LOGW(TAG,
+                   "Invalid up/down actuation payload length: %u (expected %u)",
+                   can_buf_len, kExpectedPayloadSize);
+          break;
+        }
+        JointAngle joint_angle = {
+            deserialize_float(can_buf, kFromLittleEndian)};
+        AngularVelocity target_velocity = {
+            deserialize_float(can_buf + sizeof(float), kFromLittleEndian)};
+        ESP_LOGI(TAG, "Received up/down actuation: angle=%f, velocity=%f dps",
+                 joint_angle.degree, target_velocity.dps);
         servo_set_target_angle(s_up_down_servo_handle, joint_angle);
+        servo_set_target_velocity(s_up_down_servo_handle, target_velocity);
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION: {
-        assert(can_buf_len == 4);
-        JointAngle joint_angle = {*(float*)can_buf};
-        ESP_LOGI(TAG, "Received left/right joint angle %f", joint_angle.degree);
+        enum {
+          kExpectedPayloadSize = 2 * sizeof(float),
+        };
+        if (can_buf_len != kExpectedPayloadSize) {
+          ESP_LOGW(
+              TAG,
+              "Invalid left/right actuation payload length: %u (expected %u)",
+              can_buf_len, kExpectedPayloadSize);
+          break;
+        }
+        JointAngle joint_angle = {
+            deserialize_float(can_buf, kFromLittleEndian)};
+        AngularVelocity target_velocity = {
+            deserialize_float(can_buf + sizeof(float), kFromLittleEndian)};
+        ESP_LOGI(TAG,
+                 "Received left/right actuation: angle=%f, velocity=%f dps",
+                 joint_angle.degree, target_velocity.dps);
         servo_set_target_angle(s_left_right_servo_handle, joint_angle);
+        servo_set_target_velocity(s_left_right_servo_handle, target_velocity);
         break;
       }
       case CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION: {
-        assert(can_buf_len == 4);
-        JointAngle joint_angle = {*(float*)can_buf};
-        ESP_LOGI(TAG, "Received upper arm rotation joint angle %f",
-                 joint_angle.degree);
+        enum {
+          kExpectedPayloadSize = 2 * sizeof(float),
+        };
+        if (can_buf_len != kExpectedPayloadSize) {
+          ESP_LOGW(TAG,
+                   "Invalid upper-arm rotation actuation payload length: %u "
+                   "(expected %u)",
+                   can_buf_len, kExpectedPayloadSize);
+          break;
+        }
+        JointAngle joint_angle = {
+            deserialize_float(can_buf, kFromLittleEndian)};
+        AngularVelocity target_velocity = {
+            deserialize_float(can_buf + sizeof(float), kFromLittleEndian)};
+        ESP_LOGI(
+            TAG,
+            "Received upper-arm rotation actuation: angle=%f, velocity=%f dps",
+            joint_angle.degree, target_velocity.dps);
         stepper_set_target_angle(s_upper_arm_rotation_stepper_handle,
                                  joint_angle);
+        stepper_set_target_velocity(s_upper_arm_rotation_stepper_handle,
+                                    target_velocity);
         break;
       }
       default: {

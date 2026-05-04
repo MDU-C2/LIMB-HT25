@@ -12,6 +12,7 @@
 #include "hal/ledc_types.h"
 #include "limb_utils.h"
 #include "motor_ramping.h"
+#include "portmacro.h"
 #include "potentiometer.h"
 #include "soc/gpio_num.h"
 #include "soc/soc_caps.h"
@@ -40,6 +41,7 @@ typedef struct {
   // Motion state
   bool estop_active;
   bool is_moving;
+  AngularVelocity target_velocity;
   AngularVelocity current_velocity;
   PotentiometerAngle target_angle;
   PotentiometerAngle current_angle;
@@ -63,6 +65,7 @@ static void stop_motor(stepper_control_handle_t handle) {
 
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->is_moving = false;
+  ctx->target_velocity = (AngularVelocity){0.0F};
   ctx->current_velocity = (AngularVelocity){0.0F};
   portEXIT_CRITICAL(&ctx->spinlock);
 }
@@ -284,6 +287,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   ctx.estop_active = false;
   ctx.is_moving = false;
   ctx.current_velocity = (AngularVelocity){0.0F};
+  ctx.target_velocity = (AngularVelocity){0.0F};
 
   ctx.is_initialized = true;
 
@@ -328,6 +332,11 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
   PotentiometerAngle target_angle = ctx->target_angle;
   float current_velocity_sps =
       ctx->current_velocity.dps * ctx->steps_per_degree;
+  // Aim for the target velocity, but constrain it to the max velocity.
+  const AngularVelocity constrained_target_velocity_positive = {
+      MIN(ctx->target_velocity.dps, ctx->cfg.max_velocity_positive.dps)};
+  const AngularVelocity constrained_target_velocity_negative = {
+      MIN(ctx->target_velocity.dps, ctx->cfg.max_velocity_negative.dps)};
   ctx->current_angle = angle_deg;
   ctx->use_position_feedback = true;
   portEXIT_CRITICAL(&ctx->spinlock);
@@ -343,8 +352,8 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_velocity,
       .max_acceleration = ctx->cfg.max_accel,
-      .max_velocity_negative = ctx->cfg.max_velocity_negative,
-      .max_velocity_positive = ctx->cfg.max_velocity_positive,
+      .max_velocity_negative = constrained_target_velocity_negative,
+      .max_velocity_positive = constrained_target_velocity_positive,
       .timestep_ms = dt_ms,
   };
   AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);
@@ -392,6 +401,14 @@ void stepper_set_target_angle(stepper_control_handle_t handle,
       &ctx->cfg.potentiometer, target_potentiometer_angle);
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->target_angle = target_potentiometer_angle;
+  portEXIT_CRITICAL(&ctx->spinlock);
+}
+
+void stepper_set_target_velocity(stepper_control_handle_t handle,
+                                 AngularVelocity target_velocity) {
+  motion_control_context_t *ctx = &s_contexts[handle];
+  portENTER_CRITICAL(&ctx->spinlock);
+  ctx->target_velocity = target_velocity;
   portEXIT_CRITICAL(&ctx->spinlock);
 }
 

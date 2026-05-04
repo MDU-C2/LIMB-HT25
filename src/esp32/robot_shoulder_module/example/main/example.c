@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
+#include "limb_utils.h"
 #include "portmacro.h"
 
 const char *const TAG = "Example shoulder controller";
@@ -84,9 +85,9 @@ static void can_tx([[maybe_unused]] void *arg) {
     ESP_LOGI(TAG, "Testing sending actuations");
     for (int i = 0; i < LIMB_ARR_LEN(angles); ++i) {
       {
-        float angle = angles[i];
+        float actuation[] = {htolef(angles[i]), htolef(5.F)};
         esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                                 (uint8_t *)&angle, sizeof(angle), 0);
+                                 (uint8_t *)actuation, sizeof(actuation), 0);
         if (err != ESP_OK) {
           ESP_LOGW(TAG,
                    "Error calling can_send for shoulder up down actuation: %s",
@@ -94,9 +95,10 @@ static void can_tx([[maybe_unused]] void *arg) {
         }
       }
       {
-        float angle = angles[LIMB_ARR_LEN(angles) - 1 - i];
+        float actuation[] = {htolef(angles[LIMB_ARR_LEN(angles) - 1 - i]),
+                             htolef(5.F)};
         esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                                 (uint8_t *)&angle, sizeof(angle), 0);
+                                 (uint8_t *)actuation, sizeof(actuation), 0);
         if (err != ESP_OK) {
           ESP_LOGW(
               TAG,
@@ -109,9 +111,9 @@ static void can_tx([[maybe_unused]] void *arg) {
 
     ESP_LOGI(TAG, "Testing sending stop messages");
     {
-      float angle = 0;
+      float actuation[] = {htolef(0), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle), 0);
+                               (uint8_t *)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder up/down actuation: %s",
@@ -119,9 +121,9 @@ static void can_tx([[maybe_unused]] void *arg) {
       }
     }
     {
-      float angle = 0;
+      float actuation[] = {htolef(0), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle), 0);
+                               (uint8_t *)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(
             TAG,
@@ -139,9 +141,9 @@ static void can_tx([[maybe_unused]] void *arg) {
     // receiver, it will look like we're sending data even though we aren't.
     // Issue: https://github.com/espressif/esp-idf/issues/17467
     {
-      float angle = 180;
+      float actuation[] = {htolef(180), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle), 0);
+                               (uint8_t *)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder up/down actuation: %s",
@@ -158,9 +160,9 @@ static void can_tx([[maybe_unused]] void *arg) {
       }
     }
     {
-      float angle = 180;
+      float actuation[] = {htolef(180), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                               (uint8_t *)&angle, sizeof(angle), 0);
+                               (uint8_t *)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder left/right actuation: %s",

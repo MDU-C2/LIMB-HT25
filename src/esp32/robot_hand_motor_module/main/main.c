@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
+#include "limb_utils.h"
 #include "portmacro.h"
 #include "imu.h"
 
@@ -124,11 +125,14 @@ void app_main()
                 }
 
                 ESP_LOGI(TAG, "RX-angles %d", angle);
-                
-            } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION) {
-                float angle = *(float*)msg_rx;
+
+            } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION &&
+                       rx_len == 2 * sizeof(float)) {
+                float angle = deserialize_float(msg_rx, kFromLittleEndian);
+                float velocity = deserialize_float(msg_rx + sizeof(float), kFromLittleEndian);
                 servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, angle);
-                ESP_LOGI(TAG, "Actuation wrist to %.2f degrees", angle);
+                ESP_LOGI(TAG, "Actuation wrist to %.2f degrees at %.2f dps", angle,
+                         velocity);
             } else {
                 ESP_LOGI(TAG, "CAN RX: Mensaje con ID 0x%X ", rx_id);
             } 

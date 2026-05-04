@@ -130,10 +130,27 @@ static void can_rx_task([[maybe_unused]] void *pvParameter) {
 
     switch (rx_id) {
       case CAN_ID_ROBOT_ELBOW_UP_DOWN_ACTUATION: {
-        JointAngle target_angle = {*(float *)msg_rx};
+        enum {
+          kExpectedPayloadSize = 2 * sizeof(float),
+        };
+        if (rx_len != kExpectedPayloadSize) {
+          ESP_LOGW(
+              TAG,
+              "Invalid actuation payload length for elbow: %u (expected %u)",
+              rx_len, kExpectedPayloadSize);
+          break;
+        }
+
+        JointAngle target_angle = {
+            deserialize_float(msg_rx, kFromLittleEndian)};
+        AngularVelocity target_velocity = {
+            deserialize_float(msg_rx + sizeof(float), kFromLittleEndian)};
         stepper_set_target_angle(s_elbow_stepper_handle, target_angle);
-        ESP_LOGI(TAG, "Received command: elbow target angle = %f degrees",
-                 target_angle.degree);
+        stepper_set_target_velocity(s_elbow_stepper_handle,
+                                    target_velocity);
+        ESP_LOGI(TAG,
+                 "Received elbow actuation: angle=%f degrees, velocity=%f dps",
+                 target_angle.degree, target_velocity.dps);
         break;
       }
       case CAN_ID_ROBOT_ELBOW_UP_DOWN_STOP: {
