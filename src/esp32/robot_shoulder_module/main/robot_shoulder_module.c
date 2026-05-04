@@ -58,9 +58,9 @@ static const ServoConfig kUpDownServoConfig = {
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
     .gear_ratio = 15.F,
-    .max_velocity_positive = {2.F},
-    .max_velocity_negative = {8.F},
-    .max_accel = {8.F},
+    .max_velocity_positive = {10.F},
+    .max_velocity_negative = {20.F},
+    .max_accel = {15.F},
     .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
     .potentiometer =
         (Potentiometer){
@@ -87,9 +87,9 @@ static const ServoConfig kLeftRightServoConfig = {
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
     .gear_ratio = 15.F,
-    .max_velocity_positive = {6.F},
-    .max_velocity_negative = {4.F},
-    .max_accel = {4.F},
+    .max_velocity_positive = {20.F},
+    .max_velocity_negative = {10.F},
+    .max_accel = {15.F},
     .pot_adc_channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
     .potentiometer =
         (Potentiometer){
@@ -97,9 +97,9 @@ static const ServoConfig kLeftRightServoConfig = {
             .min_adc_value = 2,
             .max_adc_value = 2922,
             // The red wire should be connected to ground and the black to Vin.
-            // Corresponds to 40 joint degrees.
+            // Corresponds to 45 joint degrees.
             .min_potentiometer_angle = {83},
-            .max_potentiometer_angle = {120},
+            .max_potentiometer_angle = {137},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
         },
@@ -116,9 +116,9 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .microstepping_mode = MICROSTEP_NONE,
     .direction = STEPPER_DIR_NORMAL,
     .gear_ratio = 15.F,
-    .max_velocity_negative = {4.F},
-    .max_velocity_positive = {4.F},
-    .max_accel = {4.F},
+    .max_velocity_negative = {20.F},
+    .max_velocity_positive = {20.F},
+    .max_accel = {10.F},
     .pot_adc_channel = POTENTIOMETER_ROTATION_CHANNEL,
     .pwm_channel = LEDC_CHANNEL_2,
     .pwm_timer = LEDC_TIMER_1,
@@ -129,9 +129,9 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
             .min_adc_value = 6,
             .max_adc_value = 3087,
             // Red is Vin and black is ground.
-            .min_potentiometer_angle = {50},
-            .max_potentiometer_angle = {130},
-            .min_potentiometer_angle_as_joint_angle = {-50.F},
+            .min_potentiometer_angle = {40},
+            .max_potentiometer_angle = {160},
+            .min_potentiometer_angle_as_joint_angle = {-60.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
         },
 };
