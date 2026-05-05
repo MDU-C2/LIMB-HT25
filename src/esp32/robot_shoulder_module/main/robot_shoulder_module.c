@@ -97,10 +97,10 @@ static const ServoConfig kLeftRightServoConfig = {
             .min_adc_value = 2,
             .max_adc_value = 2922,
             // The red wire should be connected to ground and the black to Vin.
-            // Corresponds to 45 joint degrees.
-            .min_potentiometer_angle = {83},
+            // Corresponds to 40 joint degrees.
+            .min_potentiometer_angle = {89},
             .max_potentiometer_angle = {137},
-            .min_potentiometer_angle_as_joint_angle = {0.F},
+            .min_potentiometer_angle_as_joint_angle = {5.F},
             .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
         },
 };
