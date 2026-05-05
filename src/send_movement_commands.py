@@ -1,3 +1,4 @@
+import argparse
 import sys
 import time
 from pathlib import Path
@@ -8,10 +9,6 @@ from hardware.can.can_socketcan import SocketCANInterface
 sys.path.insert(0, str(Path(__file__).parent / ".." / "dmp"))
 
 from experiment import get_trajectories
-
-unpersonalized_angles_sequence, personalized_angles_sequence = get_trajectories()
-
-joint_angles_sequence = unpersonalized_angles_sequence
 
 can_message_parser = CANMessageParser()
 
@@ -98,6 +95,42 @@ def send_actuation_commands_over_can(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="""
+            Sends a subject's sequence of DMP joint angles to the robot arm's
+            microcontrollers over CAN.
+        """,
+    )
+    parser.add_argument(
+        "-s",
+        "--subject",
+        type=int,
+        required=True,
+        help="The ID of the subject whose movement sequence should be used.",
+    )
+    parser.add_argument(
+        "-t",
+        "--type",
+        choices=["unpersonal", "personal", "reset"],
+        required=True,
+        help="""
+            The type of motion sequence to send. Can be the base sequence,
+            the personalized version of the sequence, or resetting the arm position.
+        """,
+    )
+    args = parser.parse_args()
+
+    unpersonalized_angles_sequence, personalized_angles_sequence = get_trajectories(
+        args.subject,
+    )
+
+    if args.type == "unpersonal":
+        joint_angles_sequence = unpersonalized_angles_sequence
+    elif args.type == "personal":
+        joint_angles_sequence = personalized_angles_sequence
+    else:
+        joint_angles_sequence = [[0, 0, 0, 0]]
+
     send_angles_over_can(
         joint_angles_sequence,
         command_freq_s=0.5,
