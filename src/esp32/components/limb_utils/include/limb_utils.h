@@ -1,6 +1,8 @@
 #pragma once
 
+#ifndef htobe16
 #include <endian.h>
+#endif
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/param.h>
