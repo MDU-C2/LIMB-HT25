@@ -8,6 +8,7 @@
 typedef struct {
   PotentiometerAngle current_angle;
   PotentiometerAngle target_angle;
+  // The deadband extends +-(deadband / 2) degrees from target_angle.
   PotentiometerAngle deadband;
   AngularVelocity current_velocity;
   AngularAcceleration max_acceleration;

@@ -23,10 +23,13 @@ AngularVelocity motor_ramping_trapezoidal(const MotorRampingArgs* args) {
   const AngularVelocity abs_max_velocity_delta = {
       max_acceleration.dps2 * (float)args->timestep_ms / 1000.F};
 
+  // Since we're using the absolute distance to target, we only check half the
+  // deadband.
+  const float deadband_half_width = args->deadband.degree / 2;
   // If we're within the deadband and the current velocity is within the allowed
   // acceleration limit, we want to stop entirely.
   const bool within_deadband =
-      abs_distance_to_target.degree < args->deadband.degree;
+      abs_distance_to_target.degree < deadband_half_width;
   const bool slow_enough =
       fabsf(args->current_velocity.dps) <= abs_max_velocity_delta.dps;
 

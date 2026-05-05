@@ -31,8 +31,8 @@ enum {
   SERVO_PERIOD_US = 1000000UL / SERVO_FREQUENCY,
 };
 
-#define ALPHA 0.1F
-#define DEADBAND_DEG 2.5F
+// If we're within +- 2.5 degrees, we stop.
+#define DEADBAND_DEG 5.F
 
 // We support a static amount of servo motors, so we statically allocate space
 // for them.

@@ -21,11 +21,10 @@
 
 static const char* TAG = "stepper";
 
-// Control constants
-#define ALPHA 0.1f  // Low-pass filter coefficient (0.0-1.0)
 // NOTE: Without microstepping, our step size is 1.8 degrees, so the deadband
 // should probably be at least as large.
-#define DEADBAND_DEG 3.6f  // Deadband in degrees (stop if error < this)
+// If we're within +- 2 degrees, we stop.
+#define DEADBAND_DEG 4.F
 
 // Control context
 typedef struct {

@@ -23,6 +23,7 @@ void update_motor(PotentiometerAngle current_pos, PotentiometerAngle target_pos,
   MotorRampingArgs args = {
       .current_angle = current_pos,
       .target_angle = target_pos,
+      // The deadband extends +-(deadband / 2) degrees from target_angle.
       .deadband = (PotentiometerAngle){2.0F},
       .current_velocity = current_vel,
       .max_acceleration = (AngularAcceleration){8.0F},
