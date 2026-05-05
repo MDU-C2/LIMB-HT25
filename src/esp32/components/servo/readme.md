@@ -1,12 +1,30 @@
-# Servo component targeting a modded JX Servo PDI-HV2060MG
+# Continuous servo component targeting a modded JX Servo PDI-HV2060MG
 
-This component allows for controlling a JX Servo PDI-HV2060MG that has been modded to be continuous.
+This component allows for controlling a [JX Servo
+PDI-HV2060MG](http://www.jx-servo.com/en/Product/STANDARD/SD/544.html)
+that has been modded to be continuous.
 
 ## Servo requirements
 
-The servo used needs to have been modified to be continuous.
-The basic process used in this project follows [this guide](https://learn.adafruit.com/modifying-servos-for-continuous-rotation/overview).
-After removing the internal potentiometer and adding the resistors, the servo can be controlled by providing a velocity instead of an angle.
+The servo needs to have been modified to be continuous for this component to work.
+The process of modifying it is described in [the documentation](../../../../docs/servo_modification.md)
+along with the effect the modification has on its behavior and the consequences that arise as a result.
+Once the servo is continuous, this component provides the ability to use velocities to control the servo,
+allowing for it to also be controlled using a motor update function that gets called periodically.
+
+> [!caution]
+> After modding the motor, if a pulse width has been applied, the servo will keep on rotating until the pulse width has been reset.
+> This means that if a pulse width has been set, and the `servo_update` isn't called properly to update the
+> pulse width based on the target angle and potentiometer values, the motor *will not* stop! In worst case this
+> could lead to parts of the robot arm breaking or human injury. As such it is *very important* that any program
+> using the servo component actually manages to call `servo_update` periodically.
+
+> [!note]
+> The relation between the pulse width and the motor's velocity is approximate and does not take load into account.
+> For example, the same pulse width will provide a slower velocity if the motor has to fight against gravity by
+> raising the arm up from the ground compared to if it is assisted by gravity when moving the arm down. This means
+> that the actual velocity of the arm might be different from what this component expects the velocity to be,
+> resulting in the arm potentially overshooting its target.
 
 ## Usage
 
@@ -21,6 +39,8 @@ The basic usage is as follows:
 #include "servo.h"
 #include "soc/gpio_num.h"
 
+// Create a config for the servo. Check servo.h for more details regarding the
+// what the members represent.
 static const ServoConfig kServoConfig = {
     .gpio_pin = GPIO_NUM_0,
     .pwm_timer = LEDC_TIMER_0,
@@ -31,8 +51,10 @@ static const ServoConfig kServoConfig = {
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
     .gear_ratio = 15.F,
-    .max_velocity = {8.F},
+    .max_velocity_negative = {8.F},
+    .max_velocity_positive = {16.F},
     .max_accel = {8.F},
+    .pot_adc_channel = ADC_CHANNEL_0,
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
@@ -42,6 +64,7 @@ static const ServoConfig kServoConfig = {
             .max_potentiometer_angle = {200},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
+            .is_reversed = false,
         },
 };
 
@@ -59,7 +82,6 @@ void app_main(void) {
   // These are equivalent, they all stop the servo.
   servo_apply_velocity(servo_handle, (AngularVelocity){0.F});
   servo_apply_pulse_width_as_velocity(servo_handle, 1500);
-  servo_stop_
 
   // Option 2. Set a target angle and velocity followed by calling the update
   // function periodically. This will move the servo towards the target angle
