@@ -66,7 +66,7 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .pwm_timer = PWM_ELBOW_TIMER,
     .potentiometer =
         (Potentiometer){
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             // We step down voltage we feed to the potentiometer from 3300 mV to
             // 2200 mV.
             .min_adc_value = 0,

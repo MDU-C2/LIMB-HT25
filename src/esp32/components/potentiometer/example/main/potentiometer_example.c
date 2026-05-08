@@ -76,7 +76,7 @@ void app_main(void) {
     // Set the angle limits of your potentiometer and the ADC readings when the
     // potentiometer is turned to its extremes (these should be measured).
     const Potentiometer potentiometer = {
-        .degrees_of_motion = {285.F},
+        .range_of_motion = {285.F},
         .min_potentiometer_angle_as_joint_angle = {-90.0F},
         .min_potentiometer_angle = {20.F},
         .max_potentiometer_angle = {200.F},

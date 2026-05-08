@@ -22,7 +22,7 @@ and the maximum corresponding to the largest value in the range of motion.
 > Read more about this in [the ADC documentation](../../../../docs/adc.md).
 
 Once the ADC values have been measured, you can set the
-`degrees_of_motion`, `min_adc_value`, and `max_adc_value` members
+`range_of_motion`, `min_adc_value`, and `max_adc_value` members
 in the configuration struct.  The `min_potentiometer_angle` and
 `max_potentiometer_angle` members can then be measured by calling
 `potentiometer_adc_to_angle` on the ADC values at the desired min and
@@ -44,7 +44,7 @@ void update_joint_angle(uint16_t adc_value) {
       // manually calibrating the ADC values using ESP-IDF's ADC calibration
       // driver, in which case the min and max values should be ~0 and ~Vin in
       // millivolts.
-      .degrees_of_motion = {285.F},
+      .range_of_motion = {285.F},
       .min_adc_value = 3,
       .max_adc_value = 3098,
       // The desired minimum joint limit gives a potentiometer angle of 98.

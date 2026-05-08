@@ -184,7 +184,7 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 
   if (current_angle.degree < 10 ||
       current_angle.degree >
-          (ctx->cfg.potentiometer.degrees_of_motion.degree - 10)) {
+          (ctx->cfg.potentiometer.range_of_motion.degree - 10)) {
     // If the potentiometer is close to its min or max limits, we might be in a
     // situation where the ADC values are off (maybe a loose wire or the
     // potentiometer is configured incorrectly, for example). In that situation,
@@ -198,7 +198,7 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                "Potentiometer angle %f is close to its limits of [0, %f]. "
                "Turning off motor as a safety precaution",
                current_angle.degree,
-               ctx->cfg.potentiometer.degrees_of_motion.degree);
+               ctx->cfg.potentiometer.range_of_motion.degree);
     }
     return true;
   }

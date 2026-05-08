@@ -57,7 +57,7 @@ static const ServoConfig kServoConfig = {
     .pot_adc_channel = ADC_CHANNEL_0,
     .potentiometer =
         (Potentiometer){
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             .min_adc_value = 20,
             .max_adc_value = 3087,
             .min_potentiometer_angle = {170},

@@ -16,7 +16,7 @@ typedef struct {
 // This represents the characteristics of the potentiometer used.
 typedef struct {
   // The range of motion that the potentiometer supports.
-  PotentiometerAngle degrees_of_motion;
+  PotentiometerAngle range_of_motion;
 
   // The range of motion that the joint supports in its own frame of reference.
   JointAngle min_potentiometer_angle_as_joint_angle;

@@ -52,7 +52,7 @@ const ServoConfig servo_config = {
     .pot_adc_channel = SERVO_POT_ADC_CHANNEL,
     .potentiometer =
         (Potentiometer){
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             // FIXME: These need to be calibrated.
             .min_adc_value = 6,
             .max_adc_value = 3087,

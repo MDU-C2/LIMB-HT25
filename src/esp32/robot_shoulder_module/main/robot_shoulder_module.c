@@ -66,7 +66,7 @@ static const ServoConfig kUpDownServoConfig = {
     .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
     .potentiometer =
         (Potentiometer){
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             // We step down voltage we feed to the potentiometer from 3300 mV to
             // 2200 mV.
             .min_adc_value = 0,
@@ -97,7 +97,7 @@ static const ServoConfig kLeftRightServoConfig = {
     .pot_adc_channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
     .potentiometer =
         (Potentiometer){
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             // We step down voltage we feed to the potentiometer from 3300 mV to
             // 2200 mV.
             .min_adc_value = 0,
@@ -131,7 +131,7 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .steps_per_rev = 200,
     .potentiometer =
         {
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             // We step down voltage we feed to the potentiometer from 3300 mV to
             // 2200 mV.
             .min_adc_value = 0,
