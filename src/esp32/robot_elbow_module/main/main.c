@@ -47,7 +47,10 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .enable_gpio = STEPPER_ELBOW_ENABLE_PIN,
 
     // Set these if you want microstepping.
-    .microstepping_mode = MICROSTEP_NONE,
+    .microstepping_type = MICROSTEP_HARDWARE,
+    .microstepping_mode = MICROSTEP_1_32,
+    // We're setting the stepper driver's pins in hardware, so we don't need to
+    // use them in the software.
     .microstep_m0_gpio = GPIO_NUM_NC,
     .microstep_m1_gpio = GPIO_NUM_NC,
     .microstep_m2_gpio = GPIO_NUM_NC,
