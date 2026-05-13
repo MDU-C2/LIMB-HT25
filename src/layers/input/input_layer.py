@@ -193,6 +193,7 @@ class InputLayer(Process):
         """Stop the process"""
         self.running.clear() # Clear the event to signal the process to stop
         self.can_interface.stop() # Stop the CAN interface
+        self.ble_interface.stop()
         self.window_buffer.clear() # Clear the window buffer
 
     def _update_motor_state_from_potentiometers(self, timestamp: float):
