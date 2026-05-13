@@ -38,9 +38,11 @@ enum {
   STEPPER_UPPER_ARM_ROTATION_DIR_GPIO = GPIO_NUM_10,
   STEPPER_UPPER_ARM_ROTATION_STEP_GPIO = GPIO_NUM_7,
   // Microstepping pins.
+  // NOTE: Since we're setting the stepper driver's pins in the hardware, we
+  // don't need to use these pins in software.
   STEPPER_UPPER_ARM_ROTATION_M0_GPIO = GPIO_NUM_NC,
   STEPPER_UPPER_ARM_ROTATION_M1_GPIO = GPIO_NUM_NC,
-  STEPPER_UPPER_ARM_ROTATION_M2_GPIO = GPIO_NUM_0,
+  STEPPER_UPPER_ARM_ROTATION_M2_GPIO = GPIO_NUM_NC,
   CAN_TX_GPIO = GPIO_NUM_6,
   CAN_RX_GPIO = GPIO_NUM_5,
 };
@@ -113,10 +115,11 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .enable_gpio = STEPPER_UPPER_ARM_ROTATION_ENABLE_GPIO,
     .dir_gpio = STEPPER_UPPER_ARM_ROTATION_DIR_GPIO,
     .step_gpio = STEPPER_UPPER_ARM_ROTATION_STEP_GPIO,
+    .microstepping_mode = MICROSTEP_1_32,
+    .microstepping_type = MICROSTEP_HARDWARE,
     .microstep_m0_gpio = STEPPER_UPPER_ARM_ROTATION_M0_GPIO,
     .microstep_m1_gpio = STEPPER_UPPER_ARM_ROTATION_M1_GPIO,
     .microstep_m2_gpio = STEPPER_UPPER_ARM_ROTATION_M2_GPIO,
-    .microstepping_mode = MICROSTEP_NONE,
     .direction = STEPPER_DIR_NORMAL,
     .gear_ratio = 15.F,
     .max_velocity_negative = {20.F},
