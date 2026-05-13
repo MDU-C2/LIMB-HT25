@@ -13,6 +13,11 @@ typedef enum {
 } StepperDirection;
 
 typedef enum {
+  MICROSTEP_SOFTWARE,
+  MICROSTEP_HARDWARE,
+} MicrosteppingType;
+
+typedef enum {
   MICROSTEP_NONE = 0,
   MICROSTEP_1_1 = 1,
   MICROSTEP_1_2 = 2,
@@ -32,10 +37,11 @@ typedef struct {
   gpio_num_t dir_gpio;
   // ENABLE pin (GPIO_NUM_NC if not used)
   gpio_num_t enable_gpio;
+
   gpio_num_t microstep_m0_gpio;
   gpio_num_t microstep_m1_gpio;
   gpio_num_t microstep_m2_gpio;
-
+  MicrosteppingType microstepping_type;
   MicrosteppingMode microstepping_mode;
 
   // Motor parameters

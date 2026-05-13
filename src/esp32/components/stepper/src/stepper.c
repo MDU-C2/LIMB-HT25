@@ -148,7 +148,8 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   if (cfg->enable_gpio != GPIO_NUM_NC) {
     pin_mask |= (1ULL << cfg->enable_gpio);
   }
-  if (cfg->microstepping_mode != MICROSTEP_NONE) {
+  if (cfg->microstepping_type == MICROSTEP_SOFTWARE &&
+      cfg->microstepping_mode != MICROSTEP_NONE) {
     if (cfg->microstep_m0_gpio == GPIO_NUM_NC) {
       ESP_LOGE(TAG,
                "Microstepping is enabled, but microstep_m0_gpio isn't enabled");
@@ -169,6 +170,16 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
       return ESP_ERR_INVALID_ARG;
     } else {
       pin_mask |= (1ULL << cfg->microstep_m2_gpio);
+    }
+  } else if (cfg->microstepping_type == MICROSTEP_HARDWARE &&
+             cfg->microstepping_mode != MICROSTEP_NONE) {
+    if (cfg->microstep_m0_gpio != GPIO_NUM_NC ||
+        cfg->microstep_m1_gpio != GPIO_NUM_NC ||
+        cfg->microstep_m2_gpio != GPIO_NUM_NC) {
+      ESP_LOGE(TAG,
+               "Hardware microstepping is enabled, but a microstep gpio pin is "
+               "not set to NC");
+      return ESP_ERR_INVALID_ARG;
     }
   }
 
@@ -191,51 +202,53 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   }  // active low on DRV8825
 
   // Set up microstepping.
-  switch (cfg->microstepping_mode) {
-    case MICROSTEP_NONE: {
-      // We don't need to do anything.
-      break;
-    }
-    case MICROSTEP_1_1: {
-      gpio_set_level(cfg->microstep_m0_gpio, 0);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_2: {
-      gpio_set_level(cfg->microstep_m0_gpio, 1);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_4: {
-      gpio_set_level(cfg->microstep_m0_gpio, 0);
-      gpio_set_level(cfg->microstep_m1_gpio, 1);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_8: {
-      gpio_set_level(cfg->microstep_m0_gpio, 1);
-      gpio_set_level(cfg->microstep_m1_gpio, 1);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_16: {
-      gpio_set_level(cfg->microstep_m0_gpio, 0);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 1);
-      break;
-    }
-    case MICROSTEP_1_32: {
-      gpio_set_level(cfg->microstep_m0_gpio, 1);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 1);
-      break;
-    }
-    default: {
-      ESP_LOGE(TAG, "You set the microstepping_mode to invalid value (%d)",
-               cfg->microstepping_mode);
-      return ESP_ERR_INVALID_ARG;
+  if (cfg->microstepping_type == MICROSTEP_SOFTWARE) {
+    switch (cfg->microstepping_mode) {
+      case MICROSTEP_NONE: {
+        // We don't need to do anything.
+        break;
+      }
+      case MICROSTEP_1_1: {
+        gpio_set_level(cfg->microstep_m0_gpio, 0);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_2: {
+        gpio_set_level(cfg->microstep_m0_gpio, 1);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_4: {
+        gpio_set_level(cfg->microstep_m0_gpio, 0);
+        gpio_set_level(cfg->microstep_m1_gpio, 1);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_8: {
+        gpio_set_level(cfg->microstep_m0_gpio, 1);
+        gpio_set_level(cfg->microstep_m1_gpio, 1);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_16: {
+        gpio_set_level(cfg->microstep_m0_gpio, 0);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 1);
+        break;
+      }
+      case MICROSTEP_1_32: {
+        gpio_set_level(cfg->microstep_m0_gpio, 1);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 1);
+        break;
+      }
+      default: {
+        ESP_LOGE(TAG, "You set the microstepping_mode to invalid value (%d)",
+                 cfg->microstepping_mode);
+        return ESP_ERR_INVALID_ARG;
+      }
     }
   }
 
