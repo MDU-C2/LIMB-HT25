@@ -208,7 +208,7 @@ class BleakBLEInterface(BLEInterface):
                 for sample in sensor_samples:
                     ble_sample = BLESample(
                         message_type="EMG",
-                        data={"channels": sample.tolist(), "sensor_id": sensor_id},
+                        data={"channels": sample, "sensor_id": sensor_id},
                         timestamp=timestamp
                     )
                     try: 
@@ -240,7 +240,7 @@ class BleakBLEInterface(BLEInterface):
 
                     ble_sample = BLESample(
                         message_type="IMU",
-                        data={"data": sample.tolist(), "sensor_id": sensor_id},
+                        data={"data": sample, "sensor_id": sensor_id},
                         timestamp=timestamp
                     )
                     try:
@@ -269,7 +269,7 @@ class BleakBLEInterface(BLEInterface):
                 for sample in sensor_samples:
                     ble_sample = BLESample(
                         message_type="PIEZO",
-                        data={"value": float(sample[0]), "sensor_id": sensor_id}, # TODO: Check if float() is correct
+                        data={"value": sample[0], "sensor_id": sensor_id},
                         timestamp=timestamp
                     )
                     try:
