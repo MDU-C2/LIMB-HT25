@@ -26,10 +26,6 @@ static const char *TAG = "stepper";
 // NOTE: Without microstepping, our step size is 1.8 degrees, so the deadband
 // should probably be at least as large.
 #define DEADBAND_DEG 3.6f  // Deadband in degrees (stop if error < this)
-// The LEDC library doesn't like setting a frequency lower than 5
-// (calling ledc_find_suitable_duty_resolution with lower frequencies returned
-// 0).
-#define MIN_FREQ_HZ 5  // Minimum LEDC frequency
 
 // Control context
 typedef struct {
@@ -37,6 +33,7 @@ typedef struct {
   portMUX_TYPE spinlock;
 
   // LEDC config
+  uint32_t min_frequency;
   uint32_t duty_50_percent;
 
   // Motion state
@@ -95,7 +92,7 @@ static void apply_motor_velocity(stepper_control_handle_t handle,
   float velocity_sps = roundf(velocity.dps * ctx->steps_per_degree);
 
   // Clamp frequency
-  uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), MIN_FREQ_HZ);
+  uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), ctx->min_frequency);
 
   // Update frequency and duty
   ledc_set_freq(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_timer, freq_hz);
@@ -126,7 +123,6 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio *
                          microstepping_factor / 360.0f;
 
-  const float min_allowed_velocity = (float)MIN_FREQ_HZ / ctx.steps_per_degree;
   uint32_t clk_freq = 0;
   ESP_RETURN_ON_ERROR(
       esp_clk_tree_src_get_freq_hz(SOC_MOD_CLK_APB, 0, &clk_freq), TAG,
@@ -138,16 +134,6 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   // bitwidths.
   const ledc_timer_bit_t duty_res =
       ledc_find_suitable_duty_resolution(clk_freq, max_freq);
-  if (cfg->max_velocity_negative.dps < min_allowed_velocity) {
-    ESP_LOGE(TAG, "max_velocity_negative must be at least %f dps",
-             min_allowed_velocity);
-    return ESP_ERR_INVALID_ARG;
-  }
-  if (cfg->max_velocity_positive.dps < min_allowed_velocity) {
-    ESP_LOGE(TAG, "max_velocity_positive must be at least %f dps",
-             min_allowed_velocity);
-    return ESP_ERR_INVALID_ARG;
-  }
 
   // Configure GPIOS for STEP, DIR and ENABLE
   uint64_t pin_mask = (1ULL << cfg->step_gpio);
@@ -262,20 +248,45 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   }
 
   // Configure LEDC timer
-  // Start off at lowest possible speed.
-  const uint32_t init_freq_hz = MIN_FREQ_HZ;
+  // Start off at lowest possible frequency (5 Hz for duty resolution 14 using
+  // APB_CLK on ESP32-C3-Zero).
+  const uint32_t initial_freq_hz = 5;
 
   ledc_timer_config_t timer_cfg = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
-      // For some reason, the LEDC library doesn't like setting a duty
-      // resolution below 14 bits if the frequency is at its minimum of 5 Hz.
       .duty_resolution = duty_res,
       .timer_num = cfg->pwm_timer,
-      .freq_hz = init_freq_hz,
+      .freq_hz = initial_freq_hz,
       .clk_cfg = LEDC_USE_APB_CLK,
   };
-  ESP_RETURN_ON_ERROR(ledc_timer_config(&timer_cfg), TAG,
-                      "Failed to configure LEDC timer");
+
+  // Different duty resolutions have different minimum frequencies that they
+  // support. We increase the frequency until the library allows it.
+  esp_err_t err = ledc_timer_config(&timer_cfg);
+  while (err != ESP_OK) {
+    // ESP_FAIL represents an invalid duty resolution and frequency combo.
+    // Any other error means something is wrong.
+    if (err != ESP_FAIL) {
+      ESP_LOGE(TAG, "Error configuring ledc timer: %s", esp_err_to_name(err));
+      return err;
+    }
+    ++timer_cfg.freq_hz;
+    err = ledc_timer_config(&timer_cfg);
+  }
+  ctx.min_frequency = timer_cfg.freq_hz;
+
+  const float min_allowed_velocity =
+      (float)ctx.min_frequency / ctx.steps_per_degree;
+  if (cfg->max_velocity_negative.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_velocity_negative must be at least %f dps",
+             min_allowed_velocity);
+    return ESP_ERR_INVALID_ARG;
+  }
+  if (cfg->max_velocity_positive.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_velocity_positive must be at least %f dps",
+             min_allowed_velocity);
+    return ESP_ERR_INVALID_ARG;
+  }
 
   // Configure LEDC channel for STEP output
   ctx.duty_50_percent = (1 << (timer_cfg.duty_resolution -
