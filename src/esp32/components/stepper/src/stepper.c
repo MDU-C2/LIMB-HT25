@@ -5,6 +5,7 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "esp_check.h"
+#include "esp_clk_tree.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -91,12 +92,7 @@ static void apply_motor_velocity(stepper_control_handle_t handle,
     gpio_set_level(ctx->cfg.dir_gpio, direction);
   }
 
-  // If we don't have microstepping enabled, we want the value to b, 1 so we do
-  // full steps.
-  int microstepping_factor = MAX(ctx->cfg.microstepping_mode, 1);
-
-  float velocity_sps =
-      roundf(velocity.dps * ctx->steps_per_degree * microstepping_factor);
+  float velocity_sps = roundf(velocity.dps * ctx->steps_per_degree);
 
   // Clamp frequency
   uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), MIN_FREQ_HZ);
@@ -126,9 +122,22 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
 
   // We define the degrees per second and need to convert that into steps per
   // second
-  ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio / 360.0f;
+  const float microstepping_factor = MAX((int)ctx.cfg.microstepping_mode, 1);
+  ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio *
+                         microstepping_factor / 360.0f;
 
   const float min_allowed_velocity = (float)MIN_FREQ_HZ / ctx.steps_per_degree;
+  uint32_t clk_freq = 0;
+  ESP_RETURN_ON_ERROR(
+      esp_clk_tree_src_get_freq_hz(SOC_MOD_CLK_APB, 0, &clk_freq), TAG,
+      "Couldn't get clock frequency");
+  const float max_vel =
+      MAX(ctx.cfg.max_velocity_negative.dps, ctx.cfg.max_velocity_positive.dps);
+  const uint32_t max_freq = (uint32_t)roundf(max_vel * ctx.steps_per_degree);
+  // The values of the ledc_timer_bit_t enumerations correspond to their
+  // bitwidths.
+  const ledc_timer_bit_t duty_res =
+      ledc_find_suitable_duty_resolution(clk_freq, max_freq);
   if (cfg->max_velocity_negative.dps < min_allowed_velocity) {
     ESP_LOGE(TAG, "max_velocity_negative must be at least %f dps",
              min_allowed_velocity);
@@ -260,7 +269,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
       .speed_mode = LEDC_LOW_SPEED_MODE,
       // For some reason, the LEDC library doesn't like setting a duty
       // resolution below 14 bits if the frequency is at its minimum of 5 Hz.
-      .duty_resolution = LEDC_TIMER_14_BIT,
+      .duty_resolution = duty_res,
       .timer_num = cfg->pwm_timer,
       .freq_hz = init_freq_hz,
       .clk_cfg = LEDC_USE_APB_CLK,
