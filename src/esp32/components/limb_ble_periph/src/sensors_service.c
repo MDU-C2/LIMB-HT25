@@ -29,9 +29,9 @@ bool TryNotifyEmgSubscribers(void) {
     int err = ble_gatts_notify(gEmgSubscriptionHandle, gEmgValHandle);
     if (err) {
       ESP_LOGW(kLimbTag, "Failed to send EMG notification, err(%d).", err);
-      return false; 
-    } 
-    return true; 
+      return false;
+    }
+    return true;
   }
   return false;
 }
@@ -58,7 +58,6 @@ bool TryNotifyImuSubscribers(void) {
   if (gImuPeerNotifyEnabled) {
     int err = ble_gatts_notify(gImuSubscriptionHandle, gImuValHandle);
     if (err) {
-
       ESP_LOGW(kLimbTag, "Failed to send IMU notification, err(%d).", err);
       return false;
     }

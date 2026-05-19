@@ -1,28 +1,31 @@
 #include "adc_service.h"
-#include "adc_manager.h" 
-#include "esp_log.h"
-#include "freertos/task.h"
+
+#include <string.h>
+
+#include "adc_manager.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
-#include <string.h>
+#include "esp_log.h"
+#include "freertos/task.h"
 #include "hal/adc_types.h"
 #include "limb_utils.h"
 #include "sensors_service.h"
 
-static const char *TAG = "ADC_SERVICE_STREAM";
+static const char* TAG = "ADC_SERVICE_STREAM";
 
 // --- Synchronization & State ---
 static EventGroupHandle_t s_adc_event_group;
-static portMUX_TYPE s_adc_mux = portMUX_INITIALIZER_UNLOCKED; 
+static portMUX_TYPE s_adc_mux = portMUX_INITIALIZER_UNLOCKED;
 
 // --- Channels & Calibration ---
 typedef enum {
-    kEmgChannel = ADC_CHANNEL_2,
-    kPiezoChannel = ADC_CHANNEL_3,
+  kEmgChannel = ADC_CHANNEL_2,
+  kPiezoChannel = ADC_CHANNEL_3,
 } AdcChannel;
 
 // This is a map from adc_channel_t to adc_cali_handle_t.
-// So s_adc_cali_handle[ADC_CHANNEL_2] will contain channel 2's calibration handle.
+// So s_adc_cali_handle[ADC_CHANNEL_2] will contain channel 2's calibration
+// handle.
 static adc_cali_handle_t s_adc_cali_handle[SOC_ADC_MAX_CHANNEL_NUM] = {NULL};
 
 // --- Streaming Data (Micro-packets) ---
@@ -33,178 +36,189 @@ static uint32_t s_piezo_seq = 0;
 
 // --- ADC config ---
 const AdcMgrChannelConfig kAdcChannelConfigs[] = {
-  {
-    .channel = kEmgChannel,
-    .sample_rate = kEmgFrequency,
-  },
-  {
-    .channel = kPiezoChannel,
-    .sample_rate = kPiezoFrequency,
-  }
-};
+    {
+        .channel = kEmgChannel,
+        .sample_rate = kEmgFrequency,
+    },
+    {
+        .channel = kPiezoChannel,
+        .sample_rate = kPiezoFrequency,
+    }};
 
 const AdcMgrConfig kAdcMgrConfig = {
-    .channel_configs = kAdcChannelConfigs, 
+    .channel_configs = kAdcChannelConfigs,
     .channel_configs_len = LIMB_ARR_LEN(kAdcChannelConfigs),
-    .ms_worth_of_buffer_size = 200
-};
+    .ms_worth_of_buffer_size = 200};
 
 // --- DMA Temporary Buffers (Reduced size to optimize RAM) ---
-#define ADC_READ_TEMP_CAPACITY 512 
+#define ADC_READ_TEMP_CAPACITY 512
 static uint16_t s_temp_data_emg[ADC_READ_TEMP_CAPACITY];
 static uint16_t s_temp_data_piezo[ADC_READ_TEMP_CAPACITY];
 
 // --- Flow Control ---
 typedef struct {
-    uint16_t *data;
-    uint16_t capacity;
-    uint16_t length;
+  uint16_t* data;
+  uint16_t capacity;
+  uint16_t length;
 } SampleBuffer;
 
 // Map from adc_channel_t to the corresponding channel's sample buffer.
 static SampleBuffer s_channel_sample_buffers[SOC_ADC_MAX_CHANNEL_NUM] = {
-    [kEmgChannel] = {
-        .data = s_emg_packet.data,
-        .capacity = LIMB_ARR_LEN(s_emg_packet.data),
-    },
-    [kPiezoChannel] = {
-        .data = s_piezo_packet.data,
-        .capacity = LIMB_ARR_LEN(s_piezo_packet.data),
-    },
+    [kEmgChannel] =
+        {
+            .data = s_emg_packet.data,
+            .capacity = LIMB_ARR_LEN(s_emg_packet.data),
+        },
+    [kPiezoChannel] =
+        {
+            .data = s_piezo_packet.data,
+            .capacity = LIMB_ARR_LEN(s_piezo_packet.data),
+        },
 };
 
 static void process_emg_sample(adc_channel_t channel, uint16_t millivolt) {
-    SampleBuffer *sample_buffer = &s_channel_sample_buffers[channel];
-    sample_buffer->data[sample_buffer->length++] = millivolt;
+  SampleBuffer* sample_buffer = &s_channel_sample_buffers[channel];
+  sample_buffer->data[sample_buffer->length++] = millivolt;
 
-    if (sample_buffer->length >= sample_buffer->capacity) {
-        sample_buffer->length = 0;
+  if (sample_buffer->length >= sample_buffer->capacity) {
+    sample_buffer->length = 0;
 
-        s_emg_packet.seq = s_emg_seq++;
-        xEventGroupSetBits(s_adc_event_group, ADC_EMG_STREAM_BIT);
-    }
+    s_emg_packet.seq = s_emg_seq++;
+    xEventGroupSetBits(s_adc_event_group, ADC_EMG_STREAM_BIT);
+  }
 }
 
 static void process_piezo_sample(adc_channel_t channel, uint16_t millivolt) {
-    SampleBuffer *sample_buffer = &s_channel_sample_buffers[channel];
-    sample_buffer->data[sample_buffer->length++] = millivolt;
+  SampleBuffer* sample_buffer = &s_channel_sample_buffers[channel];
+  sample_buffer->data[sample_buffer->length++] = millivolt;
 
-    if (sample_buffer->length >= sample_buffer->capacity) {
-        sample_buffer->length = 0;
+  if (sample_buffer->length >= sample_buffer->capacity) {
+    sample_buffer->length = 0;
 
-        s_piezo_packet.seq = s_piezo_seq++;
-        xEventGroupSetBits(s_adc_event_group, ADC_PIEZO_STREAM_BIT);
-    }
+    s_piezo_packet.seq = s_piezo_seq++;
+    xEventGroupSetBits(s_adc_event_group, ADC_PIEZO_STREAM_BIT);
+  }
 }
 
 /**
- * @brief Processes a single raw sample, applies calibration, and fills micro-packets.
- * * For EMG: Handles dual-channel interleaving. Sets event bit only when BOTH channels reach 40 samples.
+ * @brief Processes a single raw sample, applies calibration, and fills
+ * micro-packets.
+ * * For EMG: Handles dual-channel interleaving. Sets event bit only when BOTH
+ * channels reach 40 samples.
  */
 static void process_new_sample(AdcChannel channel, uint16_t value) {
-    // Apply ADC Calibration (Raw to Voltage mV)
-    adc_cali_handle_t cali_handle = s_adc_cali_handle[channel];
-    int voltage_mv = 0;
-    if (cali_handle != NULL) {
-        adc_cali_raw_to_voltage(cali_handle, value, &voltage_mv);
-    } else {
-        voltage_mv = value;
-    }
-    uint16_t val = (uint16_t)voltage_mv;
+  // Apply ADC Calibration (Raw to Voltage mV)
+  adc_cali_handle_t cali_handle = s_adc_cali_handle[channel];
+  int voltage_mv = 0;
+  if (cali_handle != NULL) {
+    adc_cali_raw_to_voltage(cali_handle, value, &voltage_mv);
+  } else {
+    voltage_mv = value;
+  }
+  uint16_t val = (uint16_t)voltage_mv;
 
-    switch (channel) {
-      case kEmgChannel: {
-        process_emg_sample(channel, val);
-        break;
-      }
-      case kPiezoChannel: {
-        process_piezo_sample(channel, val);
-        break;
-      }
+  switch (channel) {
+    case kEmgChannel: {
+      process_emg_sample(channel, val);
+      break;
     }
+    case kPiezoChannel: {
+      process_piezo_sample(channel, val);
+      break;
+    }
+  }
 }
 
 /**
  * @brief High-priority task that fetches DMA data from ADC Manager every 10ms.
  */
-static void adc_task(void *pvParameters) {
-    // Map temporary buffers to active channels
-    AdcMgrReadResults res = {
-      .channel_buffers = {
-        [kEmgChannel] = {
-          .data = s_temp_data_emg,
-          .capacity = ADC_READ_TEMP_CAPACITY,
-        },
-        [kPiezoChannel] = {
-          .data = s_temp_data_piezo,
-          .capacity = ADC_READ_TEMP_CAPACITY,
-        },
-      },
-    }; 
+static void adc_task(void* pvParameters) {
+  // Map temporary buffers to active channels
+  AdcMgrReadResults res = {
+      .channel_buffers =
+          {
+              [kEmgChannel] =
+                  {
+                      .data = s_temp_data_emg,
+                      .capacity = ADC_READ_TEMP_CAPACITY,
+                  },
+              [kPiezoChannel] =
+                  {
+                      .data = s_temp_data_piezo,
+                      .capacity = ADC_READ_TEMP_CAPACITY,
+                  },
+          },
+  };
 
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz && kEmgPacketSendRateHz == kPiezoPacketSendRateHz, "We assume all sensors send at the same rate");
-    const TickType_t xFrequency = pdMS_TO_TICKS(1000 / kEmgPacketSendRateHz);
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  static_assert(kEmgPacketSendRateHz == kImuPacketSendRateHz &&
+                    kEmgPacketSendRateHz == kPiezoPacketSendRateHz,
+                "We assume all sensors send at the same rate");
+  const TickType_t xFrequency = pdMS_TO_TICKS(1000 / kEmgPacketSendRateHz);
 
-    while (1) {
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  while (1) {
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-        // Fetch results from DMA through ADC Manager
-        if (adc_mgr_read(&res, 0) != ESP_OK) {
-          ESP_LOGE(TAG, "Error reading from ADC");
-          continue;
-        }
-
-        for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
-            const adc_channel_t channel = kAdcChannelConfigs[i].channel;
-            AdcMgrChannelBuffer *buf = &res.channel_buffers[channel];
-
-            for (uint32_t j = 0; j < buf->length; j++) {
-                process_new_sample(channel, buf->data[j]);
-            }
-            buf->length = 0; // Clear length after processing
-        }
+    // Fetch results from DMA through ADC Manager
+    if (adc_mgr_read(&res, 0) != ESP_OK) {
+      ESP_LOGE(TAG, "Error reading from ADC");
+      continue;
     }
+
+    for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
+      const adc_channel_t channel = kAdcChannelConfigs[i].channel;
+      AdcMgrChannelBuffer* buf = &res.channel_buffers[channel];
+
+      for (uint32_t j = 0; j < buf->length; j++) {
+        process_new_sample(channel, buf->data[j]);
+      }
+      buf->length = 0;  // Clear length after processing
+    }
+  }
 }
 
 esp_err_t adc_service_init(EventGroupHandle_t event_group) {
-    s_adc_event_group = event_group;
+  s_adc_event_group = event_group;
 
-    // Init the ADC Manager DMA engine
-    esp_err_t err = adc_mgr_init(kAdcMgrConfig);
-    if (err != ESP_OK) return err;
+  // Init the ADC Manager DMA engine
+  esp_err_t err = adc_mgr_init(kAdcMgrConfig);
+  if (err != ESP_OK) return err;
 
-    // Create calibration handles and reset indices
-    for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
-        const adc_channel_t channel = kAdcChannelConfigs[i].channel;
+  // Create calibration handles and reset indices
+  for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
+    const adc_channel_t channel = kAdcChannelConfigs[i].channel;
 
-        // TODO(johan): The calibration scheme functionality should
-        // probably be moved to the ADC manager component so the
-        // settings are guaranteed to be consistent.
-        adc_cali_curve_fitting_config_t cali_cfg = {
-            .unit_id = ADC_UNIT_1,
-            .chan = channel,
-            .atten = ADC_ATTEN_DB_12,
-            .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
-        };
-        adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_adc_cali_handle[channel]);
-        s_channel_sample_buffers[i].length = 0;
-    }
+    // TODO(johan): The calibration scheme functionality should
+    // probably be moved to the ADC manager component so the
+    // settings are guaranteed to be consistent.
+    adc_cali_curve_fitting_config_t cali_cfg = {
+        .unit_id = ADC_UNIT_1,
+        .chan = channel,
+        .atten = ADC_ATTEN_DB_12,
+        .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
+    };
+    adc_cali_create_scheme_curve_fitting(&cali_cfg,
+                                         &s_adc_cali_handle[channel]);
+    s_channel_sample_buffers[i].length = 0;
+  }
 
-    // Launch processing task on Core 0
-    return xTaskCreatePinnedToCore(adc_task, "adc_task", 4096, NULL, 10, NULL, 0) == pdPASS ? ESP_OK : ESP_FAIL;
+  // Launch processing task on Core 0
+  return xTaskCreatePinnedToCore(adc_task, "adc_task", 4096, NULL, 10, NULL,
+                                 0) == pdPASS
+             ? ESP_OK
+             : ESP_FAIL;
 }
 
-size_t adc_service_get_emg_micropacket(void *dest) {
-    taskENTER_CRITICAL(&s_adc_mux);
-    memcpy(dest, &s_emg_packet, sizeof(emg_micro_packet_t));
-    taskEXIT_CRITICAL(&s_adc_mux);
-    return sizeof(emg_micro_packet_t);
+size_t adc_service_get_emg_micropacket(void* dest) {
+  taskENTER_CRITICAL(&s_adc_mux);
+  memcpy(dest, &s_emg_packet, sizeof(emg_micro_packet_t));
+  taskEXIT_CRITICAL(&s_adc_mux);
+  return sizeof(emg_micro_packet_t);
 }
 
-size_t adc_service_get_piezo_micropacket(void *dest) {
-    taskENTER_CRITICAL(&s_adc_mux);
-    memcpy(dest, &s_piezo_packet, sizeof(piezo_micro_packet_t));
-    taskEXIT_CRITICAL(&s_adc_mux);
-    return sizeof(piezo_micro_packet_t);
+size_t adc_service_get_piezo_micropacket(void* dest) {
+  taskENTER_CRITICAL(&s_adc_mux);
+  memcpy(dest, &s_piezo_packet, sizeof(piezo_micro_packet_t));
+  taskEXIT_CRITICAL(&s_adc_mux);
+  return sizeof(piezo_micro_packet_t);
 }

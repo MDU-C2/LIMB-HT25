@@ -12,14 +12,14 @@ typedef struct {
 
 // ADC configurations for multiple channels.
 typedef struct {
-  const AdcMgrChannelConfig *channel_configs;
+  const AdcMgrChannelConfig* channel_configs;
   uint8_t channel_configs_len;
   uint16_t ms_worth_of_buffer_size;
 } AdcMgrConfig;
 
 // A simple buffer struct for 16-bit values.
 typedef struct {
-  uint16_t *data;
+  uint16_t* data;
   uint16_t capacity;
   uint16_t length;
 } AdcMgrChannelBuffer;
@@ -40,4 +40,4 @@ esp_err_t adc_mgr_deinit(void);
 // Read raw values from registered channels.
 // The caller should provide an AdcMgrChannelBuffer for all channels registered
 // in adc_mgr_init.
-esp_err_t adc_mgr_read(AdcMgrReadResults *inout_results, uint32_t timeout_ms);
+esp_err_t adc_mgr_read(AdcMgrReadResults* inout_results, uint32_t timeout_ms);

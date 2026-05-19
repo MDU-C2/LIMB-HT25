@@ -48,8 +48,8 @@ typedef struct {
 
 static bool TwaiRxCallback(
     twai_node_handle_t handle,
-    [[maybe_unused]] const twai_rx_done_event_data_t *edata, void *user_ctx) {
-  CallbackContext *ctx = user_ctx;
+    [[maybe_unused]] const twai_rx_done_event_data_t* edata, void* user_ctx) {
+  CallbackContext* ctx = user_ctx;
   ++ctx->rx.invocation_count;
 
   uint8_t recv_buff[kMaxCanMsgLen];
@@ -61,7 +61,7 @@ static bool TwaiRxCallback(
   esp_err_t ret = twai_node_receive_from_isr(handle, &rx_frame);
   ctx->rx.error = ret;
   if (ret == ESP_OK) {
-    strncpy(ctx->rx.msg, (char *)rx_frame.buffer, rx_frame.buffer_len);
+    strncpy(ctx->rx.msg, (char*)rx_frame.buffer, rx_frame.buffer_len);
     ctx->rx.msg_len = rx_frame.buffer_len;
   }
 
@@ -69,9 +69,9 @@ static bool TwaiRxCallback(
 }
 
 static bool TwaiErrCallback([[maybe_unused]] twai_node_handle_t handle,
-                            const twai_error_event_data_t *edata,
-                            void *user_ctx) {
-  CallbackContext *ctx = user_ctx;
+                            const twai_error_event_data_t* edata,
+                            void* user_ctx) {
+  CallbackContext* ctx = user_ctx;
   if (ctx->err.invocation_count < kMaxErrFlagsLen) {
     ctx->err.flags[ctx->err.invocation_count] = edata->err_flags;
   }
@@ -82,12 +82,12 @@ static bool TwaiErrCallback([[maybe_unused]] twai_node_handle_t handle,
 
 static bool TwaiTxCallback(
     [[maybe_unused]] twai_node_handle_t handle,
-    [[maybe_unused]] const twai_tx_done_event_data_t *edata, void *user_ctx) {
-  CallbackContext *ctx = user_ctx;
+    [[maybe_unused]] const twai_tx_done_event_data_t* edata, void* user_ctx) {
+  CallbackContext* ctx = user_ctx;
   ++ctx->tx.invocation_count;
   return false;
 }
-void print_callback_errors(CallbackContext *user_ctx) {
+void print_callback_errors(CallbackContext* user_ctx) {
 #define min(x, y) ((x) < (y) ? (x) : (y))
   for (int i = 0; i < min(user_ctx->err.invocation_count, kMaxErrFlagsLen);
        ++i) {
@@ -151,7 +151,7 @@ void app_main(void) {
   };
   CallbackContext user_ctx = {0};
   ESP_ERROR_CHECK(twai_node_register_event_callbacks(node_hdl, &user_cbs,
-                                                     (void *)&user_ctx));
+                                                     (void*)&user_ctx));
 
   // Start the TWAI controller.
   ESP_ERROR_CHECK(twai_node_enable(node_hdl));
@@ -161,7 +161,7 @@ void app_main(void) {
   enum { kSecondsBeforeRestart = 10 };
   for (int i = kSecondsBeforeRestart; i >= 0; i--) {
     uint8_t send_buf[kMaxCanMsgLen] = {0};
-    int chars_written = sprintf((char *)send_buf, "Hello%d", i);
+    int chars_written = sprintf((char*)send_buf, "Hello%d", i);
     if (chars_written < 0 || chars_written >= sizeof(send_buf)) {
       (void)fprintf(
           stderr,

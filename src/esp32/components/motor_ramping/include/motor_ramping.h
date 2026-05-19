@@ -19,4 +19,4 @@ typedef struct {
 
 // Calculates the velocity the motor should use to achieve a trapezoidal ramping
 // effect.
-AngularVelocity motor_ramping_trapezoidal(const MotorRampingArgs *args);
+AngularVelocity motor_ramping_trapezoidal(const MotorRampingArgs* args);

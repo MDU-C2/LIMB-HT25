@@ -13,11 +13,11 @@
 #include "soc/soc_caps.h"
 
 // --- Private function declarations ---
-static bool adc_mgr_channel_buffer_push(AdcMgrChannelBuffer *buf,
+static bool adc_mgr_channel_buffer_push(AdcMgrChannelBuffer* buf,
                                         uint16_t value);
 static bool write_results_to_channel_buffers(
-    const adc_digi_output_data_t *outputs, uint32_t output_count,
-    AdcMgrReadResults *inout_results);
+    const adc_digi_output_data_t* outputs, uint32_t output_count,
+    AdcMgrReadResults* inout_results);
 static esp_err_t adc_mgr_init_handle_preconditions(AdcMgrConfig config);
 static void adc_mgr_reset_global_values(void);
 
@@ -49,7 +49,7 @@ enum {
 static uint8_t s_adc_read_buf[kAdcReadBufLen];
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-static const char *const TAG = "adc_mgr";  //
+static const char* const TAG = "adc_mgr";  //
 
 esp_err_t adc_mgr_init(const AdcMgrConfig adc_mgr_config) {
   esp_err_t err = adc_mgr_init_handle_preconditions(adc_mgr_config);
@@ -218,7 +218,7 @@ esp_err_t adc_mgr_deinit(void) {
   return ESP_OK;
 }
 
-esp_err_t adc_mgr_read(AdcMgrReadResults *inout_results,
+esp_err_t adc_mgr_read(AdcMgrReadResults* inout_results,
                        const uint32_t timeout_ms) {
   if (!s_inited || inout_results == NULL) {
     ESP_LOGW(TAG, "Invalid arg to adc_mgr_read: inited=%d, inoutptr=%p",
@@ -240,12 +240,12 @@ esp_err_t adc_mgr_read(AdcMgrReadResults *inout_results,
         MAX((int32_t)timeout_ms - (int32_t)ms_since_start, 0);
 
     err =
-        adc_continuous_read(s_handle, (uint8_t *)s_adc_read_buf, kAdcReadBufLen,
+        adc_continuous_read(s_handle, (uint8_t*)s_adc_read_buf, kAdcReadBufLen,
                             &read_bytes, remaining_timeout_ms);
     switch (err) {
       case ESP_OK: {
-        const adc_digi_output_data_t *outputs =
-            (adc_digi_output_data_t *)s_adc_read_buf;
+        const adc_digi_output_data_t* outputs =
+            (adc_digi_output_data_t*)s_adc_read_buf;
         const uint32_t output_count = read_bytes / sizeof(*outputs);
 
         wrote_value = write_results_to_channel_buffers(outputs, output_count,
@@ -295,7 +295,7 @@ static void adc_mgr_reset_global_values(void) {
 
 // Pushes a value to the buffer.
 // Returns true if successful and false if the buffer is full.
-static bool adc_mgr_channel_buffer_push(AdcMgrChannelBuffer *buf,
+static bool adc_mgr_channel_buffer_push(AdcMgrChannelBuffer* buf,
                                         const uint16_t value) {
   if (buf->length >= buf->capacity) {
     return false;
@@ -307,8 +307,8 @@ static bool adc_mgr_channel_buffer_push(AdcMgrChannelBuffer *buf,
 
 // Pushes the read ADC values to the corresponding channel buffers.
 static bool write_results_to_channel_buffers(
-    const adc_digi_output_data_t *outputs, const uint32_t output_count,
-    AdcMgrReadResults *inout_results) {
+    const adc_digi_output_data_t* outputs, const uint32_t output_count,
+    AdcMgrReadResults* inout_results) {
   bool wrote_value = false;
   for (size_t i = 0; i < output_count; ++i) {
     const adc_channel_t channel = outputs[i].type2.channel;
