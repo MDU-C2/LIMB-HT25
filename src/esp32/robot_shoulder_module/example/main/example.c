@@ -7,11 +7,11 @@
 #include "limb_utils.h"
 #include "portmacro.h"
 
-const char *const TAG = "Example shoulder controller";
+const char* const TAG = "Example shoulder controller";
 
 #define LIMB_ARR_LEN(x) (sizeof(x) / sizeof(*(x)))
 
-static void can_rx([[maybe_unused]] void *arg) {
+static void can_rx([[maybe_unused]] void* arg) {
   uint32_t can_id = 0;
   uint8_t can_data[CAN_MAX_MESSAGE_SIZE] = {0};
   uint8_t can_data_len = 0;
@@ -29,7 +29,7 @@ static void can_rx([[maybe_unused]] void *arg) {
         }
         static int i = 0;
         if (++i == 100) {
-          uint16_t *imu_xyz = (uint16_t *)can_data;
+          uint16_t* imu_xyz = (uint16_t*)can_data;
           ESP_LOGI(TAG, "IMU accel received: %d, %d, %d", imu_xyz[0],
                    imu_xyz[1], imu_xyz[2]);
           i = 0;
@@ -42,7 +42,7 @@ static void can_rx([[maybe_unused]] void *arg) {
         }
         static int i = 0;
         if (++i == 100) {
-          uint16_t *imu_xyz = (uint16_t *)can_data;
+          uint16_t* imu_xyz = (uint16_t*)can_data;
           ESP_LOGI(TAG, "IMU gyro received: %d, %d, %d", imu_xyz[0], imu_xyz[1],
                    imu_xyz[2]);
           i = 0;
@@ -52,7 +52,7 @@ static void can_rx([[maybe_unused]] void *arg) {
       case CAN_ID_ROBOT_SHOULDER_UP_DOWN_POTENTIOMETER: {
         static int i = 0;
         if (++i == 100) {
-          float angle = *(float *)can_data;
+          float angle = *(float*)can_data;
           ESP_LOGI(TAG, "Shoulder up/down angle received: %f", angle);
           i = 0;
         }
@@ -61,7 +61,7 @@ static void can_rx([[maybe_unused]] void *arg) {
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_POTENTIOMETER: {
         static int i = 0;
         if (++i == 100) {
-          float angle = *(float *)can_data;
+          float angle = *(float*)can_data;
           ESP_LOGI(TAG, "Shoulder left/right angle received: %f", angle);
           i = 0;
         }
@@ -77,7 +77,7 @@ static void can_rx([[maybe_unused]] void *arg) {
   vTaskDelete(NULL);
 }
 
-static void can_tx([[maybe_unused]] void *arg) {
+static void can_tx([[maybe_unused]] void* arg) {
   const float angles[] = {
       0, 15, 30, 45, 90, 135, 150, 165, 180,
   };
@@ -87,7 +87,7 @@ static void can_tx([[maybe_unused]] void *arg) {
       {
         float actuation[] = {htolef(angles[i]), htolef(5.F)};
         esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                                 (uint8_t *)actuation, sizeof(actuation), 0);
+                                 (uint8_t*)actuation, sizeof(actuation), 0);
         if (err != ESP_OK) {
           ESP_LOGW(TAG,
                    "Error calling can_send for shoulder up down actuation: %s",
@@ -98,7 +98,7 @@ static void can_tx([[maybe_unused]] void *arg) {
         float actuation[] = {htolef(angles[LIMB_ARR_LEN(angles) - 1 - i]),
                              htolef(5.F)};
         esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                                 (uint8_t *)actuation, sizeof(actuation), 0);
+                                 (uint8_t*)actuation, sizeof(actuation), 0);
         if (err != ESP_OK) {
           ESP_LOGW(
               TAG,
@@ -113,7 +113,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float actuation[] = {htolef(0), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                               (uint8_t *)actuation, sizeof(actuation), 0);
+                               (uint8_t*)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder up/down actuation: %s",
@@ -123,7 +123,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float actuation[] = {htolef(0), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                               (uint8_t *)actuation, sizeof(actuation), 0);
+                               (uint8_t*)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(
             TAG,
@@ -143,7 +143,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float actuation[] = {htolef(180), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_UP_DOWN_ACTUATION,
-                               (uint8_t *)actuation, sizeof(actuation), 0);
+                               (uint8_t*)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder up/down actuation: %s",
@@ -162,7 +162,7 @@ static void can_tx([[maybe_unused]] void *arg) {
     {
       float actuation[] = {htolef(180), htolef(5.F)};
       esp_err_t err = can_send(CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION,
-                               (uint8_t *)actuation, sizeof(actuation), 0);
+                               (uint8_t*)actuation, sizeof(actuation), 0);
       if (err != ESP_OK) {
         ESP_LOGW(TAG,
                  "Error calling can_send for shoulder left/right actuation: %s",

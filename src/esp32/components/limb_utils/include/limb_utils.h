@@ -32,11 +32,11 @@ typedef struct {
 #define LIMB_ARR_LEN(arr) (sizeof(arr) / sizeof(*(arr)))
 
 // Calculates the average value from an array of uint16_ts.
-uint16_t limb_average16(const uint16_t *values, size_t n);
+uint16_t limb_average16(const uint16_t* values, size_t n);
 
 // Calculates the moving average starting with `start_value` and then following
 // the sequence `values`.
-uint16_t moving_average16(uint16_t start_value, const uint16_t *values,
+uint16_t moving_average16(uint16_t start_value, const uint16_t* values,
                           uint16_t values_len);
 
 // Returns a float deserialized from the buffer pointed to by float_buf.

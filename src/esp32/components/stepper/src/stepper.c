@@ -19,7 +19,7 @@
 #include "soc/soc_caps.h"
 #include "sys/param.h"
 
-static const char *TAG = "stepper";
+static const char* TAG = "stepper";
 
 // Control constants
 #define ALPHA 0.1f  // Low-pass filter coefficient (0.0-1.0)
@@ -56,7 +56,7 @@ typedef struct {
 static motion_control_context_t s_contexts[SOC_LEDC_CHANNEL_NUM] = {0};
 
 static void stop_motor(stepper_control_handle_t handle) {
-  motion_control_context_t *ctx = &s_contexts[handle];
+  motion_control_context_t* ctx = &s_contexts[handle];
 
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, 0);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
@@ -72,7 +72,7 @@ static void stop_motor(stepper_control_handle_t handle) {
 
 static void apply_motor_velocity(stepper_control_handle_t handle,
                                  AngularVelocity velocity) {
-  motion_control_context_t *ctx = &s_contexts[handle];
+  motion_control_context_t* ctx = &s_contexts[handle];
 
   // Enable motor
   if (ctx->cfg.enable_gpio != GPIO_NUM_NC) {
@@ -107,9 +107,9 @@ static void apply_motor_velocity(stepper_control_handle_t handle,
 
 // Initialization
 
-esp_err_t stepper_init(const stepper_control_config_t *cfg,
+esp_err_t stepper_init(const stepper_control_config_t* cfg,
                        uint16_t latest_potentiometer_adc_value,
-                       stepper_control_handle_t *out_handle) {
+                       stepper_control_handle_t* out_handle) {
   // Validate config
   if (!cfg) return ESP_ERR_INVALID_ARG;
 
@@ -353,7 +353,7 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
 }
 
 esp_err_t stepper_deinit(stepper_control_handle_t handle) {
-  motion_control_context_t *ctx = &s_contexts[handle];
+  motion_control_context_t* ctx = &s_contexts[handle];
 
   // Stop the motor
   stop_motor(handle);
@@ -367,7 +367,7 @@ esp_err_t stepper_deinit(stepper_control_handle_t handle) {
 
 void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
                     uint16_t latest_potentiometer_adc_value) {
-  motion_control_context_t *ctx = &s_contexts[handle];
+  motion_control_context_t* ctx = &s_contexts[handle];
   PotentiometerAngle angle_deg = potentiometer_adc_to_angle(
       &ctx->cfg.potentiometer, latest_potentiometer_adc_value);
 
@@ -437,7 +437,7 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
 
 void stepper_set_target_angle(stepper_control_handle_t handle,
                               JointAngle target_angle) {
-  motion_control_context_t *ctx = &s_contexts[handle];
+  motion_control_context_t* ctx = &s_contexts[handle];
 
   PotentiometerAngle target_potentiometer_angle =
       to_potentiometer_angle(&ctx->cfg.potentiometer, target_angle);
@@ -451,14 +451,14 @@ void stepper_set_target_angle(stepper_control_handle_t handle,
 
 void stepper_set_target_velocity(stepper_control_handle_t handle,
                                  AngularVelocity target_velocity) {
-  motion_control_context_t *ctx = &s_contexts[handle];
+  motion_control_context_t* ctx = &s_contexts[handle];
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->target_velocity = target_velocity;
   portEXIT_CRITICAL(&ctx->spinlock);
 }
 
 void stepper_set_estop(stepper_control_handle_t handle, bool active) {
-  motion_control_context_t *ctx = &s_contexts[handle];
+  motion_control_context_t* ctx = &s_contexts[handle];
 
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->estop_active = active;
@@ -471,7 +471,7 @@ void stepper_set_estop(stepper_control_handle_t handle, bool active) {
 // ------ Getters ------
 
 PotentiometerAngle stepper_get_current_angle(stepper_control_handle_t handle) {
-  const motion_control_context_t *ctx = &s_contexts[handle];
+  const motion_control_context_t* ctx = &s_contexts[handle];
 
   portENTER_CRITICAL(&ctx->spinlock);
   PotentiometerAngle angle = ctx->current_angle;
@@ -480,7 +480,7 @@ PotentiometerAngle stepper_get_current_angle(stepper_control_handle_t handle) {
 }
 
 PotentiometerAngle stepper_get_target_angle(stepper_control_handle_t handle) {
-  const motion_control_context_t *ctx = &s_contexts[handle];
+  const motion_control_context_t* ctx = &s_contexts[handle];
 
   portENTER_CRITICAL(&ctx->spinlock);
   PotentiometerAngle angle = ctx->target_angle;
@@ -489,7 +489,7 @@ PotentiometerAngle stepper_get_target_angle(stepper_control_handle_t handle) {
 }
 
 AngularVelocity stepper_get_current_velocity(stepper_control_handle_t handle) {
-  const motion_control_context_t *ctx = &s_contexts[handle];
+  const motion_control_context_t* ctx = &s_contexts[handle];
 
   portENTER_CRITICAL(&ctx->spinlock);
   AngularVelocity velocity = ctx->current_velocity;
@@ -498,7 +498,7 @@ AngularVelocity stepper_get_current_velocity(stepper_control_handle_t handle) {
 }
 
 bool stepper_is_moving(stepper_control_handle_t handle) {
-  const motion_control_context_t *ctx = &s_contexts[handle];
+  const motion_control_context_t* ctx = &s_contexts[handle];
 
   portENTER_CRITICAL(&ctx->spinlock);
   bool moving = ctx->is_moving;
@@ -507,7 +507,7 @@ bool stepper_is_moving(stepper_control_handle_t handle) {
 }
 
 bool stepper_has_position_feedback(stepper_control_handle_t handle) {
-  const motion_control_context_t *ctx = &s_contexts[handle];
+  const motion_control_context_t* ctx = &s_contexts[handle];
 
   portENTER_CRITICAL(&ctx->spinlock);
   bool has_feedback = ctx->use_position_feedback;
@@ -515,7 +515,7 @@ bool stepper_has_position_feedback(stepper_control_handle_t handle) {
   return has_feedback;
 }
 
-const stepper_control_config_t *stepper_get_cfg(
+const stepper_control_config_t* stepper_get_cfg(
     stepper_control_handle_t handle) {
   return &s_contexts[handle].cfg;
 }

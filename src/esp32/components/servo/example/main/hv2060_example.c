@@ -89,7 +89,7 @@ AdcMgrReadResults s_adc_read_results = {
         },
 };
 
-AdcMgrChannelBuffer *s_servo_potentiometer_adc_channel_buffer =
+AdcMgrChannelBuffer* s_servo_potentiometer_adc_channel_buffer =
     &s_adc_read_results.channel_buffers[SERVO_POT_ADC_CHANNEL];
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 

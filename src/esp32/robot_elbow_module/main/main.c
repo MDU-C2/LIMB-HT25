@@ -14,7 +14,7 @@
 #include "soc/gpio_num.h"
 #include "stepper.h"
 
-static const char *const TAG = "robot_elbow_module";
+static const char* const TAG = "robot_elbow_module";
 
 enum {
   // CAN configuration
@@ -108,7 +108,7 @@ static AdcMgrReadResults s_adc_mgr_read_results = {
                                    s_adc_elbow_channel_underlying_buffer)},
     }};
 
-static AdcMgrChannelBuffer *s_adc_mgr_elbow_buffer =
+static AdcMgrChannelBuffer* s_adc_mgr_elbow_buffer =
     &s_adc_mgr_read_results.channel_buffers[ADC_ELBOW_CHANNEL];
 
 static uint16_t s_latest_potentiometer_adc_value;
@@ -116,7 +116,7 @@ static uint16_t s_latest_potentiometer_adc_value;
 static stepper_control_handle_t s_elbow_stepper_handle = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-static void can_rx_task([[maybe_unused]] void *pvParameter) {
+static void can_rx_task([[maybe_unused]] void* pvParameter) {
   uint8_t msg_rx[CAN_MAX_MESSAGE_SIZE];
   uint8_t rx_len = CAN_MAX_MESSAGE_SIZE;
   uint32_t rx_id = 0;
@@ -146,8 +146,7 @@ static void can_rx_task([[maybe_unused]] void *pvParameter) {
         AngularVelocity target_velocity = {
             deserialize_float(msg_rx + sizeof(float), kFromLittleEndian)};
         stepper_set_target_angle(s_elbow_stepper_handle, target_angle);
-        stepper_set_target_velocity(s_elbow_stepper_handle,
-                                    target_velocity);
+        stepper_set_target_velocity(s_elbow_stepper_handle, target_velocity);
         ESP_LOGI(TAG,
                  "Received elbow actuation: angle=%f degrees, velocity=%f dps",
                  target_angle.degree, target_velocity.dps);
@@ -165,7 +164,7 @@ static void can_rx_task([[maybe_unused]] void *pvParameter) {
   }
 }
 
-static void imu_task([[maybe_unused]] void *pvParameter) {
+static void imu_task([[maybe_unused]] void* pvParameter) {
   ImuRawData raw_data;
 
   uint32_t can_error_count = 0;
@@ -192,42 +191,42 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
     float can_buf[1] = {0};
 
     can_buf[0] = htolef(data.gyro.pitch);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_PITCH, (uint8_t *)can_buf,
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_PITCH, (uint8_t*)can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.gyro.roll);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_ROLL, (uint8_t *)&can_buf,
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_ROLL, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.gyro.yaw);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_YAW, (uint8_t *)&can_buf,
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_YAW, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.accel.x);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_X, (uint8_t *)&can_buf,
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_X, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.accel.y);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Y, (uint8_t *)&can_buf,
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Y, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.accel.z);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Z, (uint8_t *)&can_buf,
+    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Z, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
@@ -245,7 +244,7 @@ static void imu_task([[maybe_unused]] void *pvParameter) {
   }
 }
 
-static void stepper_task([[maybe_unused]] void *pvParameter) {
+static void stepper_task([[maybe_unused]] void* pvParameter) {
   TickType_t last_wake_time = xTaskGetTickCount();
 
   while (1) {
@@ -265,7 +264,7 @@ static void stepper_task([[maybe_unused]] void *pvParameter) {
     JointAngle current_angle =
         to_joint_angle(&s_elbow_stepper_cfg.potentiometer, current_pot_angle);
     esp_err_t err = can_send(CAN_ID_ROBOT_ELBOW_UP_DOWN_POTENTIOMETER,
-                             (uint8_t *)&current_angle.degree,
+                             (uint8_t*)&current_angle.degree,
                              sizeof(current_angle.degree), 0);
     static int can_errors_count = 0;
     if (err != ESP_OK) {
@@ -306,7 +305,7 @@ static void stepper_task([[maybe_unused]] void *pvParameter) {
 }
 
 // Test task to cycle through different target angles
-static void stepper_test_task([[maybe_unused]] void *pvParameter) {
+static void stepper_test_task([[maybe_unused]] void* pvParameter) {
   // Wait a bit for system to initialize
   vTaskDelay(pdMS_TO_TICKS(2000));
 
@@ -437,15 +436,16 @@ void app_main(void) {
       return;
     }
 
-    err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH,
-                                 NULL, TASK_STEPPER_UPDATE_PRIORITY, NULL);
+    err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL,
+                      TASK_STEPPER_UPDATE_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
       return;
     }
 
     // Lower priority than stepper_task.
-    // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH, NULL,
+    // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH,
+    // NULL,
     //                   TASK_STEPPER_TEST_PRIORITY, NULL);
     // if (err != pdPASS) {
     //   ESP_LOGE(TAG, "Failed to create stepper_test task, err code: %d");

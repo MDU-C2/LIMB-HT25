@@ -12,7 +12,7 @@
 #include "portmacro.h"
 #include "potentiometer.h"
 
-static const char *const TAG = "Servo";
+static const char* const TAG = "Servo";
 
 typedef struct {
   portMUX_TYPE spinlock;
@@ -42,7 +42,7 @@ static ServoContext s_servo_contexts[LEDC_CHANNEL_MAX] = {0};
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 // Convert microseconds to duty cycle
-static uint32_t us_to_duty(const ServoConfig *servo, uint16_t us) {
+static uint32_t us_to_duty(const ServoConfig* servo, uint16_t us) {
   us = LIMB_CLAMP(
       us, servo->motionless_pw - servo->max_capable_angular_velocity_pw_offset,
       servo->motionless_pw + servo->max_capable_angular_velocity_pw_offset);
@@ -50,9 +50,9 @@ static uint32_t us_to_duty(const ServoConfig *servo, uint16_t us) {
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
 }
 
-esp_err_t servo_init(const ServoConfig *servo_config,
+esp_err_t servo_init(const ServoConfig* servo_config,
                      uint16_t latest_potentiometer_adc_value,
-                     ServoHandle *out_handle) {
+                     ServoHandle* out_handle) {
   // Configure LEDC timer (can be shared by all servos).
   const ledc_timer_config_t ledc_timer = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
@@ -106,20 +106,20 @@ esp_err_t servo_init(const ServoConfig *servo_config,
   return ESP_OK;
 }
 
-static ServoContext *servo_get_context(ServoHandle handle) {
+static ServoContext* servo_get_context(ServoHandle handle) {
   return &s_servo_contexts[handle];
 }
 
 void servo_set_target_velocity(ServoHandle handle,
                                AngularVelocity target_velocity) {
-  ServoContext *context = servo_get_context(handle);
+  ServoContext* context = servo_get_context(handle);
   portENTER_CRITICAL(&context->spinlock);
   context->target_angular_velocity = target_velocity;
   portEXIT_CRITICAL(&context->spinlock);
 }
 
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle) {
-  ServoContext *context = servo_get_context(handle);
+  ServoContext* context = servo_get_context(handle);
   PotentiometerAngle target_potentiometer_angle =
       to_potentiometer_angle(&context->cfg.potentiometer, target_angle);
 
@@ -134,7 +134,7 @@ void servo_set_target_angle(ServoHandle handle, JointAngle target_angle) {
 }
 
 void stop_motor(ServoHandle handle) {
-  ServoContext *ctx = servo_get_context(handle);
+  ServoContext* ctx = servo_get_context(handle);
   servo_apply_velocity(handle, (AngularVelocity){0});
 
   portENTER_CRITICAL(&ctx->spinlock);
@@ -144,7 +144,7 @@ void stop_motor(ServoHandle handle) {
 }
 
 void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
-  const ServoContext *ctx = servo_get_context(handle);
+  const ServoContext* ctx = servo_get_context(handle);
 
   if (velocity.dps == 0.F || ctx->estop_active) {
     servo_apply_pulse_width_as_velocity(handle, ctx->cfg.motionless_pw);
@@ -177,7 +177,7 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
     return false;
   }
 
-  ServoContext *ctx = servo_get_context(handle);
+  ServoContext* ctx = servo_get_context(handle);
 
   const PotentiometerAngle current_angle =
       potentiometer_adc_to_angle(&ctx->cfg.potentiometer, potentiometer_value);
@@ -217,7 +217,7 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 
 void servo_apply_pulse_width_as_velocity(ServoHandle handle,
                                          uint16_t pulse_width) {
-  const ServoContext *ctx = servo_get_context(handle);
+  const ServoContext* ctx = servo_get_context(handle);
   const uint32_t duty = us_to_duty(&ctx->cfg, pulse_width);
 
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, duty);
@@ -225,7 +225,7 @@ void servo_apply_pulse_width_as_velocity(ServoHandle handle,
 }
 
 PotentiometerAngle servo_get_current_angle(ServoHandle handle) {
-  const ServoContext *ctx = servo_get_context(handle);
+  const ServoContext* ctx = servo_get_context(handle);
   portENTER_CRITICAL(&ctx->spinlock);
   PotentiometerAngle angle = ctx->current_angle;
   portEXIT_CRITICAL(&ctx->spinlock);
@@ -233,7 +233,7 @@ PotentiometerAngle servo_get_current_angle(ServoHandle handle) {
 }
 
 PotentiometerAngle servo_get_target_angle(ServoHandle handle) {
-  const ServoContext *ctx = servo_get_context(handle);
+  const ServoContext* ctx = servo_get_context(handle);
   portENTER_CRITICAL(&ctx->spinlock);
   PotentiometerAngle angle = ctx->target_angle;
   portEXIT_CRITICAL(&ctx->spinlock);
@@ -241,7 +241,7 @@ PotentiometerAngle servo_get_target_angle(ServoHandle handle) {
 }
 
 AngularVelocity servo_get_current_velocity(ServoHandle handle) {
-  const ServoContext *ctx = servo_get_context(handle);
+  const ServoContext* ctx = servo_get_context(handle);
   portENTER_CRITICAL(&ctx->spinlock);
   AngularVelocity velocity = ctx->current_angular_velocity;
   portEXIT_CRITICAL(&ctx->spinlock);
@@ -249,7 +249,7 @@ AngularVelocity servo_get_current_velocity(ServoHandle handle) {
 }
 
 void servo_set_estop(ServoHandle handle, bool active) {
-  ServoContext *ctx = servo_get_context(handle);
+  ServoContext* ctx = servo_get_context(handle);
 
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->estop_active = active;

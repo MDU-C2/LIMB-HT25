@@ -5,17 +5,17 @@
 #include "hal/adc_types.h"
 
 /* --- Configuration Settings --- */
-#define NUM_FINGERS            5      // Number of FSR sensors used (one per finger)
-#define SAMPLES_PER_WIND   10     // Number of samples per window for statistics
-#define SAMPLE_PERIOD      50     // Sample interval (Total window: 50ms * 10 = 500ms)
+#define NUM_FINGERS 5        // Number of FSR sensors used (one per finger)
+#define SAMPLES_PER_WIND 10  // Number of samples per window for statistics
+#define SAMPLE_PERIOD 50  // Sample interval (Total window: 50ms * 10 = 500ms)
 
 /**
  * @brief Structure to store statistical analysis of pressure data.
  * Used to trigger transitions between Stability (E2) and Reaction (E3) states.
  */
 typedef struct {
-    float mean;    // Mean value (average pressure) of adc values in mV
-    float variance; // Variance (detects slips, noise, or sudden movements)
+  float mean;      // Mean value (average pressure) of adc values in mV
+  float variance;  // Variance (detects slips, noise, or sudden movements)
 } wstats_t;
 
 /**
@@ -39,4 +39,4 @@ wstats_t get_window_stats(void);
  */
 float get_instant_pressure(void);
 
-#endif // ADC_SERVICE_H
+#endif  // ADC_SERVICE_H

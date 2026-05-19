@@ -53,15 +53,15 @@ typedef struct {
   // If the angles should be reversed.
   ServoDirection direction;
   // Human-readable name for debugging
-  const char *name;
+  const char* name;
 } ServoConfig;
 
 typedef ledc_channel_t ServoHandle;
 
 // Initialize servos using provided configurations.
-esp_err_t servo_init(const ServoConfig *servo_config,
+esp_err_t servo_init(const ServoConfig* servo_config,
                      uint16_t latest_potentiometer_adc_value,
-                     ServoHandle *out_handle);
+                     ServoHandle* out_handle);
 
 // This function is meant to be called periodically. It determines how far it
 // should move the servo based on the distance to the target angle and the time
@@ -70,7 +70,8 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                   uint16_t potentiometer_value);
 
 // Set target angular velocity (degrees per second)
-void servo_set_target_velocity(ServoHandle handle, AngularVelocity target_velocity);
+void servo_set_target_velocity(ServoHandle handle,
+                               AngularVelocity target_velocity);
 
 // Sets the target angle that `servo_update` aims for.
 void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);

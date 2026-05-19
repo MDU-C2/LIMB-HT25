@@ -7,7 +7,7 @@
 
 static void start_advertising(void);
 
-static const char *const kGapTag = "LIMB GAP";
+static const char* const kGapTag = "LIMB GAP";
 
 // Constants.
 enum {
@@ -29,7 +29,7 @@ static Address gOwnAddress = {0};
 
 // Writes out the string representation of the provided address to
 // [out_addr_str].
-static void format_addr(char *out_addr_str, uint8_t *addr) {
+static void format_addr(char* out_addr_str, uint8_t* addr) {
   int bytes_written =
       sprintf(out_addr_str, "%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1],
               addr[2], addr[3], addr[4], addr[5]);  // NOLINT(*-magic-numbers)
@@ -37,7 +37,7 @@ static void format_addr(char *out_addr_str, uint8_t *addr) {
 }
 
 // Prints the provided connection description.
-static void print_conn_desc(struct ble_gap_conn_desc *desc) {
+static void print_conn_desc(struct ble_gap_conn_desc* desc) {
   char addr_str[kBleAddressStrMaxLen] = {0};
 
   ESP_LOGI(kGapTag, "connection handle: %d", desc->conn_handle);
@@ -63,8 +63,8 @@ void BleStackResetCallback(int reason) {
   ESP_LOGI(kGapTag, "nimble stack reset, reset reason: %d", reason);
 }
 
-static int GapEventHandler(struct ble_gap_event *event,
-                           [[maybe_unused]] void *arg) {
+static int GapEventHandler(struct ble_gap_event* event,
+                           [[maybe_unused]] void* arg) {
   switch (event->type) {
     case BLE_GAP_EVENT_CONNECT: {
       int conn_err = event->connect.status;
@@ -256,14 +256,14 @@ static int GapEventHandler(struct ble_gap_event *event,
 
 // Sets up advertising parameters and starts the GAP advertising process.
 static void start_advertising(void) {
-  const char *device_name = ble_svc_gap_device_name();
+  const char* device_name = ble_svc_gap_device_name();
   struct ble_hs_adv_fields adv_fields = {
       // LE General discoverable mode (advertise forever)
       // and Bluetooth basic rate/enhanced data rate ("classic" BT) not
       // supported.
       .flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP,
 
-      .name = (uint8_t *)device_name,
+      .name = (uint8_t*)device_name,
       .name_len = strlen(device_name),
       .name_is_complete = 1,
 

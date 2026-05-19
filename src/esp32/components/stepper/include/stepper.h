@@ -78,15 +78,15 @@ typedef struct {
 typedef ledc_channel_t stepper_control_handle_t;
 
 // Initialize stepper motor controller
-esp_err_t stepper_init(const stepper_control_config_t *cfg,
+esp_err_t stepper_init(const stepper_control_config_t* cfg,
                        uint16_t latest_potentiometer_adc_value,
-                       stepper_control_handle_t *out_handle);
+                       stepper_control_handle_t* out_handle);
 
 // Deinitialize stepper motor controller
 esp_err_t stepper_deinit(stepper_control_handle_t handle);
 
 // Get the config for the provided handle.
-const stepper_control_config_t *stepper_get_cfg(
+const stepper_control_config_t* stepper_get_cfg(
     stepper_control_handle_t handle);
 
 // Update stepper control loop (call periodically, e.g., every 10ms)
@@ -119,4 +119,3 @@ bool stepper_is_moving(stepper_control_handle_t handle);
 
 // Check if position feedback is enabled
 bool stepper_has_position_feedback(stepper_control_handle_t handle);
-

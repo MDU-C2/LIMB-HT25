@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 // These are angles from the potentiometer's frame of reference.
 typedef struct {
@@ -46,18 +46,18 @@ typedef struct {
 
 // Converts the provided ADC value to the potentiometer's corresponding angle.
 PotentiometerAngle potentiometer_adc_to_angle(
-    const Potentiometer *potentiometer, uint16_t adc_value);
+    const Potentiometer* potentiometer, uint16_t adc_value);
 
 // Converts an angle from the potentiometer's frame of reference to the joint's
 // frame of reference.
-JointAngle to_joint_angle(const Potentiometer *potentiometer,
+JointAngle to_joint_angle(const Potentiometer* potentiometer,
                           PotentiometerAngle angle);
 
 // Converts an angle from the joint's frame of reference to the potentiometer's
 // frame of reference.
-PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
+PotentiometerAngle to_potentiometer_angle(const Potentiometer* potentiometer,
                                           JointAngle angle);
 
 // Clamps a potentiometer angle to the limits determined by the potentiometer.
-PotentiometerAngle clamp_potentiometer_angle(const Potentiometer *potentiometer,
+PotentiometerAngle clamp_potentiometer_angle(const Potentiometer* potentiometer,
                                              PotentiometerAngle angle);

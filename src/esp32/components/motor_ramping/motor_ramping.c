@@ -6,7 +6,7 @@
 #include "limb_utils.h"
 #include "potentiometer.h"
 
-AngularVelocity motor_ramping_trapezoidal(const MotorRampingArgs *args) {
+AngularVelocity motor_ramping_trapezoidal(const MotorRampingArgs* args) {
   const PotentiometerAngle distance_to_target = {args->target_angle.degree -
                                                  args->current_angle.degree};
   const PotentiometerAngle abs_distance_to_target = {

@@ -6,14 +6,14 @@
 #include "limb_utils.h"
 
 PotentiometerAngle potentiometer_adc_to_angle(
-    const Potentiometer *potentiometer, uint16_t adc_value) {
+    const Potentiometer* potentiometer, uint16_t adc_value) {
   return (PotentiometerAngle){
       LIMB_LERP_FROM_RANGE((float)adc_value, potentiometer->min_adc_value,
                            potentiometer->max_adc_value, 0,
                            potentiometer->degrees_of_motion.degree)};
 }
 
-JointAngle to_joint_angle(const Potentiometer *potentiometer,
+JointAngle to_joint_angle(const Potentiometer* potentiometer,
                           PotentiometerAngle angle) {
   const float degrees_from_min_joint_angle =
       potentiometer->is_reversed
@@ -26,7 +26,7 @@ JointAngle to_joint_angle(const Potentiometer *potentiometer,
        potentiometer->joint_angle_to_potentiometer_angle_ratio)};
 }
 
-PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
+PotentiometerAngle to_potentiometer_angle(const Potentiometer* potentiometer,
                                           JointAngle angle) {
   const float distance_from_min_joint_angle =
       angle.degree -
@@ -43,7 +43,7 @@ PotentiometerAngle to_potentiometer_angle(const Potentiometer *potentiometer,
                 distance_as_pot_angle};
 }
 
-PotentiometerAngle clamp_potentiometer_angle(const Potentiometer *potentiometer,
+PotentiometerAngle clamp_potentiometer_angle(const Potentiometer* potentiometer,
                                              PotentiometerAngle angle) {
   return (PotentiometerAngle){
       LIMB_CLAMP(angle.degree, potentiometer->min_potentiometer_angle.degree,
