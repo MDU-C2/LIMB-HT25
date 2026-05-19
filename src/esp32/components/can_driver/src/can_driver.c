@@ -1,7 +1,11 @@
 #include "can_driver.h"
 
 #include "driver/twai.h"
+#include "esp_check.h"
+#include "esp_err.h"
 #include "esp_log.h"
+#include "hal/twai_types_deprecated.h"
+#include "portmacro.h"
 
 static const char* TAG = "CAN_DRIVER";
 
@@ -11,6 +15,27 @@ uint16_t create_filter_mask(
     CanGenericFilterMask generic_filter_mask) {
   return msg_type_filter_mask | recipient_node_filter_mask |
          generic_filter_mask;
+}
+
+esp_err_t can_automatically_reenable_on_bus_off(void) {
+  const uint32_t error_state_alert =
+      TWAI_ALERT_BUS_OFF | TWAI_ALERT_BUS_RECOVERED;
+  ESP_RETURN_ON_ERROR(
+      twai_reconfigure_alerts(error_state_alert, NULL), TAG,
+      "Couldn't reconfigure alerts, bus won't reenable on Bus Off state");
+  ESP_LOGI(TAG, "CAN driver will now be re-enabled if a Bus Off state occurs");
+  while (true) {
+    uint32_t alerts = 0;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(twai_read_alerts(&alerts, portMAX_DELAY));
+    if (alerts & TWAI_ALERT_BUS_OFF) {
+      ESP_LOGW(TAG, "ALERT: CAN bus in Bus Off state");
+      ESP_ERROR_CHECK_WITHOUT_ABORT(twai_initiate_recovery());
+    } else if (alerts & TWAI_ALERT_BUS_RECOVERED) {
+      ESP_LOGW(TAG, "ALERT: CAN bus recovered from Bus Off state");
+      ESP_ERROR_CHECK_WITHOUT_ABORT(twai_start());
+    }
+  }
+  return ESP_OK;
 }
 
 esp_err_t can_init(int tx_pin, int rx_pin, int baudrate,

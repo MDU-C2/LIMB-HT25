@@ -17,6 +17,13 @@ enum {
   CAN_BAUDRATE = 1000000,
 };
 
+static void reenable_can_task([[maybe_unused]] void* pvParameter) {
+  while (true) {
+    can_automatically_reenable_on_bus_off();
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 static void imu_task([[maybe_unused]] void* pvParameter) {
   uint32_t can_error_count = 0;
   esp_err_t err = ESP_OK;
@@ -47,15 +54,15 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
     float can_buf[1] = {0};
 
     can_buf[0] = htolef(data.gyro.pitch);
-    err = can_send(CAN_ID_ROBOT_LOWER_ARM_IMU_GYRO_PITCH, (const uint8_t*)can_buf,
-                   sizeof(can_buf), 0);
+    err = can_send(CAN_ID_ROBOT_LOWER_ARM_IMU_GYRO_PITCH,
+                   (const uint8_t*)can_buf, sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.gyro.roll);
-    err = can_send(CAN_ID_ROBOT_LOWER_ARM_IMU_GYRO_ROLL, (const uint8_t*)can_buf,
-                   sizeof(can_buf), 0);
+    err = can_send(CAN_ID_ROBOT_LOWER_ARM_IMU_GYRO_ROLL,
+                   (const uint8_t*)can_buf, sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
@@ -247,4 +254,13 @@ void app_main() {
       abort();
     }
   }
+
+#if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
+  BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
+                               1024 * 2 * 2, NULL, 6, NULL);
+  if (err != pdPASS) {
+    ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+    abort();
+  }
+#endif
 }

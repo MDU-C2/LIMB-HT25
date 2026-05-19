@@ -244,6 +244,13 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+static void reenable_can_task([[maybe_unused]] void* pvParameter) {
+  while (true) {
+    can_automatically_reenable_on_bus_off();
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 static void stepper_task([[maybe_unused]] void* pvParameter) {
   TickType_t last_wake_time = xTaskGetTickCount();
 
@@ -428,6 +435,15 @@ void app_main(void) {
       ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
       abort();
     }
+
+#if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
+    err = xTaskCreate(reenable_can_task, "reenable_can_task", TASK_STACK_DEPTH,
+                      NULL, TASK_CAN_RX_PRIORITY + 1, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
+#endif
 
     err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
                       TASK_IMU_PRIORITY, NULL);
