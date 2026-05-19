@@ -361,7 +361,7 @@ void app_main(void) {
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Failed to initialize CAN driver: %s",
                esp_err_to_name(err));
-      return;
+      abort();
     }
     ESP_LOGI(TAG, "CAN initialized (TX=%d, RX=%d, %d baud)", CAN_TX_PIN,
              CAN_RX_PIN, CAN_BAUDRATE);
@@ -376,7 +376,7 @@ void app_main(void) {
     if (err) {
       ESP_LOGE(TAG, "Failed to initialize IMU driver: %s",
                esp_err_to_name(err));
-      return;
+      abort();
     }
     ESP_LOGI(TAG, "IMU initialized (SDA=%d, SCL=%d)", imu_cfg.sda_pin,
              imu_cfg.scl_pin);
@@ -388,7 +388,7 @@ void app_main(void) {
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Failed to initialize ADC manager: %s",
                esp_err_to_name(err));
-      return;
+      abort();
     }
     ESP_LOGI(TAG, "ADC manager initialized");
   }
@@ -407,7 +407,7 @@ void app_main(void) {
                      &s_elbow_stepper_handle);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Failed to initialize elbow stepper");
-      return;
+      abort();
     }
   }
   s_adc_mgr_elbow_buffer->length = 0;
@@ -426,21 +426,21 @@ void app_main(void) {
                                  TASK_CAN_RX_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
-      return;
+      abort();
     }
 
     err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
                       TASK_IMU_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
-      return;
+      abort();
     }
 
     err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL,
                       TASK_STEPPER_UPDATE_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
-      return;
+      abort();
     }
 
     // Lower priority than stepper_task.

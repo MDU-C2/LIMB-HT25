@@ -20,7 +20,7 @@ void app_main(void) {
   EventGroupHandle_t sync_group = xEventGroupCreate();
   if (sync_group == NULL) {
     ESP_LOGE(TAG_MAIN, "Critical Error: Could not create Event Group!");
-    return;
+    abort();
   }
 
   /**
@@ -38,6 +38,7 @@ void app_main(void) {
    */
   if (ble_service_start(sync_group, streaming_mask) != ESP_OK) {
     ESP_LOGE(TAG_MAIN, "Failed to start BLE Service!");
+    abort();
   } else {
     ESP_LOGI(TAG_MAIN,
              "BLE Service Running: Listening for Micro-Streaming events.");
@@ -49,6 +50,7 @@ void app_main(void) {
   // 5. Start IMU Service (I2C Scanning & 100Hz Task)
   if (imu_service_start(sync_group) != ESP_OK) {
     ESP_LOGE(TAG_MAIN, "Failed to start IMU Service!");
+    abort();
   } else {
     ESP_LOGI(TAG_MAIN, "IMU Service Running.");
   }
@@ -57,6 +59,7 @@ void app_main(void) {
   // This starts the high-speed continuous sampling engine
   if (adc_service_init(sync_group) != ESP_OK) {
     ESP_LOGE(TAG_MAIN, "Failed to start ADC Service!");
+    abort();
   } else {
     ESP_LOGI(TAG_MAIN, "ADC Service Running.");
   }

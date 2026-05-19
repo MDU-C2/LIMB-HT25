@@ -115,6 +115,7 @@ void app_main() {
     ESP_ERROR_CHECK_WITHOUT_ABORT(imu_init(&imu_config));
     if (!imu_is_present()) {
       ESP_LOGW(TAG, "IMU isn't present");
+      abort();
     }
   }
 
@@ -132,7 +133,7 @@ void app_main() {
     esp_err_t err = can_init(CAN_TX_PIN, CAN_RX_PIN, CAN_BAUDRATE, NULL);
     if (err) {
       ESP_LOGE(TAG, "Couldn't start can driver: %s", esp_err_to_name(err));
-      return;
+      abort();
     }
   }
 
