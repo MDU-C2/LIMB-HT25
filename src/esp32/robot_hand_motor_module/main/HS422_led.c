@@ -67,8 +67,7 @@ static const servo_config_t servos[NUM_SERVOS] = {
 
 // Convert microseconds to duty cycle
 uint32_t us_to_duty(uint32_t us) {
-  if (us < SERVO_MIN_US) us = SERVO_MIN_US;
-  if (us > SERVO_MAX_US) us = SERVO_MAX_US;
+  us = LIMB_CLAMP(us, SERVO_MIN_US, SERVO_MAX_US);
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
 }
 
