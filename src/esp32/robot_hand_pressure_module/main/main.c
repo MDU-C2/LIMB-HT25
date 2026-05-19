@@ -3,6 +3,7 @@
 
 #include "adc_service.h"
 #include "can_driver.h"
+#include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -47,12 +48,18 @@ void app_main(void) {
 
   if (init_adc_service() != ESP_OK) {
     ESP_LOGE(TAG, "ADC Service Init Failed!");
-    return;
+    abort();
   }
 
   // 2. Initialize CAN Bus
-  can_init(CAN_TX_GPIO, CAN_RX_GPIO, CAN_BAUDRATE, NULL);
-  ESP_LOGI(TAG, "CAN Bus Initialized ");
+  {
+    esp_err_t err = can_init(CAN_TX_GPIO, CAN_RX_GPIO, CAN_BAUDRATE, NULL);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to initialize CAN: %s", esp_err_to_name(err));
+      abort();
+    }
+    ESP_LOGI(TAG, "CAN Bus Initialized ");
+  }
 
   while (1) {
     loop_control();

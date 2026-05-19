@@ -482,7 +482,7 @@ void app_main(void) {
     esp_err_t err = can_init(CAN_TX_GPIO, CAN_RX_GPIO, 1000000, &can_filter);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error calling can_init: %s", esp_err_to_name(err));
-      return;
+      abort();
     }
   }
 
@@ -491,7 +491,7 @@ void app_main(void) {
     esp_err_t err = adc_mgr_init(kAdcMgrConfig);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error calling adc_mgr_init: %s", esp_err_to_name(err));
-      return;
+      abort();
     }
   }
 
@@ -501,7 +501,7 @@ void app_main(void) {
     esp_err_t err = adc_mgr_read(&s_adc_read_results, 0);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error calling adc_mgr_read: %s", esp_err_to_name(err));
-      return;
+      abort();
     }
 
     s_latest_potentiometer_up_down_value =
@@ -523,7 +523,7 @@ void app_main(void) {
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error calling servos_init for up/down servo: %s",
                esp_err_to_name(err));
-      return;
+      abort();
     }
 
     err = servo_init(&kLeftRightServoConfig,
@@ -533,7 +533,7 @@ void app_main(void) {
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error calling servos_init for left/right servo: %s",
                esp_err_to_name(err));
-      return;
+      abort();
     }
 
     err = stepper_init(&kUpperArmRotationStepperConfig,
@@ -544,7 +544,7 @@ void app_main(void) {
       ESP_LOGE(TAG,
                "Error calling stepper_init for upper arm rotation stepper: %s",
                esp_err_to_name(err));
-      return;
+      abort();
     }
   }
 
