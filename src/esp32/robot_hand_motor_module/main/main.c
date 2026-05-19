@@ -22,7 +22,7 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
   esp_err_t err = ESP_OK;
   uint32_t can_error_count_since_last_log = 0;
 
-  const uint16_t period_ms = 1000;
+  const uint16_t period_ms = 100;
   TickType_t current_tick = xTaskGetTickCount();
   while (true) {
     xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(period_ms));
