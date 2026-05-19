@@ -5,6 +5,7 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "esp_check.h"
+#include "esp_clk_tree.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -25,10 +26,6 @@ static const char *TAG = "stepper";
 // NOTE: Without microstepping, our step size is 1.8 degrees, so the deadband
 // should probably be at least as large.
 #define DEADBAND_DEG 3.6f  // Deadband in degrees (stop if error < this)
-// The LEDC library doesn't like setting a frequency lower than 5
-// (calling ledc_find_suitable_duty_resolution with lower frequencies returned
-// 0).
-#define MIN_FREQ_HZ 5  // Minimum LEDC frequency
 
 // Control context
 typedef struct {
@@ -36,6 +33,7 @@ typedef struct {
   portMUX_TYPE spinlock;
 
   // LEDC config
+  uint32_t min_frequency;
   uint32_t duty_50_percent;
 
   // Motion state
@@ -62,6 +60,8 @@ static void stop_motor(stepper_control_handle_t handle) {
 
   ledc_set_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel, 0);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_channel);
+
+  ESP_LOGD(TAG, "Stopping motor");
 
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->is_moving = false;
@@ -91,15 +91,12 @@ static void apply_motor_velocity(stepper_control_handle_t handle,
     gpio_set_level(ctx->cfg.dir_gpio, direction);
   }
 
-  // If we don't have microstepping enabled, we want the value to b, 1 so we do
-  // full steps.
-  int microstepping_factor = MAX(ctx->cfg.microstepping_mode, 1);
-
-  float velocity_sps =
-      roundf(velocity.dps * ctx->steps_per_degree * microstepping_factor);
+  float velocity_sps = roundf(velocity.dps * ctx->steps_per_degree);
 
   // Clamp frequency
-  uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), MIN_FREQ_HZ);
+  uint32_t freq_hz = MAX((uint32_t)fabsf(velocity_sps), ctx->min_frequency);
+
+  ESP_LOGD(TAG, "Setting freq: %u Hz for %f dps", freq_hz, velocity.dps);
 
   // Update frequency and duty
   ledc_set_freq(LEDC_LOW_SPEED_MODE, ctx->cfg.pwm_timer, freq_hz);
@@ -126,19 +123,27 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
 
   // We define the degrees per second and need to convert that into steps per
   // second
-  ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio / 360.0f;
+  const float microstepping_factor = MAX((int)ctx.cfg.microstepping_mode, 1);
+  ctx.steps_per_degree = (float)cfg->steps_per_rev * cfg->gear_ratio *
+                         microstepping_factor / 360.0f;
 
-  const float min_allowed_velocity = (float)MIN_FREQ_HZ / ctx.steps_per_degree;
-  if (cfg->max_velocity_negative.dps < min_allowed_velocity) {
-    ESP_LOGE(TAG, "max_velocity_negative must be at least %f dps",
-             min_allowed_velocity);
-    return ESP_ERR_INVALID_ARG;
-  }
-  if (cfg->max_velocity_positive.dps < min_allowed_velocity) {
-    ESP_LOGE(TAG, "max_velocity_positive must be at least %f dps",
-             min_allowed_velocity);
-    return ESP_ERR_INVALID_ARG;
-  }
+  uint32_t clk_freq = 0;
+  ESP_RETURN_ON_ERROR(
+      esp_clk_tree_src_get_freq_hz(SOC_MOD_CLK_APB, 0, &clk_freq), TAG,
+      "Couldn't get clock frequency");
+  const float max_vel =
+      MAX(ctx.cfg.max_velocity_negative.dps, ctx.cfg.max_velocity_positive.dps);
+  const uint32_t max_freq = (uint32_t)roundf(max_vel * ctx.steps_per_degree);
+
+  ESP_LOGI(TAG, "Using microstepping factor %u", microstepping_factor);
+
+  // The values of the ledc_timer_bit_t enumerations correspond to their
+  // bitwidths.
+  const ledc_timer_bit_t duty_res =
+      ledc_find_suitable_duty_resolution(clk_freq, max_freq);
+
+  ESP_LOGI(TAG, "Selecting duty resolution %d for max frequency %u", duty_res,
+           (uint32_t)max_freq);
 
   // Configure GPIOS for STEP, DIR and ENABLE
   uint64_t pin_mask = (1ULL << cfg->step_gpio);
@@ -148,7 +153,8 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   if (cfg->enable_gpio != GPIO_NUM_NC) {
     pin_mask |= (1ULL << cfg->enable_gpio);
   }
-  if (cfg->microstepping_mode != MICROSTEP_NONE) {
+  if (cfg->microstepping_type == MICROSTEP_SOFTWARE &&
+      cfg->microstepping_mode != MICROSTEP_NONE) {
     if (cfg->microstep_m0_gpio == GPIO_NUM_NC) {
       ESP_LOGE(TAG,
                "Microstepping is enabled, but microstep_m0_gpio isn't enabled");
@@ -169,6 +175,16 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
       return ESP_ERR_INVALID_ARG;
     } else {
       pin_mask |= (1ULL << cfg->microstep_m2_gpio);
+    }
+  } else if (cfg->microstepping_type == MICROSTEP_HARDWARE &&
+             cfg->microstepping_mode != MICROSTEP_NONE) {
+    if (cfg->microstep_m0_gpio != GPIO_NUM_NC ||
+        cfg->microstep_m1_gpio != GPIO_NUM_NC ||
+        cfg->microstep_m2_gpio != GPIO_NUM_NC) {
+      ESP_LOGE(TAG,
+               "Hardware microstepping is enabled, but a microstep gpio pin is "
+               "not set to NC");
+      return ESP_ERR_INVALID_ARG;
     }
   }
 
@@ -191,69 +207,98 @@ esp_err_t stepper_init(const stepper_control_config_t *cfg,
   }  // active low on DRV8825
 
   // Set up microstepping.
-  switch (cfg->microstepping_mode) {
-    case MICROSTEP_NONE: {
-      // We don't need to do anything.
-      break;
-    }
-    case MICROSTEP_1_1: {
-      gpio_set_level(cfg->microstep_m0_gpio, 0);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_2: {
-      gpio_set_level(cfg->microstep_m0_gpio, 1);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_4: {
-      gpio_set_level(cfg->microstep_m0_gpio, 0);
-      gpio_set_level(cfg->microstep_m1_gpio, 1);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_8: {
-      gpio_set_level(cfg->microstep_m0_gpio, 1);
-      gpio_set_level(cfg->microstep_m1_gpio, 1);
-      gpio_set_level(cfg->microstep_m2_gpio, 0);
-      break;
-    }
-    case MICROSTEP_1_16: {
-      gpio_set_level(cfg->microstep_m0_gpio, 0);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 1);
-      break;
-    }
-    case MICROSTEP_1_32: {
-      gpio_set_level(cfg->microstep_m0_gpio, 1);
-      gpio_set_level(cfg->microstep_m1_gpio, 0);
-      gpio_set_level(cfg->microstep_m2_gpio, 1);
-      break;
-    }
-    default: {
-      ESP_LOGE(TAG, "You set the microstepping_mode to invalid value (%d)",
-               cfg->microstepping_mode);
-      return ESP_ERR_INVALID_ARG;
+  if (cfg->microstepping_type == MICROSTEP_SOFTWARE) {
+    switch (cfg->microstepping_mode) {
+      case MICROSTEP_NONE: {
+        // We don't need to do anything.
+        break;
+      }
+      case MICROSTEP_1_1: {
+        gpio_set_level(cfg->microstep_m0_gpio, 0);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_2: {
+        gpio_set_level(cfg->microstep_m0_gpio, 1);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_4: {
+        gpio_set_level(cfg->microstep_m0_gpio, 0);
+        gpio_set_level(cfg->microstep_m1_gpio, 1);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_8: {
+        gpio_set_level(cfg->microstep_m0_gpio, 1);
+        gpio_set_level(cfg->microstep_m1_gpio, 1);
+        gpio_set_level(cfg->microstep_m2_gpio, 0);
+        break;
+      }
+      case MICROSTEP_1_16: {
+        gpio_set_level(cfg->microstep_m0_gpio, 0);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 1);
+        break;
+      }
+      case MICROSTEP_1_32: {
+        gpio_set_level(cfg->microstep_m0_gpio, 1);
+        gpio_set_level(cfg->microstep_m1_gpio, 0);
+        gpio_set_level(cfg->microstep_m2_gpio, 1);
+        break;
+      }
+      default: {
+        ESP_LOGE(TAG, "You set the microstepping_mode to invalid value (%d)",
+                 cfg->microstepping_mode);
+        return ESP_ERR_INVALID_ARG;
+      }
     }
   }
 
   // Configure LEDC timer
-  // Start off at lowest possible speed.
-  const uint32_t init_freq_hz = MIN_FREQ_HZ;
+  // Start off at lowest possible frequency (5 Hz for duty resolution 14 using
+  // APB_CLK on ESP32-C3-Zero).
+  const uint32_t initial_freq_hz = 5;
 
   ledc_timer_config_t timer_cfg = {
       .speed_mode = LEDC_LOW_SPEED_MODE,
-      // For some reason, the LEDC library doesn't like setting a duty
-      // resolution below 14 bits if the frequency is at its minimum of 5 Hz.
-      .duty_resolution = LEDC_TIMER_14_BIT,
+      .duty_resolution = duty_res,
       .timer_num = cfg->pwm_timer,
-      .freq_hz = init_freq_hz,
+      .freq_hz = initial_freq_hz,
       .clk_cfg = LEDC_USE_APB_CLK,
   };
-  ESP_RETURN_ON_ERROR(ledc_timer_config(&timer_cfg), TAG,
-                      "Failed to configure LEDC timer");
+
+  ESP_LOGI(TAG, "Finding min supported frequency...");
+  // Different duty resolutions have different minimum frequencies that they
+  // support. We increase the frequency until the library allows it.
+  esp_err_t err = ledc_timer_config(&timer_cfg);
+  while (err != ESP_OK) {
+    // ESP_FAIL represents an invalid duty resolution and frequency combo.
+    // Any other error means something is wrong.
+    if (err != ESP_FAIL) {
+      ESP_LOGE(TAG, "Error configuring ledc timer: %s", esp_err_to_name(err));
+      return err;
+    }
+    ++timer_cfg.freq_hz;
+    err = ledc_timer_config(&timer_cfg);
+  }
+  ctx.min_frequency = timer_cfg.freq_hz;
+  ESP_LOGI(TAG, "Selecting min frequency %u Hz", ctx.min_frequency);
+
+  const float min_allowed_velocity =
+      (float)ctx.min_frequency / ctx.steps_per_degree;
+  if (cfg->max_velocity_negative.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_velocity_negative must be at least %f dps",
+             min_allowed_velocity);
+    return ESP_ERR_INVALID_ARG;
+  }
+  if (cfg->max_velocity_positive.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_velocity_positive must be at least %f dps",
+             min_allowed_velocity);
+    return ESP_ERR_INVALID_ARG;
+  }
 
   // Configure LEDC channel for STEP output
   ctx.duty_50_percent = (1 << (timer_cfg.duty_resolution -
