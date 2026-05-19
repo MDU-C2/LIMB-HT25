@@ -1,5 +1,7 @@
 #include "HS422_led.h"
 
+#include "limb_utils.h"
+
 static const char* TAG = "HS422_LEDC";
 
 static int dedos[NUM_SERVOS] = {THUMB_SERVO_GPIO, INDEX_SERVO_GPIO,
@@ -130,22 +132,23 @@ esp_err_t servo_led_init(void) {
 }
 
 // Write angle to specific servo channel
-void servo_write_deg_channel(int channel, int deg) {
+void servo_write_deg_channel(int channel, float deg) {
   if (channel < 0 || channel >= NUM_SERVOS) return;
 
   servo_config_t* servo = &servos[channel];
-  // Clamp angle
-  if (deg < servo->min_angle) deg = servo->min_angle;
-  if (deg > servo->max_angle) deg = servo->max_angle;
+
+  deg = LIMB_CLAMP(deg, servo->min_angle, servo->max_angle);
+
+  if (servo->direction == SERVO_DIR_REVERSE) {
+    deg = servo->min_angle + (servo->max_angle - deg);
+  }
 
   // Convert angle to pulse width
-  uint32_t us =
-      servo->min_pulse_us +
-      ((deg - servo->min_angle) * (servo->max_pulse_us - servo->min_pulse_us)) /
-          (servo->max_angle - servo->min_angle);
+  float us = LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
+                                  servo->min_pulse_us, servo->max_pulse_us);
 
   // Set duty cycle
-  uint32_t duty = us_to_duty(us);
+  uint32_t duty = us_to_duty((uint32_t)us);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
 

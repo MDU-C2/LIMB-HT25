@@ -113,24 +113,73 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
     }
 
     if (rx_id == CAN_ID_ROBOT_THUMB_ACTUATION) {
-      if (rx_len != 1) {
-        ESP_LOGW(TAG, "Received grip activation with invalid len: %u", rx_len);
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received thumb activation with invalid len: %u", rx_len);
         continue;
       }
-      int angle = (int)rx_data[0];
 
-      for (int i = 0; i < NUM_SERVOS; i++) {
-        servo_write_deg_channel(i, angle);
-        vTaskDelay(pdMS_TO_TICKS(50));
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_0, angle);
+      ESP_LOGI(TAG, "Actuation thumb to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_INDEX_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received index activation with invalid len: %u", rx_len);
+        continue;
       }
 
-      ESP_LOGI(TAG, "RX-angles %d", angle);
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_1, angle);
+      ESP_LOGI(TAG, "Actuation index to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_MIDDLE_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received middle activation with invalid len: %u",
+                 rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_2, angle);
+      ESP_LOGI(TAG, "Actuation middle to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_RING_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received ring activation with invalid len: %u", rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_3, angle);
+      ESP_LOGI(TAG, "Actuation ring to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_PINKY_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received pinky activation with invalid len: %u", rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_4, angle);
+      ESP_LOGI(TAG, "Actuation pinky to %.2f degrees at %.2f dps", angle,
+               velocity);
     } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION) {
-      if (rx_len != sizeof(float)) {
+      if (rx_len != 2 * sizeof(float)) {
         ESP_LOGW(TAG, "Received rotation activation with invalid len: %u",
                  rx_len);
         continue;
       }
+
       float angle = deserialize_float(rx_data, kFromLittleEndian);
       float velocity =
           deserialize_float(rx_data + sizeof(float), kFromLittleEndian);

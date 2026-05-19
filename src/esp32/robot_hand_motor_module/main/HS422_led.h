@@ -46,11 +46,11 @@ typedef enum { SERVO_DIR_NORMAL = 1, SERVO_DIR_REVERSE = -1 } servo_direction_t;
 typedef struct {
   int gpio_pin;                 // GPIO pin for this servo
   ledc_channel_t ledc_channel;  // LEDC channel (0-7)
-  int min_angle;                // Minimum angle in degrees
-  int max_angle;                // Maximum angle in degrees
+  float min_angle;              // Minimum angle in degrees
+  float max_angle;              // Maximum angle in degrees
   uint32_t min_pulse_us;        // Minimum pulse width in microseconds
   uint32_t max_pulse_us;        // Maximum pulse width in microseconds
-  int current_angle;            // Current servo position
+  float current_angle;          // Current servo position
   float current_force;          // Current force applied, measured by FSR
   servo_direction_t direction;  // Direction of servo movement
   const char* name;             // Human-readable name for debugging
@@ -67,7 +67,7 @@ typedef enum {
 // Function declarations
 uint32_t us_to_duty(uint32_t us);
 esp_err_t servo_led_init(void);
-void servo_write_deg_channel(int channel, int deg);
+void servo_write_deg_channel(int channel, float deg);
 void servo_write_all_deg(int deg);
 void close_all_fingers(void);
 void open_all_fingers(void);
