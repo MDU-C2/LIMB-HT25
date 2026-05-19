@@ -35,9 +35,11 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
 
     ImuData data = imu_to_mg_and_mdps(raw_data);
 
-    ESP_LOGI(TAG, "Read IMU accel [%d, %d, %d], gyro [%d, %d, %d]",
-             data.accel.x, data.accel.y, data.accel.z, data.gyro.pitch,
-             data.gyro.roll, data.gyro.yaw);
+    ESP_LOGI(
+        TAG,
+        "Read IMU accel [%.2f, %.2f, %.2f] mG, gyro [%.2f, %.2f, %.2f] mdps",
+        data.accel.x, data.accel.y, data.accel.z, data.gyro.pitch,
+        data.gyro.roll, data.gyro.yaw);
 
     // We first copy the floats we want to send to a buffer so we can reverse
     // the bytes if necessary to guarantee that we send them in little-endian
