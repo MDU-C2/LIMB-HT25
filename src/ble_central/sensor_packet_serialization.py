@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+from enum import Enum
+
 import numpy as np
 import numpy.typing as npt
 
 
 def decode_packet(view: memoryview[int]) -> tuple[int, memoryview[int]]:
-    """Extract the 32-bit sequence number and sensor data from the packet data."""
+    """Extract the 32-bit sequence number and sensor data from packet data."""
     return (int.from_bytes(view[:4], "little"), view[4:])
+
+
+class ValueDataType(Enum):
+    """The data type of the values in a sample."""
+
+    SIGNED_INTEGER = 0
+    UNSIGNED_INTEGER = 1
+    FLOATING_POINT = 2
 
 
 def deserialize_packet_data(
@@ -17,12 +27,12 @@ def deserialize_packet_data(
     bytes_per_value: int,
     values_per_sample: int,
     sensor_count: int,
-    signed: bool = False,
+    value_data_type: ValueDataType,
 ) -> list[npt.NDArray]:
     """Turn packet data into a list of channel samples.
 
-    The packet data is expected to be a byte array of little endian n-byte integers.
-    After converting the byte array into an n-byte integer array of sensor values,
+    The packet data is expected to be a byte array of little endian n-byte numeric values.
+    After converting the byte array into an n-byte array of sensor values,
     the packet data for 2 sensors with 2 values per samples and N total samples is
     expected to be in the following format:
     [
@@ -47,9 +57,14 @@ def deserialize_packet_data(
             list[i][j] -> Sample j of sensor i.
             list[i][j][k] -> Value k of sample j of sensor i.
     """
-    signed_str = "i" if signed else "u"
-    # Treat byte array as array of n-byte little-endian unsigned values.
-    values = np.frombuffer(packet_data_view, dtype=f"<{signed_str}{bytes_per_value}")
+    if value_data_type is ValueDataType.FLOATING_POINT:
+        dtype_prefix = "f"
+    elif value_data_type is ValueDataType.SIGNED_INTEGER:
+        dtype_prefix = "i"
+    else:
+        dtype_prefix = "u"
+
+    values = np.frombuffer(packet_data_view, dtype=f"<{dtype_prefix}{bytes_per_value}")
 
     # Group values by the amount of values present in a single sample (e.g. the first 6
     # values in IMU data belong to the same sample, the next 6 values belong to another

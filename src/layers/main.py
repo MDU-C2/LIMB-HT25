@@ -273,7 +273,7 @@ class LIMBSystem:
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals"""
         print(f"\n[System] Received signal {signum}, stopping...")
-        self.running = False
+        self.stop()
 
 def load_config(config_path: Optional[str] = None) -> dict:
     """

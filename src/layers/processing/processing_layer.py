@@ -145,7 +145,7 @@ class ProcessingLayer(Process):
                 input_dim = config.get("input_dim")
                 hidden_dim = config.get("hidden_dim")
             else:
-                input_dim = 12 # 6 feature * 2 channels # TODO: Check that this is correct
+                input_dim = 6 # 6 feature * 2 channels # TODO: Check that this is correct
                 hidden_dim = 32 
 
             self.model = get_simple_lstm(input_dim=input_dim, hidden_dim=hidden_dim, num_classes=self.num_classes).to(self.device) # TODO: Check that this works.

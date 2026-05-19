@@ -70,7 +70,7 @@ class PacketBuilder:
             motors=latest_motor_state,
             metadata={
                 "sample_rate": sample_rate,
-                "window_size": window_buffer.window_size,
+                "window_size": window_buffer.window_size_ms,
                 "build_time": time.time()
             }
         )

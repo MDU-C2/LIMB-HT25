@@ -85,14 +85,26 @@ These are the messages that are send over the robot arm's CAN bus.
 | $\texttt{0x4A3}$  | Shoulder left/right servo potentiometer  |
 
 ### IMU messages
-| CAN ID | Message                                     |
-| ------ | ------------------------------------------- |
-| $\texttt{0x5A0}$  | IMU robot upper arm gyro         |
-| $\texttt{0x5A1}$  | IMU robot upper arm acceleration |
-| $\texttt{0x5A2}$  | IMU robot lower arm gyro         |
-| $\texttt{0x5A3}$  | IMU robot lower arm acceleration |
-| $\texttt{0x5A4}$  | IMU robot hand gyro              |
-| $\texttt{0x5A5}$  | IMU robot hand acceleration      |
+| CAN ID            | Message                            |
+| ------            | ---------------------------------- |
+| $\texttt{0x5A0}$  | IMU robot upper arm gyro pitch     |
+| $\texttt{0x5A1}$  | IMU robot upper arm gyro roll      |
+| $\texttt{0x5A2}$  | IMU robot upper arm gyro yaw       |
+| $\texttt{0x5A3}$  | IMU robot upper arm acceleration x |
+| $\texttt{0x5A4}$  | IMU robot upper arm acceleration y |
+| $\texttt{0x5A5}$  | IMU robot upper arm acceleration z |
+| $\texttt{0x5A6}$  | IMU robot lower arm gyro pitch     |
+| $\texttt{0x5A7}$  | IMU robot lower arm gyro roll      |
+| $\texttt{0x5A8}$  | IMU robot lower arm gyro yaw       |
+| $\texttt{0x5A9}$  | IMU robot lower arm acceleration x |
+| $\texttt{0x5AA}$  | IMU robot lower arm acceleration y |
+| $\texttt{0x5AB}$  | IMU robot lower arm acceleration z |
+| $\texttt{0x5AC}$  | IMU robot hand gyro pitch          |
+| $\texttt{0x5AD}$  | IMU robot hand gyro roll           |
+| $\texttt{0x5AE}$  | IMU robot hand gyro yaw            |
+| $\texttt{0x5AF}$  | IMU robot hand acceleration x      |
+| $\texttt{0x5B0}$  | IMU robot hand acceleration y      |
+| $\texttt{0x5B1}$  | IMU robot hand acceleration z      |
 
 ### Pressure messages
 | CAN ID | Message                                  |

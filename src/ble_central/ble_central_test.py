@@ -12,7 +12,11 @@ from bleak import (
     BleakScanner,
 )
 
-from sensor_packet_serialization import decode_packet, deserialize_packet_data
+from sensor_packet_serialization import (
+    ValueDataType,
+    decode_packet,
+    deserialize_packet_data,
+)
 
 if TYPE_CHECKING:
     from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -22,30 +26,30 @@ EMG_CHARACTERISTIC_UUID = "24011525-1212-efde-1523-785feabcd122"
 IMU_CHARACTERISTIC_UUID = "25011525-1212-efde-1523-785feabcd122"
 PIEZO_CHARACTERISTIC_UUID = "26011525-1212-efde-1523-785feabcd122"
 
-EMG_SENSOR_COUNT = 2
+EMG_SENSOR_COUNT = 1
 EMG_BYTES_PER_VALUE = 2
 EMG_VALUES_PER_SAMPLE = 1
 EMG_FREQUENCY = 4000
-EMG_MS_PER_WINDOW = 200
-EMG_MS_PER_OVERLAP = 50
+EMG_MS_PER_WINDOW = 100
+EMG_MS_PER_OVERLAP = 0
 EMG_SAMPLES_PER_WINDOW = int(EMG_FREQUENCY * EMG_MS_PER_WINDOW / 1000)
 EMG_SAMPLES_PER_OVERLAP = int(EMG_FREQUENCY * EMG_MS_PER_OVERLAP / 1000)
 
-IMU_SENSOR_COUNT = 2
-IMU_BYTES_PER_VALUE = 2
+IMU_SENSOR_COUNT = 1
+IMU_BYTES_PER_VALUE = 4
 IMU_VALUES_PER_SAMPLE = 6
 IMU_FREQUENCY = 100
-IMU_MS_PER_WINDOW = 200
-IMU_MS_PER_OVERLAP = 50
+IMU_MS_PER_WINDOW = 100
+IMU_MS_PER_OVERLAP = 0
 IMU_SAMPLES_PER_WINDOW = int(IMU_FREQUENCY * IMU_MS_PER_WINDOW / 1000)
 IMU_SAMPLES_PER_OVERLAP = int(IMU_FREQUENCY * IMU_MS_PER_OVERLAP / 1000)
 
 PIEZO_SENSOR_COUNT = 1
 PIEZO_BYTES_PER_VALUE = 2
 PIEZO_VALUES_PER_SAMPLE = 1
-PIEZO_FREQUENCY = 100
-PIEZO_MS_PER_WINDOW = 200
-PIEZO_MS_PER_OVERLAP = 50
+PIEZO_FREQUENCY = 1000
+PIEZO_MS_PER_WINDOW = 100
+PIEZO_MS_PER_OVERLAP = 0
 PIEZO_SAMPLES_PER_WINDOW = int(PIEZO_FREQUENCY * PIEZO_MS_PER_WINDOW / 1000)
 PIEZO_SAMPLES_PER_OVERLAP = int(PIEZO_FREQUENCY * PIEZO_MS_PER_OVERLAP / 1000)
 
@@ -199,6 +203,7 @@ def set_up_notify_handler(
             bytes_per_value=EMG_BYTES_PER_VALUE,
             values_per_sample=EMG_VALUES_PER_SAMPLE,
             sensor_count=EMG_SENSOR_COUNT,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         global first_emg_sequence_number
         global latest_emg_sequence_number
@@ -228,7 +233,7 @@ def set_up_notify_handler(
             bytes_per_value=IMU_BYTES_PER_VALUE,
             values_per_sample=IMU_VALUES_PER_SAMPLE,
             sensor_count=IMU_SENSOR_COUNT,
-            signed=True,
+            value_data_type=ValueDataType.FLOATING_POINT,
         )
         global first_imu_sequence_number
         global latest_imu_sequence_number
@@ -258,6 +263,7 @@ def set_up_notify_handler(
             bytes_per_value=PIEZO_BYTES_PER_VALUE,
             values_per_sample=PIEZO_VALUES_PER_SAMPLE,
             sensor_count=PIEZO_SENSOR_COUNT,
+            value_data_type=ValueDataType.UNSIGNED_INTEGER,
         )
         global first_piezo_sequence_number
         global latest_piezo_sequence_number
