@@ -2,14 +2,14 @@
 
 #include "limb_utils.h"
 
-static const char* TAG = "HS422_LEDC";
+static const char* const TAG = "HS422_LEDC";
 
-static int dedos[NUM_SERVOS] = {THUMB_SERVO_GPIO, INDEX_SERVO_GPIO,
-                                MID_SERVO_GPIO, RING_SERVO_GPIO,
-                                PINKY_SERVO_GPIO};
+static const int dedos[NUM_SERVOS] = {THUMB_SERVO_GPIO, INDEX_SERVO_GPIO,
+                                      MID_SERVO_GPIO, RING_SERVO_GPIO,
+                                      PINKY_SERVO_GPIO};
 
 // Servo configurations - customize each servo individually
-static servo_config_t servos[NUM_SERVOS] = {
+static const servo_config_t servos[NUM_SERVOS] = {
     // Thumb servo
     {.gpio_pin = THUMB_SERVO_GPIO,
      .ledc_channel = LEDC_CHANNEL_0,
@@ -122,7 +122,7 @@ esp_err_t servo_led_init(void) {
   // }
 
   for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-    servo_write_deg_channel(i, 180);  // Start at center position
+    // servo_write_deg_channel(i, 180);  // Start at center position
     // vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
   }
 
@@ -135,7 +135,7 @@ esp_err_t servo_led_init(void) {
 void servo_write_deg_channel(int channel, float deg) {
   if (channel < 0 || channel >= NUM_SERVOS) return;
 
-  servo_config_t* servo = &servos[channel];
+  const servo_config_t* servo = &servos[channel];
 
   deg = LIMB_CLAMP(deg, servo->min_angle, servo->max_angle);
 
@@ -144,11 +144,12 @@ void servo_write_deg_channel(int channel, float deg) {
   }
 
   // Convert angle to pulse width
-  float us = LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
-                                  servo->min_pulse_us, servo->max_pulse_us);
+  const float us =
+      LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
+                           servo->min_pulse_us, servo->max_pulse_us);
 
   // Set duty cycle
-  uint32_t duty = us_to_duty((uint32_t)us);
+  const uint32_t duty = us_to_duty((uint32_t)us);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
 
