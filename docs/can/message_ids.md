@@ -50,8 +50,8 @@ These are the messages that are send over the robot arm's CAN bus.
 | ------ | ----------------------------------------  |
 | $\texttt{0x120}$ | Shoulder up/down servo stop     |
 | $\texttt{0x121}$ | Shoulder left/right servo stop  |
+| $\texttt{0x122}$ | Upper arm rotation stepper stop |
 | $\texttt{0x140}$ | Elbow up/down stepper stop      |
-| $\texttt{0x141}$ | Upper arm rotation stepper stop |
 | $\texttt{0x160}$ | Lower arm rotation servo stop   |
 | $\texttt{0x161}$ | Finger servos stop              |
 | $\texttt{0x162}$ | Thumb servo stop                |
@@ -65,8 +65,8 @@ These are the messages that are send over the robot arm's CAN bus.
 | ------ | ---------------------------------------------- |
 | $\texttt{0x220}$ | Shoulder up/down servo actuation     |
 | $\texttt{0x221}$ | Shoulder left/right servo actuation  |
+| $\texttt{0x222}$ | Upper arm rotation stepper actuation |
 | $\texttt{0x240}$ | Elbow up/down stepper actuation      |
-| $\texttt{0x241}$ | Upper arm rotation stepper actuation |
 | $\texttt{0x260}$ | Lower arm rotation servo actuation   |
 | $\texttt{0x261}$ | Thumb servo actuation                |
 | $\texttt{0x262}$ | Index servo actuation                |
