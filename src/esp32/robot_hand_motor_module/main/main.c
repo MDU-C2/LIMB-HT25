@@ -22,7 +22,7 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
   esp_err_t err = ESP_OK;
   uint32_t can_error_count_since_last_log = 0;
 
-  const uint16_t period_ms = 1000;
+  const uint16_t period_ms = 100;
   TickType_t current_tick = xTaskGetTickCount();
   while (true) {
     xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(period_ms));
@@ -35,9 +35,11 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
 
     ImuData data = imu_to_mg_and_mdps(raw_data);
 
-    ESP_LOGI(TAG, "Read IMU accel [%d, %d, %d], gyro [%d, %d, %d]",
-             data.accel.x, data.accel.y, data.accel.z, data.gyro.pitch,
-             data.gyro.roll, data.gyro.yaw);
+    ESP_LOGI(
+        TAG,
+        "Read IMU accel [%.2f, %.2f, %.2f] mG, gyro [%.2f, %.2f, %.2f] mdps",
+        data.accel.x, data.accel.y, data.accel.z, data.gyro.pitch,
+        data.gyro.roll, data.gyro.yaw);
 
     // We first copy the floats we want to send to a buffer so we can reverse
     // the bytes if necessary to guarantee that we send them in little-endian
@@ -98,6 +100,96 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+static void can_rx_task([[maybe_unused]] void* pvParameter) {
+  while (true) {
+    uint32_t rx_id = 0;
+    uint8_t rx_data[CAN_MAX_MESSAGE_SIZE] = {0};
+    uint8_t rx_len = 0;
+
+    esp_err_t err = can_receive(&rx_id, rx_data, &rx_len, portMAX_DELAY);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Error receiving CAN message: %s", esp_err_to_name(err));
+      continue;
+    }
+
+    if (rx_id == CAN_ID_ROBOT_THUMB_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received thumb activation with invalid len: %u", rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_0, angle);
+      ESP_LOGI(TAG, "Actuation thumb to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_INDEX_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received index activation with invalid len: %u", rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_1, angle);
+      ESP_LOGI(TAG, "Actuation index to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_MIDDLE_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received middle activation with invalid len: %u",
+                 rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_2, angle);
+      ESP_LOGI(TAG, "Actuation middle to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_RING_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received ring activation with invalid len: %u", rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_3, angle);
+      ESP_LOGI(TAG, "Actuation ring to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_PINKY_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received pinky activation with invalid len: %u", rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(LEDC_CHANNEL_4, angle);
+      ESP_LOGI(TAG, "Actuation pinky to %.2f degrees at %.2f dps", angle,
+               velocity);
+    } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION) {
+      if (rx_len != 2 * sizeof(float)) {
+        ESP_LOGW(TAG, "Received rotation activation with invalid len: %u",
+                 rx_len);
+        continue;
+      }
+
+      float angle = deserialize_float(rx_data, kFromLittleEndian);
+      float velocity =
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
+      servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, angle);
+      ESP_LOGI(TAG, "Actuation wrist to %.2f degrees at %.2f dps", angle,
+               velocity);
+    }
+  }
+}
+
 void app_main() {
   ESP_LOGI(TAG, "Starting servo control application");
   // vTaskDelay(pdMS_TO_TICKS(2000));
@@ -139,7 +231,7 @@ void app_main() {
 
   {
     BaseType_t err =
-        xTaskCreate(imu_task, "imu_task", 1024 * 2 * 2, NULL, 6, NULL);
+        xTaskCreate(imu_task, "imu_task", 1024 * 2 * 2, NULL, 5, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create imu task, err code: %d", err);
       can_deinit();
@@ -147,61 +239,12 @@ void app_main() {
       abort();
     }
   }
-
-  uint8_t msg_rx[8];
-
-  uint32_t rx_id;
-  uint8_t rx_len = 1;
-
-  // uint32_t loop_counter = 0;
-  uint8_t cmd_data;
-  //--------------------------
-
-  // Variables estáticas para almacenar los 5 valores de milivoltios recibidos
-
-  ESP_LOGI(TAG, "Starting servo test loop...");
-
-  while (1) {
-    if (can_receive(&rx_id, msg_rx, &rx_len, 100) == ESP_OK) {
-      // 1. Verificación del ID
-      if (rx_id == CAN_ID_ROBOT_THUMB_ACTUATION && rx_len == 1) {
-        int angle = (int)msg_rx[0];
-
-        for (int i = 0; i < NUM_SERVOS; i++) {
-          servo_write_deg_channel(i, angle);
-          vTaskDelay(pdMS_TO_TICKS(50));
-        }
-
-        ESP_LOGI(TAG, "RX-angles %d", angle);
-
-      } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION &&
-                 rx_len == 2 * sizeof(float)) {
-        float angle = deserialize_float(msg_rx, kFromLittleEndian);
-        float velocity =
-            deserialize_float(msg_rx + sizeof(float), kFromLittleEndian);
-        servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, angle);
-        ESP_LOGI(TAG, "Actuation wrist to %.2f degrees at %.2f dps", angle,
-                 velocity);
-      } else {
-        ESP_LOGI(TAG, "CAN RX: Mensaje con ID 0x%X ", rx_id);
-      }
+  {
+    BaseType_t err =
+        xTaskCreate(can_rx_task, "can_rx_task", 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create imu task, err code: %d", err);
+      abort();
     }
-
-    // // --- sending test ---
-    // vTaskDelay(pdMS_TO_TICKS(100));
-    // loop_counter++;
-
-    // if (loop_counter == 50) {
-    //     ESP_LOGW("TEST", ">>> sending start");
-    //     cmd_data = 0x01;
-    //     can_send(CAN_ID_ROBOT_HAND_SET_GRIP_STATE, &cmd_data, 1);
-    // }
-
-    // if (loop_counter == 150) {
-    //     ESP_LOGW("TEST", ">>> sending stop");
-    //     cmd_data = 0x02;
-    //     can_send(CAN_ID_ROBOT_HAND_SET_GRIP_STATE, &cmd_data, 1);
-    //     loop_counter = 0;
-    // }
   }
 }

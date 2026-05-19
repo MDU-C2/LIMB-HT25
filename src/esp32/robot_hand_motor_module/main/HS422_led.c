@@ -1,64 +1,64 @@
 #include "HS422_led.h"
 
-static const char* TAG = "HS422_LEDC";
+#include "limb_utils.h"
 
-static int dedos[NUM_SERVOS] = {THUMB_SERVO_GPIO, INDEX_SERVO_GPIO,
-                                MID_SERVO_GPIO, RING_SERVO_GPIO,
-                                PINKY_SERVO_GPIO};
+static const char* const TAG = "HS422_LEDC";
+
+static const int dedos[NUM_SERVOS] = {THUMB_SERVO_GPIO, INDEX_SERVO_GPIO,
+                                      MID_SERVO_GPIO, RING_SERVO_GPIO,
+                                      PINKY_SERVO_GPIO};
 
 // Servo configurations - customize each servo individually
-static servo_config_t servos[NUM_SERVOS] = {
+static const servo_config_t servos[NUM_SERVOS] = {
     // Thumb servo
     {.gpio_pin = THUMB_SERVO_GPIO,
      .ledc_channel = LEDC_CHANNEL_0,
-     .max_angle = 180,
+     .max_angle = 30,
      .min_angle = 0,
-     .min_pulse_us = 1100,
-     .max_pulse_us = 1700,
+     .min_pulse_us = 1400,
+     .max_pulse_us = 1900,
      .direction = SERVO_DIR_REVERSE,
      .name = "Thumb"},
     // Index finger
     {.gpio_pin = INDEX_SERVO_GPIO,
      .ledc_channel = LEDC_CHANNEL_1,
-     .max_angle = 180,
+     .max_angle = 85,
      .min_angle = 0,
      .min_pulse_us = 1100,
-     .max_pulse_us = 1700,
+     .max_pulse_us = 1900,
      .direction = SERVO_DIR_REVERSE,
      .name = "Index"},
     // Middle finger
     {.gpio_pin = MID_SERVO_GPIO,
      .ledc_channel = LEDC_CHANNEL_2,
-     .max_angle = 180,
+     .max_angle = 90,
      .min_angle = 0,
-     .min_pulse_us = 1100,
+     .min_pulse_us = 800,
      .max_pulse_us = 1700,
      .direction = SERVO_DIR_REVERSE,
      .name = "Middle"},
     // Ring finger
     {.gpio_pin = RING_SERVO_GPIO,
      .ledc_channel = LEDC_CHANNEL_3,
-     .max_angle = 180,
+     .max_angle = 50,
      .min_angle = 0,
-     .min_pulse_us = 1100,
-     .max_pulse_us = 1700,
+     .min_pulse_us = 1400,
+     .max_pulse_us = 2200,
      .direction = SERVO_DIR_REVERSE,
      .name = "Ring"},
     // Pinky finger
     {.gpio_pin = PINKY_SERVO_GPIO,
      .ledc_channel = LEDC_CHANNEL_4,
-     .max_angle = 180,
+     .max_angle = 90,
      .min_angle = 0,
-     .min_pulse_us = 1200,
-     .max_pulse_us = 1700,
+     .min_pulse_us = 700,
+     .max_pulse_us = 1600,
      .direction = SERVO_DIR_REVERSE,
      .name = "Pinky"},
     {.gpio_pin = TWIST_SERVO_GPIO,
      .ledc_channel = LEDC_CHANNEL_5,
      .min_angle = 0,
-     // FIXME: This max angle most likely doesn't correspond to the max pulse
-     // width.
-     .max_angle = 55,
+     .max_angle = 140,
      .min_pulse_us = 500,
      .max_pulse_us = 2500,
      .direction = SERVO_DIR_NORMAL,
@@ -67,8 +67,7 @@ static servo_config_t servos[NUM_SERVOS] = {
 
 // Convert microseconds to duty cycle
 uint32_t us_to_duty(uint32_t us) {
-  if (us < SERVO_MIN_US) us = SERVO_MIN_US;
-  if (us > SERVO_MAX_US) us = SERVO_MAX_US;
+  us = LIMB_CLAMP(us, SERVO_MIN_US, SERVO_MAX_US);
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
 }
 
@@ -122,7 +121,7 @@ esp_err_t servo_led_init(void) {
   // }
 
   for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-    servo_write_deg_channel(i, 180);  // Start at center position
+    // servo_write_deg_channel(i, 180);  // Start at center position
     // vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
   }
 
@@ -132,22 +131,24 @@ esp_err_t servo_led_init(void) {
 }
 
 // Write angle to specific servo channel
-void servo_write_deg_channel(int channel, int deg) {
+void servo_write_deg_channel(int channel, float deg) {
   if (channel < 0 || channel >= NUM_SERVOS) return;
 
-  servo_config_t* servo = &servos[channel];
-  // Clamp angle
-  if (deg < servo->min_angle) deg = servo->min_angle;
-  if (deg > servo->max_angle) deg = servo->max_angle;
+  const servo_config_t* servo = &servos[channel];
+
+  deg = LIMB_CLAMP(deg, servo->min_angle, servo->max_angle);
+
+  if (servo->direction == SERVO_DIR_REVERSE) {
+    deg = servo->min_angle + (servo->max_angle - deg);
+  }
 
   // Convert angle to pulse width
-  uint32_t us =
-      servo->min_pulse_us +
-      ((deg - servo->min_angle) * (servo->max_pulse_us - servo->min_pulse_us)) /
-          (servo->max_angle - servo->min_angle);
+  const float us =
+      LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
+                           servo->min_pulse_us, servo->max_pulse_us);
 
   // Set duty cycle
-  uint32_t duty = us_to_duty(us);
+  const uint32_t duty = us_to_duty((uint32_t)us);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
 
