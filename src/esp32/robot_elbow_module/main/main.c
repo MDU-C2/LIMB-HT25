@@ -18,21 +18,22 @@ static const char* const TAG = "robot_elbow_module";
 
 enum {
   // CAN configuration
-  CAN_TX_PIN = GPIO_NUM_2,
-  CAN_RX_PIN = GPIO_NUM_3,
+  CAN_TX_PIN = GPIO_NUM_0,
+  CAN_RX_PIN = GPIO_NUM_1,
   CAN_BAUDRATE = 1000000,
 
   // IMU pins.
-  IMU_SDA_PIN = GPIO_NUM_4,
-  IMU_SCL_PIN = GPIO_NUM_5,
+  IMU_SDA_PIN = GPIO_NUM_3,
+  IMU_SCL_PIN = GPIO_NUM_4,
 
   // GPIO pin definitions
-  STEPPER_ELBOW_ENABLE_PIN = GPIO_NUM_6,
-  STEPPER_ELBOW_DIR_PIN = GPIO_NUM_7,
-  STEPPER_ELBOW_STEP_PIN = GPIO_NUM_8,
+  // The enable pin is enabled by default.
+  STEPPER_ELBOW_ENABLE_PIN = GPIO_NUM_NC,
+  STEPPER_ELBOW_DIR_PIN = GPIO_NUM_6,
+  STEPPER_ELBOW_STEP_PIN = GPIO_NUM_7,
 
   // ADC channels
-  ADC_ELBOW_CHANNEL = ADC_CHANNEL_1,  // GPIO 1
+  ADC_ELBOW_CHANNEL = ADC_CHANNEL_2,  // GPIO 2
 
   // PWM timers and channels
   PWM_ELBOW_CHANNEL = LEDC_CHANNEL_0,

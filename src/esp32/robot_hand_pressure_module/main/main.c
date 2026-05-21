@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "soc/gpio_num.h"
 
 static const char* TAG = "HAND_MAIN";
 
@@ -37,9 +38,20 @@ float Kd = 0.2;
 int servo_angle = 180;
 wstats_t resultss = {0.0f, 0.0f};
 
-#define CAN_TX_GPIO 5
-#define CAN_RX_GPIO 8
-#define CAN_BAUDRATE 1000000
+enum {
+  CAN_TX_GPIO = GPIO_NUM_5,
+  CAN_RX_GPIO = GPIO_NUM_6,
+  CAN_BAUDRATE = 1000000,
+
+  IMU_SDA_GPIO = GPIO_NUM_10,
+  IMU_SCL_GPIO = GPIO_NUM_7,
+
+  PRESSURE_THUMB_ADC = ADC_CHANNEL_0,
+  PRESSURE_INDEX_ADC = ADC_CHANNEL_1,
+  PRESSURE_MIDDLE_ADC = ADC_CHANNEL_2,
+  PRESSURE_RING_ADC = ADC_CHANNEL_3,
+  PRESSURE_PINKY_ADC = ADC_CHANNEL_4,
+};
 
 void loop_control(void);
 
