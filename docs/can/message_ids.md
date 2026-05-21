@@ -7,7 +7,7 @@ with regards to potential message latency.
 ## CAN message ID allocation strategy
 We want to allow for easy filtering of relevant messages. We also want to
 prioritize different types of messages. By splitting up the 11 ID bits into
-three sections representing the message type, the node, and a generic ID
+three sections representing the message type, the recipient node, and a generic ID
 we're able to both prioritize and easily filter the messages.
 
 The layout we use is the following, with $x$ belonging to the message type section,
@@ -35,7 +35,6 @@ For the recipients, we get the following masks:
 | Robot wrist    | $\texttt{XXX\ 011X\ XXXX}$ | $\texttt{0xX6X}$  |
 | Robot hand     | $\texttt{XXX\ 100X\ XXXX}$ | $\texttt{0xX8X}$  |
 | Robot AGX Orin | $\texttt{XXX\ 101X\ XXXX}$ | $\texttt{0xXAX}$  |
-| Human shoulder | $\texttt{XXX\ 110X\ XXXX}$ | $\texttt{0xXCX}$  |
 
 This way we prioritize stop messages and actuation messages the most. We also
 prioritize messages intended for the robot shoulder and robot elbows the most,
