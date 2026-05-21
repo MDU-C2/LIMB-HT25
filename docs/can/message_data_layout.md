@@ -23,7 +23,7 @@ Little endian 4-byte float angle.
 | value | lo | mid lo | mid hi | hi | x | x | x | x |
 
 ## Pressure sensors
-Little endian 2-byte integer value.
+Little endian 2-byte integer value representing millivolts.
 
 ### Byte representation of CAN message data field (8 bytes)
 | byte  |  0 |  1 | 2 | 3 | 4 | 5 | 6 | 7 |

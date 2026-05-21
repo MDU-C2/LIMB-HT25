@@ -31,6 +31,11 @@ $$
 V_\text{out} = 3.3 \mathrm{V} \times \frac{2\ \text{k}\Omega}{1\ \text{k}\Omega + 2\ \text{k}\Omega} = 2.2 \mathrm{V}.
 $$
 
+## Calibration
+Although the reference voltage is designed to be $1.1 \mathrm{V}$, it might vary slightly between chips. To compensate for this, we use
+the [calibration driver](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/api-reference/peripherals/adc_calibration.html)
+provided by ESP-IDF to get more accurate ADC readings.
+
 ## More information
 More infomation can be found in
 [the datasheet](https://documentation.espressif.com/esp32-c3_datasheet_en.pdf#subsection.5.5),

@@ -160,8 +160,9 @@ static void adc_task(void* pvParameters) {
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
     // Fetch results from DMA through ADC Manager
-    if (adc_mgr_read(&res, 0) != ESP_OK) {
-      ESP_LOGE(TAG, "Error reading from ADC");
+    esp_err_t err = adc_mgr_read(&res, 0);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error reading from ADC: %s", esp_err_to_name(err));
       continue;
     }
 

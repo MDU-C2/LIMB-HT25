@@ -79,15 +79,15 @@ void app_main(void) {
   AdcMgrChannelBuffer* piezo_channel_buffer =
       &results.channel_buffers[kPiezoChannel];
 
-  // Print piezo readings.
+  // Print piezo readings in millivolts.
   for (int i = 0; i < piezo_channel_buffer->length; ++i) {
-    uint16_t value = piezo_channel_buffer->data[i];
+    uint16_t value_mv = piezo_channel_buffer->data[i];
     // Do something with the value.
   }
 
-  // Print EMG readings.
+  // Print EMG readings in millivolts.
   for (int i = 0; i < emg_channel_buffer->length; ++i) {
-    uint16_t value = emg_channel_buffer->data[i];
+    uint16_t value_mv = emg_channel_buffer->data[i];
     // Do something with the value.
   }
 
