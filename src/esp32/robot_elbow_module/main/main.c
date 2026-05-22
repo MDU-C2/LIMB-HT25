@@ -70,12 +70,13 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
             .max_adc_value = 2200,
             .min_potentiometer_angle_as_joint_angle = {0.F},
             // Angle increases as the elbow is pulled in.
-            .min_potentiometer_angle = {98.F},
+            .min_potentiometer_angle = {123.F},
             // Using the ratio between the joint angles and potentiomter angles,
             // 72 degrees of potentiometer angle becomes 60 degrees
             // of joint angle.
-            .max_potentiometer_angle = {165.F},
+            .max_potentiometer_angle = {195.F},
             .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
+            .is_reversed = true,
         },
 };
 
