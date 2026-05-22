@@ -65,9 +65,10 @@ static const ServoConfig kUpDownServoConfig = {
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 20,
-            .max_adc_value = 3087,
-            // The red wire is ground and black is Vin.
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
             .min_potentiometer_angle = {170},
             .max_potentiometer_angle = {250},
             .min_potentiometer_angle_as_joint_angle = {0.F},
@@ -94,8 +95,10 @@ static const ServoConfig kLeftRightServoConfig = {
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 2,
-            .max_adc_value = 2922,
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
             // The red wire should be connected to ground and the black to Vin.
             // Corresponds to 40 joint degrees.
             .min_potentiometer_angle = {89},
@@ -126,8 +129,10 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .potentiometer =
         {
             .degrees_of_motion = {285.F},
-            .min_adc_value = 6,
-            .max_adc_value = 3087,
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
             // Red is Vin and black is ground.
             .min_potentiometer_angle = {40},
             .max_potentiometer_angle = {160},

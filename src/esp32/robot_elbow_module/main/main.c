@@ -64,8 +64,10 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 3,
-            .max_adc_value = 3098,
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
             .min_potentiometer_angle_as_joint_angle = {0.F},
             // Angle increases as the elbow is pulled in.
             .min_potentiometer_angle = {98.F},
