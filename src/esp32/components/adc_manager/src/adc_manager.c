@@ -4,7 +4,10 @@
 #include <string.h>
 #include <sys/param.h>
 
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_continuous.h"
+#include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -39,6 +42,7 @@ static uint32_t s_desired_sample_rates_per_channel[SOC_ADC_MAX_CHANNEL_NUM];
 static uint32_t s_values_in_channel_periods[SOC_ADC_MAX_CHANNEL_NUM] = {0};
 static uint32_t s_values_read_already_in_period[SOC_ADC_MAX_CHANNEL_NUM];
 
+static adc_cali_handle_t s_calibration_handle;
 // TODO(johan): Could be configured using Kconfig together with channels and
 // frequency. That way we get it as a compile time argument and can initialize
 // the array size based on the actual frequency used.
@@ -56,6 +60,19 @@ esp_err_t adc_mgr_init(const AdcMgrConfig adc_mgr_config) {
   if (err != ESP_OK) {
     return err;
   }
+
+  adc_cali_curve_fitting_config_t cali_cfg = {
+      .unit_id = ADC_UNIT_1,
+      // The channel doesn't make a difference, so we just default to 0.
+      // https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32c3/api-reference/peripherals/adc_calibration.html#adc-calibration-curve-fitting-scheme
+      .chan = ADC_CHANNEL_0,
+      .atten = ADC_ATTEN_DB_12,
+      .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
+  };
+
+  ESP_RETURN_ON_ERROR(
+      adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_calibration_handle),
+      TAG, "Couldn't create adc calibration scheme");
 
   // Since every channel has the same sample rate internally, we set the ADC
   // to the largest and then during reads make sure to downsample by throwing
@@ -128,6 +145,7 @@ esp_err_t adc_mgr_init(const AdcMgrConfig adc_mgr_config) {
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "adc_continuous_new_handle failed : %s",
              esp_err_to_name(err));
+    adc_cali_delete_scheme_curve_fitting(s_calibration_handle);
     return err;
   }
 
@@ -191,6 +209,7 @@ esp_err_t adc_mgr_init(const AdcMgrConfig adc_mgr_config) {
 
 adc_mgr_init_cleanup:
   adc_continuous_deinit(s_handle);
+  adc_cali_delete_scheme_curve_fitting(s_calibration_handle);
   adc_mgr_reset_global_values();
   return err;
 }
@@ -312,13 +331,16 @@ static bool write_results_to_channel_buffers(
   bool wrote_value = false;
   for (size_t i = 0; i < output_count; ++i) {
     const adc_channel_t channel = outputs[i].type2.channel;
-    const uint16_t value = outputs[i].type2.data;
+    int millivolts = 0;
+    esp_err_t err = adc_cali_raw_to_voltage(s_calibration_handle,
+                                            outputs[i].type2.data, &millivolts);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(err);
     const uint32_t values_in_period = s_values_in_channel_periods[channel];
 
     // Only write the first value in a channel's period, ignore the rest.
     if (++s_values_read_already_in_period[channel] == values_in_period) {
       const bool success = adc_mgr_channel_buffer_push(
-          &inout_results->channel_buffers[channel], value);
+          &inout_results->channel_buffers[channel], millivolts);
       if (!success) {
         ESP_LOGW(TAG, "Channel buffer for ADC values is full.");
         // In a debug build we don't want this situation to be missed.

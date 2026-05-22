@@ -3,8 +3,6 @@
 #include <string.h>
 
 #include "adc_manager.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
 #include "esp_log.h"
 #include "freertos/task.h"
 #include "hal/adc_types.h"
@@ -22,11 +20,6 @@ typedef enum {
   kEmgChannel = ADC_CHANNEL_2,
   kPiezoChannel = ADC_CHANNEL_3,
 } AdcChannel;
-
-// This is a map from adc_channel_t to adc_cali_handle_t.
-// So s_adc_cali_handle[ADC_CHANNEL_2] will contain channel 2's calibration
-// handle.
-static adc_cali_handle_t s_adc_cali_handle[SOC_ADC_MAX_CHANNEL_NUM] = {NULL};
 
 // --- Streaming Data (Micro-packets) ---
 static emg_micro_packet_t s_emg_packet;
@@ -107,23 +100,13 @@ static void process_piezo_sample(adc_channel_t channel, uint16_t millivolt) {
  * channels reach 40 samples.
  */
 static void process_new_sample(AdcChannel channel, uint16_t value) {
-  // Apply ADC Calibration (Raw to Voltage mV)
-  adc_cali_handle_t cali_handle = s_adc_cali_handle[channel];
-  int voltage_mv = 0;
-  if (cali_handle != NULL) {
-    adc_cali_raw_to_voltage(cali_handle, value, &voltage_mv);
-  } else {
-    voltage_mv = value;
-  }
-  uint16_t val = (uint16_t)voltage_mv;
-
   switch (channel) {
     case kEmgChannel: {
-      process_emg_sample(channel, val);
+      process_emg_sample(channel, value);
       break;
     }
     case kPiezoChannel: {
-      process_piezo_sample(channel, val);
+      process_piezo_sample(channel, value);
       break;
     }
   }
@@ -160,8 +143,9 @@ static void adc_task(void* pvParameters) {
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
     // Fetch results from DMA through ADC Manager
-    if (adc_mgr_read(&res, 0) != ESP_OK) {
-      ESP_LOGE(TAG, "Error reading from ADC");
+    esp_err_t err = adc_mgr_read(&res, 0);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error reading from ADC: %s", esp_err_to_name(err));
       continue;
     }
 
@@ -184,21 +168,8 @@ esp_err_t adc_service_init(EventGroupHandle_t event_group) {
   esp_err_t err = adc_mgr_init(kAdcMgrConfig);
   if (err != ESP_OK) return err;
 
-  // Create calibration handles and reset indices
+  // Make sure sample buffers are empty.
   for (int i = 0; i < LIMB_ARR_LEN(kAdcChannelConfigs); i++) {
-    const adc_channel_t channel = kAdcChannelConfigs[i].channel;
-
-    // TODO(johan): The calibration scheme functionality should
-    // probably be moved to the ADC manager component so the
-    // settings are guaranteed to be consistent.
-    adc_cali_curve_fitting_config_t cali_cfg = {
-        .unit_id = ADC_UNIT_1,
-        .chan = channel,
-        .atten = ADC_ATTEN_DB_12,
-        .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
-    };
-    adc_cali_create_scheme_curve_fitting(&cali_cfg,
-                                         &s_adc_cali_handle[channel]);
     s_channel_sample_buffers[i].length = 0;
   }
 
