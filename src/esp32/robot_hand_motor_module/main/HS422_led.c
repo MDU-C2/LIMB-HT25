@@ -148,7 +148,7 @@ void servo_write_deg_channel(int channel, float deg) {
   ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
 
-  ESP_LOGI(TAG, "%s -> %d° (%lu us)", servo->name, deg, us);
+  ESP_LOGI(TAG, "%s -> %f° (%u us)", servo->name, deg, (uint32_t)us);
 }
 
 // Write same angle to all servos
