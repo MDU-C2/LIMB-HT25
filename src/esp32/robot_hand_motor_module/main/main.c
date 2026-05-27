@@ -3,6 +3,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "imu.h"
@@ -18,6 +19,13 @@ enum {
 
   IMU_SDA_GPIO = GPIO_NUM_9,
   IMU_SCL_GPIO = GPIO_NUM_7,
+
+  THUMB_HANDLE = 0,
+  INDEX_HANDLE = 1,
+  MIDDLE_HANDLE = 2,
+  RING_HANDLE = 3,
+  PINKY_HANDLE = 4,
+  WRIST_HANDLE = 5,
 };
 
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
@@ -111,6 +119,8 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
 }
 
 static void can_rx_task([[maybe_unused]] void* pvParameter) {
+  ESP_LOGI(TAG, "Starting CAN rx task");
+
   while (true) {
     uint32_t rx_id = 0;
     uint8_t rx_data[CAN_MAX_MESSAGE_SIZE] = {0};
@@ -129,11 +139,11 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       }
 
       float angle = deserialize_float(rx_data, kFromLittleEndian);
-      float velocity =
-          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
-      servo_write_deg_channel(LEDC_CHANNEL_0, angle);
+      AngularVelocity velocity = {
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
+      servo_move_to_angle_with_speed(THUMB_HANDLE, angle, velocity);
       ESP_LOGI(TAG, "Actuation thumb to %.2f degrees at %.2f dps", angle,
-               velocity);
+               velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_INDEX_ACTUATION) {
       if (rx_len != 2 * sizeof(float)) {
         ESP_LOGW(TAG, "Received index activation with invalid len: %u", rx_len);
@@ -141,11 +151,11 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       }
 
       float angle = deserialize_float(rx_data, kFromLittleEndian);
-      float velocity =
-          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
-      servo_write_deg_channel(LEDC_CHANNEL_1, angle);
+      AngularVelocity velocity = {
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
+      servo_move_to_angle_with_speed(INDEX_HANDLE, angle, velocity);
       ESP_LOGI(TAG, "Actuation index to %.2f degrees at %.2f dps", angle,
-               velocity);
+               velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_MIDDLE_ACTUATION) {
       if (rx_len != 2 * sizeof(float)) {
         ESP_LOGW(TAG, "Received middle activation with invalid len: %u",
@@ -154,11 +164,11 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       }
 
       float angle = deserialize_float(rx_data, kFromLittleEndian);
-      float velocity =
-          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
-      servo_write_deg_channel(LEDC_CHANNEL_2, angle);
+      AngularVelocity velocity = {
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
+      servo_move_to_angle_with_speed(MIDDLE_HANDLE, angle, velocity);
       ESP_LOGI(TAG, "Actuation middle to %.2f degrees at %.2f dps", angle,
-               velocity);
+               velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_RING_ACTUATION) {
       if (rx_len != 2 * sizeof(float)) {
         ESP_LOGW(TAG, "Received ring activation with invalid len: %u", rx_len);
@@ -166,11 +176,11 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       }
 
       float angle = deserialize_float(rx_data, kFromLittleEndian);
-      float velocity =
-          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
-      servo_write_deg_channel(LEDC_CHANNEL_3, angle);
+      AngularVelocity velocity = {
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
+      servo_move_to_angle_with_speed(RING_HANDLE, angle, velocity);
       ESP_LOGI(TAG, "Actuation ring to %.2f degrees at %.2f dps", angle,
-               velocity);
+               velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_PINKY_ACTUATION) {
       if (rx_len != 2 * sizeof(float)) {
         ESP_LOGW(TAG, "Received pinky activation with invalid len: %u", rx_len);
@@ -178,11 +188,11 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       }
 
       float angle = deserialize_float(rx_data, kFromLittleEndian);
-      float velocity =
-          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
-      servo_write_deg_channel(LEDC_CHANNEL_4, angle);
+      AngularVelocity velocity = {
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
+      servo_move_to_angle_with_speed(PINKY_HANDLE, angle, velocity);
       ESP_LOGI(TAG, "Actuation pinky to %.2f degrees at %.2f dps", angle,
-               velocity);
+               velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION) {
       if (rx_len != 2 * sizeof(float)) {
         ESP_LOGW(TAG, "Received rotation activation with invalid len: %u",
@@ -191,11 +201,11 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       }
 
       float angle = deserialize_float(rx_data, kFromLittleEndian);
-      float velocity =
-          deserialize_float(rx_data + sizeof(float), kFromLittleEndian);
-      servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX, angle);
+      AngularVelocity velocity = {
+          deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
+      servo_move_to_angle_with_speed(WRIST_HANDLE, angle, velocity);
       ESP_LOGI(TAG, "Actuation wrist to %.2f degrees at %.2f dps", angle,
-               velocity);
+               velocity.dps);
     }
   }
 }

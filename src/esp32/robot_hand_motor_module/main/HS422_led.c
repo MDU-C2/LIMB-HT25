@@ -1,5 +1,10 @@
 #include "HS422_led.h"
 
+#include <math.h>
+
+#include "driver/ledc.h"
+#include "esp_err.h"
+#include "hal/ledc_types.h"
 #include "limb_utils.h"
 
 static const char* const TAG = "HS422_LEDC";
@@ -13,6 +18,7 @@ static const servo_config_t servos[NUM_SERVOS] = {
      .min_angle = 0,
      .min_pulse_us = 1400,
      .max_pulse_us = 1900,
+     .max_speed = {40},
      .direction = SERVO_DIR_REVERSE,
      .name = "Thumb"},
     // Index finger
@@ -22,6 +28,7 @@ static const servo_config_t servos[NUM_SERVOS] = {
      .min_angle = 0,
      .min_pulse_us = 1100,
      .max_pulse_us = 1900,
+     .max_speed = {40},
      .direction = SERVO_DIR_REVERSE,
      .name = "Index"},
     // Middle finger
@@ -31,6 +38,7 @@ static const servo_config_t servos[NUM_SERVOS] = {
      .min_angle = 0,
      .min_pulse_us = 800,
      .max_pulse_us = 1700,
+     .max_speed = {40},
      .direction = SERVO_DIR_REVERSE,
      .name = "Middle"},
     // Ring finger
@@ -40,6 +48,7 @@ static const servo_config_t servos[NUM_SERVOS] = {
      .min_angle = 0,
      .min_pulse_us = 1400,
      .max_pulse_us = 2200,
+     .max_speed = {40},
      .direction = SERVO_DIR_REVERSE,
      .name = "Ring"},
     // Pinky finger
@@ -49,6 +58,7 @@ static const servo_config_t servos[NUM_SERVOS] = {
      .min_angle = 0,
      .min_pulse_us = 700,
      .max_pulse_us = 1600,
+     .max_speed = {120},
      .direction = SERVO_DIR_REVERSE,
      .name = "Pinky"},
     {.gpio_pin = TWIST_SERVO_GPIO,
@@ -57,6 +67,7 @@ static const servo_config_t servos[NUM_SERVOS] = {
      .max_angle = 140,
      .min_pulse_us = 500,
      .max_pulse_us = 2500,
+     .max_speed = {100},
      .direction = SERVO_DIR_NORMAL,
      .name = "Wrist"},
 };
@@ -65,6 +76,28 @@ static const servo_config_t servos[NUM_SERVOS] = {
 uint32_t us_to_duty(uint32_t us) {
   us = LIMB_CLAMP(us, SERVO_MIN_US, SERVO_MAX_US);
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
+}
+
+uint32_t duty_to_us(uint32_t duty) {
+  return (uint32_t)((uint64_t)duty * SERVO_PERIOD_US / SERVO_MAX_DUTY);
+}
+
+float pulse_width_to_angle(const servo_config_t* servo, uint16_t pw_us) {
+  const float angle = LIMB_LERP_FROM_RANGE(
+      (float)pw_us, (float)servo->min_pulse_us, (float)servo->max_pulse_us,
+      servo->min_angle, servo->max_angle);
+  return angle;
+}
+
+uint16_t angle_to_pulse_width(const servo_config_t* servo, float angle_deg) {
+  angle_deg = LIMB_CLAMP(angle_deg, servo->min_angle, servo->max_angle);
+  if (servo->direction == SERVO_DIR_REVERSE) {
+    angle_deg = servo->min_angle + (servo->max_angle - angle_deg);
+  }
+  const float us =
+      LIMB_LERP_FROM_RANGE(angle_deg, servo->min_angle, servo->max_angle,
+                           servo->min_pulse_us, servo->max_pulse_us);
+  return (uint16_t)us;
 }
 
 // Initialize all servos
@@ -97,6 +130,8 @@ esp_err_t servo_led_init(void) {
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 
+  ledc_fade_func_install(0);
+
   ESP_LOGI(TAG, "All channels configured, setting initial positions");
 
   // Initialize all servos to their center position.
@@ -112,25 +147,56 @@ esp_err_t servo_led_init(void) {
   return ESP_OK;
 }
 
+void servo_move_to_angle_with_speed(ServoHandle handle, float angle,
+                                    AngularVelocity speed) {
+  if (handle < 0 || handle >= NUM_SERVOS) {
+    return;
+  }
+
+  const servo_config_t* servo = &servos[handle];
+
+  const AngularVelocity clamped_speed = {MIN(speed.dps, servo->max_speed.dps)};
+  const float clamped_angle =
+      LIMB_CLAMP(angle, servo->min_angle, servo->max_angle);
+
+  // We find the current angle based on the current duty.
+  const uint32_t current_duty =
+      ledc_get_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
+  const uint16_t current_us = duty_to_us(current_duty);
+  const float current_angle = pulse_width_to_angle(servo, current_us);
+
+  const float abs_angle_diff = fabsf(clamped_angle - current_angle);
+  // Don't move if we're close to the angle.
+  const float deadband = 0.5F;
+  if (abs_angle_diff < deadband) {
+    return;
+  }
+  const uint16_t time_to_move_ms =
+      (uint16_t)(abs_angle_diff / clamped_speed.dps * 1000.F);
+
+  const ledc_channel_t channel = servo->ledc_channel;
+
+  const uint16_t us = angle_to_pulse_width(servo, clamped_angle);
+  const uint32_t duty = us_to_duty(us);
+
+  // Since we're starting a new fade, we stop the previous fade in case it's
+  // not done yet.
+  ESP_ERROR_CHECK_WITHOUT_ABORT(ledc_fade_stop(LEDC_LOW_SPEED_MODE, channel));
+  ESP_ERROR_CHECK_WITHOUT_ABORT(ledc_set_fade_time_and_start(
+      LEDC_LOW_SPEED_MODE, channel, duty, time_to_move_ms, LEDC_FADE_NO_WAIT));
+  ESP_LOGI(TAG, "%s -> %f° (%u us)", servo->name, angle, us);
+}
+
 // Write angle to specific servo channel
 void servo_write_deg_channel(int channel, float deg) {
   if (channel < 0 || channel >= NUM_SERVOS) return;
 
   const servo_config_t* servo = &servos[channel];
 
-  deg = LIMB_CLAMP(deg, servo->min_angle, servo->max_angle);
-
-  if (servo->direction == SERVO_DIR_REVERSE) {
-    deg = servo->min_angle + (servo->max_angle - deg);
-  }
-
-  // Convert angle to pulse width
-  const float us =
-      LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
-                           servo->min_pulse_us, servo->max_pulse_us);
+  const uint16_t us = angle_to_pulse_width(servo, deg);
 
   // Set duty cycle
-  const uint32_t duty = us_to_duty((uint32_t)us);
+  const uint32_t duty = us_to_duty(us);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
 

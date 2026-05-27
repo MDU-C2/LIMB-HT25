@@ -1,11 +1,12 @@
 #pragma once
 
-#include "driver/gpio.h"
-#include "driver/ledc.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "hal/ledc_types.h"
+#include "limb_utils.h"
+#include "soc/gpio_num.h"
 
 // =================================
 // #define BUTTON_Next_GPIO  19    // GPIO for button to move to next position
@@ -43,14 +44,16 @@
 // Direction enum
 typedef enum { SERVO_DIR_NORMAL = 1, SERVO_DIR_REVERSE = -1 } servo_direction_t;
 
+typedef ledc_channel_t ServoHandle;
+
 typedef struct {
-  int gpio_pin;                 // GPIO pin for this servo
+  gpio_num_t gpio_pin;          // GPIO pin for this servo
   ledc_channel_t ledc_channel;  // LEDC channel (0-7)
   float min_angle;              // Minimum angle in degrees
   float max_angle;              // Maximum angle in degrees
   uint32_t min_pulse_us;        // Minimum pulse width in microseconds
   uint32_t max_pulse_us;        // Maximum pulse width in microseconds
-  float current_angle;          // Current servo position
+  AngularVelocity max_speed;
   float current_force;          // Current force applied, measured by FSR
   servo_direction_t direction;  // Direction of servo movement
   const char* name;             // Human-readable name for debugging
@@ -65,9 +68,10 @@ typedef enum {
 } calibration_state_t;
 
 // Function declarations
-uint32_t us_to_duty(uint32_t us);
 esp_err_t servo_led_init(void);
 void servo_write_deg_channel(int channel, float deg);
+void servo_move_to_angle_with_speed(ServoHandle handle, float angle,
+                                    AngularVelocity speed);
 void servo_write_all_deg(int deg);
 void close_all_fingers(void);
 void open_all_fingers(void);
