@@ -4,10 +4,6 @@
 
 static const char* const TAG = "HS422_LEDC";
 
-static const int dedos[NUM_SERVOS] = {THUMB_SERVO_GPIO, INDEX_SERVO_GPIO,
-                                      MID_SERVO_GPIO, RING_SERVO_GPIO,
-                                      PINKY_SERVO_GPIO};
-
 // Servo configurations - customize each servo individually
 static const servo_config_t servos[NUM_SERVOS] = {
     // Thumb servo
