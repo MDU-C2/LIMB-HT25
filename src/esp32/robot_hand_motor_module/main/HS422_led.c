@@ -302,9 +302,9 @@ void custom_grip_2(void) {
 // ROTARY ENCODER IMPLEMENTATION
 // ============================================================================
 
-static volatile int encoder_value = 0;
-static volatile bool button_pressed = false;
-static volatile uint32_t last_button_time = 0;
+static int encoder_value = 0;
+static bool button_pressed = false;
+static uint32_t last_button_time = 0;
 static const uint32_t DEBOUNCE_TIME_MS = 200;
 
 // ISR for CLK pin (rotary encoder rotation)
