@@ -485,8 +485,6 @@ void start_calibration_mode(void) {
             encoder_value = temp_min_angle;
           } else {
             // Save the calibration
-            servos[selected_finger].min_angle = temp_min_angle;
-            servos[selected_finger].max_angle = temp_max_angle;
             ESP_LOGI(TAG, "Max angle set to %d°", temp_max_angle);
             ESP_LOGI(TAG, "%s calibration complete: Min=%d°, Max=%d°",
                      servos[selected_finger].name, temp_min_angle,
