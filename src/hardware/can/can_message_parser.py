@@ -56,13 +56,6 @@ class CANMessageParser:
         0x7A2: {"type": "robot_middle_pressure", "format": "<f"},
         0x7A3: {"type": "robot_ring_pressure", "format": "<f"},
         0x7A4: {"type": "robot_pinky_pressure", "format": "<f"},
-
-        # Human EMG message
-        0x3C0: {"type": "human_upper_arm_emg", "format": "<2f"},  # 2 EMG channels
-
-        # Human IMU messages
-        0x5C0: {"type": "human_upper_arm_imu_gyro", "format": "<3f"},  # [gx, gy, gz]
-        0x5C1: {"type": "human_upper_arm_imu_accel", "format": "<3f"},  # [ax, ay, az]
     }
 
     def parse(self, message: CANMessage) -> CANMessage:
@@ -110,27 +103,8 @@ class CANMessageParser:
     def _format_parsed_data(self, msg_type, parsed) -> Dict:
         """Format parsed data into a meaningful dictionary."""
 
-        # Human EMG
-        if msg_type == "human_upper_arm_emg":
-            return {
-                "channels": list(parsed), # [ch0] for single channel, [ch0, ch1] for dual channel
-                "channel_count": len(parsed)
-            }
-        
-        # Human IMU
-        elif msg_type == "human_upper_arm_imu_gyro":
-            return {
-                "data": list(parsed), # [gx, gy, gz]
-                "type": "gyro"
-            }
-        elif msg_type == "human_upper_arm_imu_accel":
-            return {
-                "data": list(parsed), # [ax, ay, az]
-                "type": "accel"
-            }
-        
         # Robot IMU
-        elif msg_type.endswith("_imu_gyro"):
+        if msg_type.endswith("_imu_gyro"):
             return {
                 "data": list(parsed), # [gx, gy, gz]
                 "type": "gyro",
@@ -210,8 +184,6 @@ class CANMessageParser:
                 values = (data["value"],)
             elif msg_type.endswith("_imu_gyro") or msg_type.endswith("_imu_accel"):
                 values = tuple(data["data"])
-            elif msg_type == "human_upper_arm_emg":
-                values = tuple(data["channels"])
             else:
                 return None
 
