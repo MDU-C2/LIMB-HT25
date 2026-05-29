@@ -43,10 +43,10 @@ class CANMessageParser:
         0x4A3: {"type": "robot_shoulder_left_right_potentiometer", "format": "<f"},
 
         # IMU messages (robot)
-        0x5A0: {"type": "robot_shoulder_imu_gyro", "format": "<3f"},  # [gx, gy, gz]
-        0x5A1: {"type": "robot_shoulder_imu_accel", "format": "<3f"},  # [ax, ay, az]
-        0x5A2: {"type": "robot_elbow_imu_gyro", "format": "<3f"},
-        0x5A3: {"type": "robot_elbow_imu_accel", "format": "<3f"},
+        0x5A0: {"type": "robot_upper_arm_imu_gyro", "format": "<3f"},  # [gx, gy, gz]
+        0x5A1: {"type": "robot_upper_arm_imu_accel", "format": "<3f"},  # [ax, ay, az]
+        0x5A2: {"type": "robot_lower_arm_imu_gyro", "format": "<3f"},
+        0x5A3: {"type": "robot_lower_arm_imu_accel", "format": "<3f"},
         0x5A4: {"type": "robot_hand_imu_gyro", "format": "<3f"},
         0x5A5: {"type": "robot_hand_imu_accel", "format": "<3f"},
 
