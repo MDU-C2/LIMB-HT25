@@ -1,0 +1,8 @@
+mainmenu "Human lower arm module"
+    menu "LIMB config"
+        config IMU_ENABLED
+            bool "Enable IMU"
+            default y
+            help
+                This option enables the IMU. In case the IMU isn't needed, you can turn it off using this option.
+    endmenu

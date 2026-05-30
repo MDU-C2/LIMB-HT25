@@ -128,6 +128,8 @@ uint16_t create_filter_mask(
     CanRecipientNodeFilterMask recipient_node_filter_mask,
     CanGenericFilterMask generic_filter_mask);
 
+esp_err_t can_automatically_reenable_on_bus_off(void);
+
 // Initialize the CAN bus
 esp_err_t can_init(int tx_pin, int rx_pin, int baudrate,
                    const CanMsgFilter* filter);

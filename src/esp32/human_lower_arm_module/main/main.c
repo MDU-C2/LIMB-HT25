@@ -47,6 +47,7 @@ void app_main(void) {
   // Small delay to ensure BLE stack stability before sensor interrupts fire
   vTaskDelay(pdMS_TO_TICKS(100));
 
+#if CONFIG_IMU_ENABLED
   // 5. Start IMU Service (I2C Scanning & 100Hz Task)
   if (imu_service_start(sync_group) != ESP_OK) {
     ESP_LOGE(TAG_MAIN, "Failed to start IMU Service!");
@@ -54,6 +55,7 @@ void app_main(void) {
   } else {
     ESP_LOGI(TAG_MAIN, "IMU Service Running.");
   }
+#endif
 
   // 6. Start ADC Service (EMG & Piezo via DMA)
   // This starts the high-speed continuous sampling engine
