@@ -1,0 +1,15 @@
+mainmenu "Robot elbow module"
+    menu "LIMB config"
+        config IMU_ENABLED
+            bool "Enable IMU"
+            default y
+            help
+                This option enables the IMU. In case the IMU isn't needed, you can turn it off using this option.
+        config FORCE_REENABLE_CAN_ON_BUS_OFF
+            bool "Force reenable CAN on bus off"
+            default n
+            help
+                This option force reenables CAN if it enters a bus off state. WARNING: This might cause CAN messages
+                to be starved! A bus off event means that a bunch of errors have happened, so forcing it to be reenabled
+                might flood the bus with error frames.
+    endmenu
