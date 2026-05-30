@@ -135,9 +135,9 @@ class ElbowNodeTester:
 
             if msg_type == "robot_elbow_up_down_potentiometer":
                 feedback["potentiometer"] = parsed_data.get("value")
-            elif msg_type == "robot_elbow_imu_gyro":
+            elif msg_type == "robot_upper_arm_imu_gyro":
                 feedback["imu_gyro"] = parsed_data.get("data")
-            elif msg_type == "robot_elbow_imu_accel":
+            elif msg_type == "robot_upper_arm_imu_accel":
                 feedback["imu_accel"] = parsed_data.get("data")
 
         return feedback

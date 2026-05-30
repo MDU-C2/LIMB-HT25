@@ -191,42 +191,42 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
     float can_buf[1] = {0};
 
     can_buf[0] = htolef(data.gyro.pitch);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_PITCH, (uint8_t*)can_buf,
+    err = can_send(CAN_ID_ROBOT_UPPER_ARM_IMU_GYRO_PITCH, (uint8_t*)can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.gyro.roll);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_ROLL, (uint8_t*)&can_buf,
+    err = can_send(CAN_ID_ROBOT_UPPER_ARM_IMU_GYRO_ROLL, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.gyro.yaw);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_GYRO_YAW, (uint8_t*)&can_buf,
+    err = can_send(CAN_ID_ROBOT_UPPER_ARM_IMU_GYRO_YAW, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.accel.x);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_X, (uint8_t*)&can_buf,
+    err = can_send(CAN_ID_ROBOT_UPPER_ARM_IMU_ACCEL_X, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.accel.y);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Y, (uint8_t*)&can_buf,
+    err = can_send(CAN_ID_ROBOT_UPPER_ARM_IMU_ACCEL_Y, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
     }
 
     can_buf[0] = htolef(data.accel.z);
-    err = can_send(CAN_ID_ROBOT_ELBOW_IMU_ACCEL_Z, (uint8_t*)&can_buf,
+    err = can_send(CAN_ID_ROBOT_UPPER_ARM_IMU_ACCEL_Z, (uint8_t*)&can_buf,
                    sizeof(can_buf), 0);
     if (err != ESP_OK) {
       ++can_error_count_since_last_log;
