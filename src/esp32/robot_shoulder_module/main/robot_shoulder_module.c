@@ -555,16 +555,32 @@ void app_main(void) {
     }
   }
 
-  xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
-  xTaskCreate(motors_update_task, "Motors update task", 1024 * 2 * 2, NULL, 6,
-              NULL);
+  {
+    BaseType_t err =
+        xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
+  }
+
+  {
+    BaseType_t err = xTaskCreate(motors_update_task, "Motors update task",
+                                 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
+  }
 
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
-  BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
-                               1024 * 2 * 2, NULL, 6, NULL);
-  if (err != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
-    abort();
+  {
+    BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
+                                 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
   }
 #endif
 }

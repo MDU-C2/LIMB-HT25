@@ -397,27 +397,34 @@ void app_main(void) {
       ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
       abort();
     }
+  }
 
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
-    err = xTaskCreate(reenable_can_task, "reenable_can_task", TASK_STACK_DEPTH,
-                      NULL, TASK_CAN_RX_PRIORITY + 1, NULL);
+  {
+    BaseType_t err =
+        xTaskCreate(reenable_can_task, "reenable_can_task", TASK_STACK_DEPTH,
+                    NULL, TASK_CAN_RX_PRIORITY + 1, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
       abort();
     }
+  }
 #endif
 
 #if CONFIG_IMU_ENABLED
-    err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
-                      TASK_IMU_PRIORITY, NULL);
+  {
+    BaseType_t err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
+                                 TASK_IMU_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
       abort();
     }
+  }
 #endif
 
-    err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL,
-                      TASK_STEPPER_UPDATE_PRIORITY, NULL);
+  {
+    BaseType_t err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH,
+                                 NULL, TASK_STEPPER_UPDATE_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
       abort();

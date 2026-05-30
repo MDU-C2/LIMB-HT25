@@ -73,11 +73,14 @@ void app_main(void) {
   };
 
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
-  err = xTaskCreate(reenable_can_task, "reenable_can_task", TASK_STACK_DEPTH,
+  {
+    BaseType_t err =
+        xTaskCreate(reenable_can_task, "reenable_can_task", TASK_STACK_DEPTH,
                     NULL, TASK_CAN_RX_PRIORITY + 1, NULL);
-  if (err != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
-    abort();
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
   }
 #endif
 
