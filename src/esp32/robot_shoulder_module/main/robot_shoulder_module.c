@@ -69,8 +69,9 @@ static const ServoConfig kUpDownServoConfig = {
             // 2200 mV.
             .min_adc_value = 0,
             .max_adc_value = 2200,
-            .min_potentiometer_angle = {170},
-            .max_potentiometer_angle = {250},
+            // should be [0,90], but is actually like [0,75]
+            .min_potentiometer_angle = {150},
+            .max_potentiometer_angle = {240},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
             .is_reversed = true,
@@ -99,10 +100,9 @@ static const ServoConfig kLeftRightServoConfig = {
             // 2200 mV.
             .min_adc_value = 0,
             .max_adc_value = 2200,
-            // The red wire should be connected to ground and the black to Vin.
-            // Corresponds to 40 joint degrees.
-            .min_potentiometer_angle = {89},
-            .max_potentiometer_angle = {137},
+            // Corresponds to between 5 and 40 joint degrees.
+            .min_potentiometer_angle = {86},
+            .max_potentiometer_angle = {128},
             .min_potentiometer_angle_as_joint_angle = {5.F},
             .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
         },
