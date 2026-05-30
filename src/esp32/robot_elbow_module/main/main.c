@@ -263,6 +263,7 @@ static void stepper_task([[maybe_unused]] void* pvParameter) {
 
   while (1) {
     const uint16_t dt_ms = 10;
+    xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(dt_ms));
 
     adc_mgr_read(&s_adc_mgr_read_results, 0);
     s_latest_potentiometer_adc_value = moving_average16(
@@ -313,8 +314,6 @@ static void stepper_task([[maybe_unused]] void* pvParameter) {
                target_pot_angle.degree, current_angle.degree,
                target_angle.degree, velocity.dps, moving ? "Yes" : "No");
     }
-
-    xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(dt_ms));
   }
 }
 
