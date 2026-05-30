@@ -370,6 +370,21 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
   PotentiometerAngle angle_deg = potentiometer_adc_to_angle(
       &ctx->cfg.potentiometer, latest_potentiometer_adc_value);
 
+  if (angle_deg.degree < 10 ||
+      angle_deg.degree >
+          (ctx->cfg.potentiometer.degrees_of_motion.degree - 10)) {
+    // If the potentiometer is close to its min or max limits, we might be in a
+    // situation where the ADC values are off (maybe a loose wire or the
+    // potentiometer is configured incorrectly, for example). In that situation,
+    // we want to err on the side of caution and not move the motor.
+    ESP_LOGW(TAG,
+             "Potentiometer angle %f is close to its limits of [0, %f]. "
+             "Turning off motor as a safety precaution",
+             angle_deg.degree, ctx->cfg.potentiometer.degrees_of_motion.degree);
+    stop_motor(handle);
+    return;
+  }
+
   // Take snapshot of shared state and update current angle from feedback
   portENTER_CRITICAL(&ctx->spinlock);
   bool estop = ctx->estop_active;
