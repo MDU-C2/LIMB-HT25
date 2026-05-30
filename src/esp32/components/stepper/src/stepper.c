@@ -65,7 +65,6 @@ static void stop_motor(stepper_control_handle_t handle) {
 
   portENTER_CRITICAL(&ctx->spinlock);
   ctx->is_moving = false;
-  ctx->target_velocity = (AngularVelocity){0.0F};
   ctx->current_velocity = (AngularVelocity){0.0F};
   portEXIT_CRITICAL(&ctx->spinlock);
 }
