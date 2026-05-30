@@ -311,46 +311,6 @@ static void stepper_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
-// Test task to cycle through different target angles
-static void stepper_test_task([[maybe_unused]] void* pvParameter) {
-  // Wait a bit for system to initialize
-  vTaskDelay(pdMS_TO_TICKS(2000));
-
-  // Test angles to cycle through (in degrees)
-  const float test_angles[] = {0.0F, 60.F};
-  int num_angles = sizeof(test_angles) / sizeof(test_angles[0]);
-  int angle_index = 0;
-
-  ESP_LOGI(TAG, "Stepper test task started - will cycle through test angles");
-
-  while (1) {
-    // Set new target angle
-    float target = test_angles[angle_index];
-    stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){target});
-    ESP_LOGI(TAG, ">>> Setting target angle to %.1f°", target);
-
-    TickType_t start_time = xTaskGetTickCount();
-
-    // Allow motor to start moving.
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    TickType_t ticks_since_start_time = xTaskGetTickCount() - start_time;
-
-    // Wait for stepper to reach target (or timeout after 5 seconds)
-    while (stepper_is_moving(s_elbow_stepper_handle) &&
-           (ticks_since_start_time < pdMS_TO_TICKS(15000))) {
-      vTaskDelay(pdMS_TO_TICKS(100));
-      ticks_since_start_time = xTaskGetTickCount() - start_time;
-    }
-
-    // Hold at this position for 2 seconds
-    vTaskDelay(pdMS_TO_TICKS(2000));
-
-    // Move to next angle
-    angle_index = (angle_index + 1) % num_angles;
-  }
-}
-
 void app_main(void) {
   ESP_LOGI(TAG, "Robot elbow module starting...");
 
@@ -462,15 +422,6 @@ void app_main(void) {
       ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
       abort();
     }
-
-    // Lower priority than stepper_task.
-    // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH,
-    // NULL,
-    //                   TASK_STEPPER_TEST_PRIORITY, NULL);
-    // if (err != pdPASS) {
-    //   ESP_LOGE(TAG, "Failed to create stepper_test task, err code: %d");
-    //   return;
-    // }
   }
 
   ESP_LOGI(TAG, "Tasks created, system running");
