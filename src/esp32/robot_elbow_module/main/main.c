@@ -374,6 +374,7 @@ void app_main(void) {
              CAN_RX_PIN, CAN_BAUDRATE);
   }
 
+#if CONFIG_IMU_ENABLED
   // Initialize IMU.
   {
     ImuConfig imu_cfg = IMU_CONFIG_DEFAULT();
@@ -388,6 +389,7 @@ void app_main(void) {
     ESP_LOGI(TAG, "IMU initialized (SDA=%d, SCL=%d)", imu_cfg.sda_pin,
              imu_cfg.scl_pin);
   }
+#endif
 
   // Initialize ADC.
   {
@@ -445,12 +447,14 @@ void app_main(void) {
     }
 #endif
 
+#if CONFIG_IMU_ENABLED
     err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
                       TASK_IMU_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
       abort();
     }
+#endif
 
     err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL,
                       TASK_STEPPER_UPDATE_PRIORITY, NULL);

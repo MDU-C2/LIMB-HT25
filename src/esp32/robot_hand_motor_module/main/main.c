@@ -206,6 +206,7 @@ void app_main() {
   servo_led_init();
   // vTaskDelay(pdMS_TO_TICKS(1000));
 
+#if CONFIG_IMU_ENABLED
   {
     ESP_LOGI(TAG, "Initializing IMUs...");
     ImuConfig imu_config = IMU_CONFIG_DEFAULT();
@@ -217,6 +218,7 @@ void app_main() {
       abort();
     }
   }
+#endif
 
   // Initialize rotary encoder
   // ESP_LOGI(TAG, "Initializing rotary encoder...");
@@ -236,6 +238,7 @@ void app_main() {
     }
   }
 
+#if CONFIG_IMU_ENABLED
   {
     BaseType_t err =
         xTaskCreate(imu_task, "imu_task", 1024 * 2 * 2, NULL, 5, NULL);
@@ -246,6 +249,8 @@ void app_main() {
       abort();
     }
   }
+#endif
+
   {
     BaseType_t err =
         xTaskCreate(can_rx_task, "can_rx_task", 1024 * 2 * 2, NULL, 6, NULL);
