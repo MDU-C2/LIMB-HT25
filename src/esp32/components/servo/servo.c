@@ -189,12 +189,17 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
     // situation where the ADC values are off (maybe a loose wire or the
     // potentiometer is configured incorrectly, for example). In that situation,
     // we want to err on the side of caution and not move the motor.
-    ESP_LOGW(TAG,
-             "Potentiometer angle %f is close to its limits of [0, %f]. "
-             "Turning off motor as a safety precaution",
-             current_angle.degree,
-             ctx->cfg.potentiometer.degrees_of_motion.degree);
     servo_apply_velocity(handle, (AngularVelocity){0});
+    static int i = 0;
+    // Don't print every time to avoid triggering the task watchdog.
+    if (--i < 0) {
+      i = 50;
+      ESP_LOGW(TAG,
+               "Potentiometer angle %f is close to its limits of [0, %f]. "
+               "Turning off motor as a safety precaution",
+               current_angle.degree,
+               ctx->cfg.potentiometer.degrees_of_motion.degree);
+    }
     return true;
   }
 
