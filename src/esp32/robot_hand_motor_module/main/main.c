@@ -12,9 +12,12 @@
 static const char* TAG = "SERVOS";
 
 enum {
-  CAN_TX_PIN = 3,
-  CAN_RX_PIN = 4,
+  CAN_TX_PIN = GPIO_NUM_6,
+  CAN_RX_PIN = GPIO_NUM_10,
   CAN_BAUDRATE = 1000000,
+
+  IMU_SDA_GPIO = GPIO_NUM_9,
+  IMU_SCL_GPIO = GPIO_NUM_7,
 };
 
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
@@ -210,8 +213,8 @@ void app_main() {
   {
     ESP_LOGI(TAG, "Initializing IMUs...");
     ImuConfig imu_config = IMU_CONFIG_DEFAULT();
-    imu_config.sda_pin = GPIO_NUM_0;
-    imu_config.scl_pin = GPIO_NUM_1;
+    imu_config.sda_pin = IMU_SDA_GPIO;
+    imu_config.scl_pin = IMU_SCL_GPIO;
     ESP_ERROR_CHECK_WITHOUT_ABORT(imu_init(&imu_config));
     if (!imu_is_present()) {
       ESP_LOGW(TAG, "IMU isn't present");
@@ -261,11 +264,13 @@ void app_main() {
   }
 
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
-  BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
-                               1024 * 2 * 2, NULL, 6, NULL);
-  if (err != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
-    abort();
+  {
+    BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
+                                 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
   }
 #endif
 }

@@ -17,12 +17,12 @@
 #define ROTARY_ENCODER_DT_GPIO 18   // DT pin (B phase)
 #define ROTARY_ENCODER_SW_GPIO 19   // SW pin (button/switch)
 
-#define TWIST_SERVO_GPIO 9
-#define THUMB_SERVO_GPIO 5
-#define INDEX_SERVO_GPIO 6
-#define MID_SERVO_GPIO 7
-#define RING_SERVO_GPIO 8
-#define PINKY_SERVO_GPIO 10
+#define THUMB_SERVO_GPIO GPIO_NUM_0
+#define INDEX_SERVO_GPIO GPIO_NUM_1
+#define MID_SERVO_GPIO GPIO_NUM_2
+#define RING_SERVO_GPIO GPIO_NUM_3
+#define PINKY_SERVO_GPIO GPIO_NUM_4
+#define TWIST_SERVO_GPIO GPIO_NUM_5
 
 #define SERVO_FREQ_HZ 50   // 50 Hz = 20 ms period
 #define SERVO_RES_BITS 13  // resolution; 13 bits = 8191 ticks

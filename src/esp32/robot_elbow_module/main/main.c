@@ -18,21 +18,22 @@ static const char* const TAG = "robot_elbow_module";
 
 enum {
   // CAN configuration
-  CAN_TX_PIN = GPIO_NUM_2,
-  CAN_RX_PIN = GPIO_NUM_3,
+  CAN_TX_PIN = GPIO_NUM_0,
+  CAN_RX_PIN = GPIO_NUM_1,
   CAN_BAUDRATE = 1000000,
 
   // IMU pins.
-  IMU_SDA_PIN = GPIO_NUM_4,
-  IMU_SCL_PIN = GPIO_NUM_5,
+  IMU_SDA_PIN = GPIO_NUM_3,
+  IMU_SCL_PIN = GPIO_NUM_4,
 
   // GPIO pin definitions
-  STEPPER_ELBOW_ENABLE_PIN = GPIO_NUM_6,
-  STEPPER_ELBOW_DIR_PIN = GPIO_NUM_7,
-  STEPPER_ELBOW_STEP_PIN = GPIO_NUM_8,
+  // The enable pin is enabled by default.
+  STEPPER_ELBOW_ENABLE_PIN = GPIO_NUM_NC,
+  STEPPER_ELBOW_DIR_PIN = GPIO_NUM_6,
+  STEPPER_ELBOW_STEP_PIN = GPIO_NUM_7,
 
   // ADC channels
-  ADC_ELBOW_CHANNEL = ADC_CHANNEL_1,  // GPIO 1
+  ADC_ELBOW_CHANNEL = ADC_CHANNEL_2,  // GPIO 2
 
   // PWM timers and channels
   PWM_ELBOW_CHANNEL = LEDC_CHANNEL_0,
@@ -46,7 +47,10 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .enable_gpio = STEPPER_ELBOW_ENABLE_PIN,
 
     // Set these if you want microstepping.
-    .microstepping_mode = MICROSTEP_NONE,
+    .microstepping_type = MICROSTEP_HARDWARE,
+    .microstepping_mode = MICROSTEP_1_32,
+    // We're setting the stepper driver's pins in hardware, so we don't need to
+    // use them in the software.
     .microstep_m0_gpio = GPIO_NUM_NC,
     .microstep_m1_gpio = GPIO_NUM_NC,
     .microstep_m2_gpio = GPIO_NUM_NC,
@@ -54,8 +58,8 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .direction = STEPPER_DIR_REVERSE,
     .steps_per_rev = 200,
     .gear_ratio = 15.0F,
-    .max_velocity_negative = {20.0F},
-    .max_velocity_positive = {20.0F},
+    .max_velocity_negative = {40.0F},
+    .max_velocity_positive = {40.0F},
     .max_accel = {20.0F},
     .pot_adc_channel = ADC_ELBOW_CHANNEL,
     .pwm_channel = PWM_ELBOW_CHANNEL,
@@ -63,16 +67,19 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 3,
-            .max_adc_value = 3098,
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
             .min_potentiometer_angle_as_joint_angle = {0.F},
             // Angle increases as the elbow is pulled in.
-            .min_potentiometer_angle = {98.F},
+            .min_potentiometer_angle = {123.F},
             // Using the ratio between the joint angles and potentiomter angles,
             // 72 degrees of potentiometer angle becomes 60 degrees
             // of joint angle.
-            .max_potentiometer_angle = {165.F},
+            .max_potentiometer_angle = {195.F},
             .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
+            .is_reversed = true,
         },
 };
 
@@ -311,46 +318,6 @@ static void stepper_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
-// Test task to cycle through different target angles
-static void stepper_test_task([[maybe_unused]] void* pvParameter) {
-  // Wait a bit for system to initialize
-  vTaskDelay(pdMS_TO_TICKS(2000));
-
-  // Test angles to cycle through (in degrees)
-  const float test_angles[] = {0.0F, 60.F};
-  int num_angles = sizeof(test_angles) / sizeof(test_angles[0]);
-  int angle_index = 0;
-
-  ESP_LOGI(TAG, "Stepper test task started - will cycle through test angles");
-
-  while (1) {
-    // Set new target angle
-    float target = test_angles[angle_index];
-    stepper_set_target_angle(s_elbow_stepper_handle, (JointAngle){target});
-    ESP_LOGI(TAG, ">>> Setting target angle to %.1f°", target);
-
-    TickType_t start_time = xTaskGetTickCount();
-
-    // Allow motor to start moving.
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    TickType_t ticks_since_start_time = xTaskGetTickCount() - start_time;
-
-    // Wait for stepper to reach target (or timeout after 5 seconds)
-    while (stepper_is_moving(s_elbow_stepper_handle) &&
-           (ticks_since_start_time < pdMS_TO_TICKS(15000))) {
-      vTaskDelay(pdMS_TO_TICKS(100));
-      ticks_since_start_time = xTaskGetTickCount() - start_time;
-    }
-
-    // Hold at this position for 2 seconds
-    vTaskDelay(pdMS_TO_TICKS(2000));
-
-    // Move to next angle
-    angle_index = (angle_index + 1) % num_angles;
-  }
-}
-
 void app_main(void) {
   ESP_LOGI(TAG, "Robot elbow module starting...");
 
@@ -437,40 +404,38 @@ void app_main(void) {
       ESP_LOGE(TAG, "Failed to create can_rx task, err code: %d");
       abort();
     }
+  }
 
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
-    err = xTaskCreate(reenable_can_task, "reenable_can_task", TASK_STACK_DEPTH,
-                      NULL, TASK_CAN_RX_PRIORITY + 1, NULL);
+  {
+    BaseType_t err =
+        xTaskCreate(reenable_can_task, "reenable_can_task", TASK_STACK_DEPTH,
+                    NULL, TASK_CAN_RX_PRIORITY + 1, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
       abort();
     }
+  }
 #endif
 
 #if CONFIG_IMU_ENABLED
-    err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
-                      TASK_IMU_PRIORITY, NULL);
+  {
+    BaseType_t err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
+                                 TASK_IMU_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
       abort();
     }
+  }
 #endif
 
-    err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH, NULL,
-                      TASK_STEPPER_UPDATE_PRIORITY, NULL);
+  {
+    BaseType_t err = xTaskCreate(stepper_task, "stepper_task", TASK_STACK_DEPTH,
+                                 NULL, TASK_STEPPER_UPDATE_PRIORITY, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create stepper task, err code: %d");
       abort();
     }
-
-    // Lower priority than stepper_task.
-    // err = xTaskCreate(stepper_test_task, "stepper_test", TASK_STACK_DEPTH,
-    // NULL,
-    //                   TASK_STEPPER_TEST_PRIORITY, NULL);
-    // if (err != pdPASS) {
-    //   ESP_LOGE(TAG, "Failed to create stepper_test task, err code: %d");
-    //   return;
-    // }
   }
 
   ESP_LOGI(TAG, "Tasks created, system running");

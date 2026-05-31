@@ -10,7 +10,9 @@ First of all, you need to figure out the relationship between the ADC
 values you read from the potentiometer and the angles they represent. For
 this, you need three things: the potentiometer's range of motion and the
 ADC values measured when the potentiometer is turned as far as possible
-in both the clockwise as well as the counterclockwise direction. From
+in both the clockwise as well as the counterclockwise direction. If
+you are using the [adc_manager component](../adc_manager/), these ADC
+values should be 0 and 𝑉<sub>in</sub> expressed in millivolts. From
 this, you can create a linear relationship between the range of motion
 and the ADC values, with the minimum ADC value corresponding to 0&deg;
 and the maximum corresponding to the largest value in the range of motion.
@@ -38,6 +40,10 @@ void update_joint_angle(uint16_t adc_value) {
       // Turning the potentiometer to the 0 degree position gives an ADC value
       // of 3, turning it to the 285 degree position gives an ADC value of
       // 3098.
+      // NOTE: Ideally you should be using the ADC manager component or
+      // manually calibrating the ADC values using ESP-IDF's ADC calibration
+      // driver, in which case the min and max values should be ~0 and ~Vin in
+      // millivolts.
       .degrees_of_motion = {285.F},
       .min_adc_value = 3,
       .max_adc_value = 3098,

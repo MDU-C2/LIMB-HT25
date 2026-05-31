@@ -24,25 +24,27 @@ enum {
 };
 
 enum {
-  SERVO_UP_DOWN_GPIO = GPIO_NUM_9,
+  SERVO_UP_DOWN_GPIO = GPIO_NUM_3,
   // The channel number corresponds to the GPIO number.
   POTENTIOMETER_UP_DOWN_CHANNEL = ADC_CHANNEL_2,
 
-  SERVO_LEFT_RIGHT_GPIO = GPIO_NUM_10,
+  SERVO_LEFT_RIGHT_GPIO = GPIO_NUM_4,
   // The channel number corresponds to the GPIO number.
-  POTENTIOMETER_LEFT_RIGHT_CHANNEL = ADC_CHANNEL_3,
+  POTENTIOMETER_LEFT_RIGHT_CHANNEL = ADC_CHANNEL_1,
 
   // The channel number corresponds to the GPIO number.
-  POTENTIOMETER_ROTATION_CHANNEL = ADC_CHANNEL_4,
-  STEPPER_UPPER_ARM_ROTATION_ENABLE_GPIO = GPIO_NUM_8,
-  STEPPER_UPPER_ARM_ROTATION_DIR_GPIO = GPIO_NUM_5,
-  STEPPER_UPPER_ARM_ROTATION_STEP_GPIO = GPIO_NUM_1,
+  POTENTIOMETER_ROTATION_CHANNEL = ADC_CHANNEL_0,
+  STEPPER_UPPER_ARM_ROTATION_ENABLE_GPIO = GPIO_NUM_NC,
+  STEPPER_UPPER_ARM_ROTATION_DIR_GPIO = GPIO_NUM_10,
+  STEPPER_UPPER_ARM_ROTATION_STEP_GPIO = GPIO_NUM_7,
   // Microstepping pins.
+  // NOTE: Since we're setting the stepper driver's pins in the hardware, we
+  // don't need to use these pins in software.
   STEPPER_UPPER_ARM_ROTATION_M0_GPIO = GPIO_NUM_NC,
   STEPPER_UPPER_ARM_ROTATION_M1_GPIO = GPIO_NUM_NC,
-  STEPPER_UPPER_ARM_ROTATION_M2_GPIO = GPIO_NUM_0,
+  STEPPER_UPPER_ARM_ROTATION_M2_GPIO = GPIO_NUM_NC,
   CAN_TX_GPIO = GPIO_NUM_6,
-  CAN_RX_GPIO = GPIO_NUM_7,
+  CAN_RX_GPIO = GPIO_NUM_5,
 };
 
 // Motors are hv2060
@@ -65,11 +67,13 @@ static const ServoConfig kUpDownServoConfig = {
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 20,
-            .max_adc_value = 3087,
-            // The red wire is ground and black is Vin.
-            .min_potentiometer_angle = {170},
-            .max_potentiometer_angle = {250},
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
+            // should be [0,90], but is actually like [0,75]
+            .min_potentiometer_angle = {150},
+            .max_potentiometer_angle = {240},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
             .is_reversed = true,
@@ -94,12 +98,13 @@ static const ServoConfig kLeftRightServoConfig = {
     .potentiometer =
         (Potentiometer){
             .degrees_of_motion = {285.F},
-            .min_adc_value = 2,
-            .max_adc_value = 2922,
-            // The red wire should be connected to ground and the black to Vin.
-            // Corresponds to 40 joint degrees.
-            .min_potentiometer_angle = {89},
-            .max_potentiometer_angle = {137},
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
+            // Corresponds to between 5 and 40 joint degrees.
+            .min_potentiometer_angle = {86},
+            .max_potentiometer_angle = {128},
             .min_potentiometer_angle_as_joint_angle = {5.F},
             .joint_angle_to_potentiometer_angle_ratio = 18.F / 15.F,
         },
@@ -110,15 +115,16 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .enable_gpio = STEPPER_UPPER_ARM_ROTATION_ENABLE_GPIO,
     .dir_gpio = STEPPER_UPPER_ARM_ROTATION_DIR_GPIO,
     .step_gpio = STEPPER_UPPER_ARM_ROTATION_STEP_GPIO,
+    .microstepping_mode = MICROSTEP_1_32,
+    .microstepping_type = MICROSTEP_HARDWARE,
     .microstep_m0_gpio = STEPPER_UPPER_ARM_ROTATION_M0_GPIO,
     .microstep_m1_gpio = STEPPER_UPPER_ARM_ROTATION_M1_GPIO,
     .microstep_m2_gpio = STEPPER_UPPER_ARM_ROTATION_M2_GPIO,
-    .microstepping_mode = MICROSTEP_NONE,
     .direction = STEPPER_DIR_NORMAL,
     .gear_ratio = 15.F,
-    .max_velocity_negative = {20.F},
-    .max_velocity_positive = {20.F},
-    .max_accel = {10.F},
+    .max_velocity_negative = {40.F},
+    .max_velocity_positive = {40.F},
+    .max_accel = {20.F},
     .pot_adc_channel = POTENTIOMETER_ROTATION_CHANNEL,
     .pwm_channel = LEDC_CHANNEL_2,
     .pwm_timer = LEDC_TIMER_1,
@@ -126,8 +132,10 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .potentiometer =
         {
             .degrees_of_motion = {285.F},
-            .min_adc_value = 6,
-            .max_adc_value = 3087,
+            // We step down voltage we feed to the potentiometer from 3300 mV to
+            // 2200 mV.
+            .min_adc_value = 0,
+            .max_adc_value = 2200,
             // Red is Vin and black is ground.
             .min_potentiometer_angle = {40},
             .max_potentiometer_angle = {160},
@@ -555,16 +563,32 @@ void app_main(void) {
     }
   }
 
-  xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
-  xTaskCreate(motors_update_task, "Motors update task", 1024 * 2 * 2, NULL, 6,
-              NULL);
+  {
+    BaseType_t err =
+        xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
+  }
+
+  {
+    BaseType_t err = xTaskCreate(motors_update_task, "Motors update task",
+                                 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
+  }
 
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
-  BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
-                               1024 * 2 * 2, NULL, 6, NULL);
-  if (err != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
-    abort();
+  {
+    BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
+                                 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
   }
 #endif
 }
