@@ -1,69 +1,19 @@
 #include "HS422_led.h"
 
+#include <math.h>
+
+#include "driver/ledc.h"
+#include "esp_err.h"
+#include "hal/ledc_types.h"
 #include "limb_utils.h"
 
 static const char* const TAG = "HS422_LEDC";
 
-static const int dedos[NUM_SERVOS] = {THUMB_SERVO_GPIO, INDEX_SERVO_GPIO,
-                                      MID_SERVO_GPIO, RING_SERVO_GPIO,
-                                      PINKY_SERVO_GPIO};
-
-// Servo configurations - customize each servo individually
-static const servo_config_t servos[NUM_SERVOS] = {
-    // Thumb servo
-    {.gpio_pin = THUMB_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_0,
-     .max_angle = 30,
-     .min_angle = 0,
-     .min_pulse_us = 1400,
-     .max_pulse_us = 1900,
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Thumb"},
-    // Index finger
-    {.gpio_pin = INDEX_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_1,
-     .max_angle = 85,
-     .min_angle = 0,
-     .min_pulse_us = 1100,
-     .max_pulse_us = 1900,
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Index"},
-    // Middle finger
-    {.gpio_pin = MID_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_2,
-     .max_angle = 90,
-     .min_angle = 0,
-     .min_pulse_us = 800,
-     .max_pulse_us = 1700,
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Middle"},
-    // Ring finger
-    {.gpio_pin = RING_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_3,
-     .max_angle = 50,
-     .min_angle = 0,
-     .min_pulse_us = 1400,
-     .max_pulse_us = 2200,
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Ring"},
-    // Pinky finger
-    {.gpio_pin = PINKY_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_4,
-     .max_angle = 90,
-     .min_angle = 0,
-     .min_pulse_us = 700,
-     .max_pulse_us = 1600,
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Pinky"},
-    {.gpio_pin = TWIST_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_5,
-     .min_angle = 0,
-     .max_angle = 140,
-     .min_pulse_us = 500,
-     .max_pulse_us = 2500,
-     .direction = SERVO_DIR_NORMAL,
-     .name = "Wrist"},
-};
+// We support a static amount of servo motors, so we statically allocate space
+// for them.
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+static servo_config_t s_servo_configs[LEDC_CHANNEL_MAX] = {0};
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 // Convert microseconds to duty cycle
 uint32_t us_to_duty(uint32_t us) {
@@ -71,9 +21,37 @@ uint32_t us_to_duty(uint32_t us) {
   return (uint32_t)((uint64_t)SERVO_MAX_DUTY * us / SERVO_PERIOD_US);
 }
 
+uint32_t duty_to_us(uint32_t duty) {
+  return (uint32_t)((uint64_t)duty * SERVO_PERIOD_US / SERVO_MAX_DUTY);
+}
+
+float pulse_width_to_angle(const servo_config_t* servo, uint16_t pw_us) {
+  const float angle = LIMB_LERP_FROM_RANGE(
+      (float)pw_us, (float)servo->min_pulse_us, (float)servo->max_pulse_us,
+      servo->min_angle, servo->max_angle);
+  return angle;
+}
+
+uint16_t angle_to_pulse_width(const servo_config_t* servo, float angle_deg) {
+  angle_deg = LIMB_CLAMP(angle_deg, servo->min_angle, servo->max_angle);
+  if (servo->direction == SERVO_DIR_REVERSE) {
+    angle_deg = servo->min_angle + (servo->max_angle - angle_deg);
+  }
+  const float us =
+      LIMB_LERP_FROM_RANGE(angle_deg, servo->min_angle, servo->max_angle,
+                           servo->min_pulse_us, servo->max_pulse_us);
+  return (uint16_t)us;
+}
+
 // Initialize all servos
-esp_err_t servo_led_init(void) {
-  ESP_LOGI(TAG, "Initializing LEDC for %d servos", NUM_SERVOS);
+esp_err_t servo_led_init(const servo_config_t* servos, size_t servos_size) {
+  if (servos_size > LIMB_ARR_LEN(s_servo_configs)) {
+    ESP_LOGE(TAG, "Tried to initialize more servos than are supported (%u)",
+             LIMB_ARR_LEN(s_servo_configs));
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  ESP_LOGI(TAG, "Initializing LEDC for %d servos", servos_size);
 
   // Configure LEDC timer (shared by all servos)
   ledc_timer_config_t ledc_timer = {.speed_mode = LEDC_LOW_SPEED_MODE,
@@ -85,7 +63,7 @@ esp_err_t servo_led_init(void) {
 
   ESP_LOGI(TAG, "Timer configured");
   // Configure each servo channel individually
-  for (int i = 0; i < NUM_SERVOS; i++) {
+  for (int i = 0; i < servos_size; i++) {
     ESP_LOGI(TAG, "Configuring %s on GPIO%d, Channel %d", servos[i].name,
              servos[i].gpio_pin, servos[i].ledc_channel);
 
@@ -101,28 +79,22 @@ esp_err_t servo_led_init(void) {
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 
+  ledc_fade_func_install(0);
+
   ESP_LOGI(TAG, "All channels configured, setting initial positions");
 
-  // Set initial wrist rotation at center position.
-  // servo_write_deg_channel(WRIST_SERVO_CONFIG_INDEX,
-  // (servos[WRIST_SERVO_CONFIG_INDEX].max_angle -
-  // servos[WRIST_SERVO_CONFIG_INDEX].min_angle) / 2 + 10);
+  // Initialize all servos to their center position.
+  for (int i = 0; i < servos_size; i++) {
+    const servo_config_t* servo = &servos[i];
+    const float mid_angle =
+        servo->min_angle + ((servo->max_angle - servo->min_angle) / 2.F);
+    servo_move_to_angle(servo, mid_angle);  // Start at center position
+    vTaskDelay(pdMS_TO_TICKS(50));  // Small delay between servo movements
+  }
 
-  // Set initial positions after all channels are configured
-  // for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-  //     servo_write_deg_channel(i, 180);  // Start at center position
-  //     vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
-  // }
-  // vTaskDelay(pdMS_TO_TICKS(2000));
-
-  // for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-  //     servo_write_deg_channel(i, 0);  // Start at center position
-  //     vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
-  // }
-
-  for (int i = 0; i < NUM_FINGER_SERVOS; i++) {
-    // servo_write_deg_channel(i, 180);  // Start at center position
-    // vTaskDelay(pdMS_TO_TICKS(50));   // Small delay between servo movements
+  // Copy the configs.
+  for (int i = 0; i < servos_size; i++) {
+    s_servo_configs[i] = servos[i];
   }
 
   ESP_LOGI(TAG, "All servos initialized at neutral position");
@@ -130,37 +102,64 @@ esp_err_t servo_led_init(void) {
   return ESP_OK;
 }
 
-// Write angle to specific servo channel
-void servo_write_deg_channel(int channel, float deg) {
-  if (channel < 0 || channel >= NUM_SERVOS) return;
+void servo_move_to_angle_with_speed(const servo_config_t* servo, float angle,
+                                    AngularVelocity speed) {
+  const AngularVelocity clamped_speed = {MIN(speed.dps, servo->max_speed.dps)};
+  const float clamped_angle =
+      LIMB_CLAMP(angle, servo->min_angle, servo->max_angle);
 
-  const servo_config_t* servo = &servos[channel];
+  // We find the current angle based on the current duty.
+  const uint32_t current_duty =
+      ledc_get_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
+  const uint16_t current_us = duty_to_us(current_duty);
+  const float current_angle = pulse_width_to_angle(servo, current_us);
 
-  deg = LIMB_CLAMP(deg, servo->min_angle, servo->max_angle);
-
-  if (servo->direction == SERVO_DIR_REVERSE) {
-    deg = servo->min_angle + (servo->max_angle - deg);
+  const float abs_angle_diff = fabsf(clamped_angle - current_angle);
+  // Don't move if we're close to the angle.
+  const float deadband = 0.5F;
+  if (abs_angle_diff < deadband) {
+    return;
   }
+  const uint16_t time_to_move_ms =
+      (uint16_t)(abs_angle_diff / clamped_speed.dps * 1000.F);
 
-  // Convert angle to pulse width
-  const float us =
-      LIMB_LERP_FROM_RANGE(deg, servo->min_angle, servo->max_angle,
-                           servo->min_pulse_us, servo->max_pulse_us);
+  const ledc_channel_t channel = servo->ledc_channel;
+
+  const uint16_t us = angle_to_pulse_width(servo, clamped_angle);
+  const uint32_t duty = us_to_duty(us);
+
+  // Since we're starting a new fade, we stop the previous fade in case it's
+  // not done yet.
+  ESP_ERROR_CHECK_WITHOUT_ABORT(ledc_fade_stop(LEDC_LOW_SPEED_MODE, channel));
+  ESP_ERROR_CHECK_WITHOUT_ABORT(ledc_set_fade_time_and_start(
+      LEDC_LOW_SPEED_MODE, channel, duty, time_to_move_ms, LEDC_FADE_NO_WAIT));
+  ESP_LOGI(TAG, "%s -> %f° (%u us)", servo->name, angle, us);
+}
+
+void servo_fade_to_angle(const servo_config_t* servo, float angle,
+                         uint32_t fade_ms) {
+  const uint16_t us = angle_to_pulse_width(servo, angle);
+  const uint32_t duty = us_to_duty(us);
+
+  ESP_ERROR_CHECK_WITHOUT_ABORT(
+      ledc_fade_stop(LEDC_LOW_SPEED_MODE, servo->ledc_channel));
+  ESP_ERROR_CHECK_WITHOUT_ABORT(
+      ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, servo->ledc_channel,
+                                   duty, fade_ms, LEDC_FADE_NO_WAIT));
+
+  ESP_LOGI(TAG, "%s -> %f° (%u us)", servo->name, angle, us);
+}
+
+// Write angle to specific servo channel
+void servo_move_to_angle(const servo_config_t* servo, float angle) {
+  const uint16_t us = angle_to_pulse_width(servo, angle);
 
   // Set duty cycle
-  const uint32_t duty = us_to_duty((uint32_t)us);
+  const uint32_t duty = us_to_duty(us);
   ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel, duty);
   ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->ledc_channel);
 
-  ESP_LOGI(TAG, "%s -> %d° (%lu us)", servo->name, deg, us);
-}
-
-// Write same angle to all servos
-void servo_write_all_deg(int deg) {
-  ESP_LOGI(TAG, "Setting all servos to %d°", deg);
-  for (int i = 0; i < NUM_SERVOS; i++) {
-    servo_write_deg_channel(i, deg);
-  }
+  ESP_LOGI(TAG, "%s -> %f° (%u us)", servo->name, angle, us);
 }
 
 // ============================================================================
@@ -169,11 +168,11 @@ void servo_write_all_deg(int deg) {
 
 void make_fist_gesture(void) {
   ESP_LOGI(TAG, "Executing 'Make Fist' gesture");
-  for (int i = 0; i < NUM_SERVOS; i++) {
-    if (servos[i].direction == SERVO_DIR_REVERSE) {
-      servo_write_deg_channel(i, servos[i].max_angle);
+  for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
+    if (s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
+      servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
     } else {
-      servo_write_deg_channel(i, servos[i].min_angle);
+      servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
     }
   }
   vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
@@ -181,11 +180,11 @@ void make_fist_gesture(void) {
 
 void open_hand_gesture(void) {
   ESP_LOGI(TAG, "Executing 'Open Hand' gesture");
-  for (int i = 0; i < NUM_SERVOS; i++) {
-    if (servos[i].direction == SERVO_DIR_REVERSE) {
-      servo_write_deg_channel(i, servos[i].min_angle);
+  for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
+    if (s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
+      servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
     } else {
-      servo_write_deg_channel(i, servos[i].max_angle);
+      servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
     }
   }
   vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
@@ -193,18 +192,18 @@ void open_hand_gesture(void) {
 
 void make_peace_gesture(void) {
   ESP_LOGI(TAG, "Executing 'Peace' gesture");
-  for (int i = 0; i < NUM_SERVOS; i++) {
+  for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
     if (i == 1 || i == 2) {  // Index and Middle fingers
-      if (servos[i].direction == SERVO_DIR_REVERSE) {
-        servo_write_deg_channel(i, servos[i].min_angle);
+      if (s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
       } else {
-        servo_write_deg_channel(i, servos[i].max_angle);
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
       }
     } else {  // Other fingers
-      if (servos[i].direction == SERVO_DIR_REVERSE) {
-        servo_write_deg_channel(i, servos[i].max_angle);
+      if (s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
       } else {
-        servo_write_deg_channel(i, servos[i].min_angle);
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
       }
     }
   }
@@ -218,10 +217,10 @@ void count_to_five_gesture(void) {
 
   // Open fingers one by one
   for (int i = 0; i < 5; i++) {
-    if (servos[i].direction == SERVO_DIR_REVERSE) {
-      servo_write_deg_channel(i, servos[i].min_angle);
+    if (s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
+      servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
     } else {
-      servo_write_deg_channel(i, servos[i].max_angle);
+      servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
     }
     vTaskDelay(pdMS_TO_TICKS(500));  // Wait half a second between fingers
   }
@@ -231,18 +230,18 @@ void count_to_five_gesture(void) {
 
 void rock_gesture(void) {
   ESP_LOGI(TAG, "Executing 'Rock' gesture");
-  for (int i = 0; i < NUM_SERVOS; i++) {
+  for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
     if (i == 0 || i == 1 || i == 4) {  // Thumb, Index, Pinky fingers
-      if (servos[i].direction == SERVO_DIR_NORMAL) {
-        servo_write_deg_channel(i, servos[i].max_angle);
+      if (s_servo_configs[i].direction == SERVO_DIR_NORMAL) {
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
       } else {
-        servo_write_deg_channel(i, servos[i].min_angle);
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
       }
     } else {  // Index and Middle fingers
-      if (servos[i].direction == SERVO_DIR_NORMAL) {
-        servo_write_deg_channel(i, servos[i].min_angle);
+      if (s_servo_configs[i].direction == SERVO_DIR_NORMAL) {
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
       } else {
-        servo_write_deg_channel(i, servos[i].max_angle);
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
       }
     }
   }
@@ -251,18 +250,18 @@ void rock_gesture(void) {
 
 void flip_off_gesture(void) {
   ESP_LOGI(TAG, "Executing 'Flip Off' gesture");
-  for (int i = 0; i < NUM_SERVOS; i++) {
+  for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
     if (i == 2) {  // Middle finger
-      if (servos[i].direction == SERVO_DIR_REVERSE) {
-        servo_write_deg_channel(i, servos[i].min_angle);
+      if (s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
       } else {
-        servo_write_deg_channel(i, servos[i].max_angle);
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
       }
     } else {  // Other fingers
-      if (servos[i].direction == SERVO_DIR_REVERSE) {
-        servo_write_deg_channel(i, servos[i].max_angle);
+      if (s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].max_angle);
       } else {
-        servo_write_deg_channel(i, servos[i].min_angle);
+        servo_move_to_angle(&s_servo_configs[i], s_servo_configs[i].min_angle);
       }
     }
   }
@@ -271,44 +270,44 @@ void flip_off_gesture(void) {
 
 void custom_grip_1(void) {
   ESP_LOGI(TAG, "Executing 'custom grip 1' gesture");
-  // for (int i = 0; i < NUM_SERVOS; i++) {
-  //     if(servos[i].direction == SERVO_DIR_REVERSE) {
+  // for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
+  //     if(s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
   //         //always in reverse direction
   //         servo_write_deg_channel(i, 90);
   //     }
   // }
-  servo_write_deg_channel(0, 120);  // thumb
-  servo_write_deg_channel(1, 90);   // pinky
-  servo_write_deg_channel(2, 90);   // ring
-  servo_write_deg_channel(3, 120);  // mid
-  servo_write_deg_channel(4, 120);  // index
-  vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
-  vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
+  servo_move_to_angle(&s_servo_configs[0], 120);  // thumb
+  servo_move_to_angle(&s_servo_configs[1], 90);   // pinky
+  servo_move_to_angle(&s_servo_configs[2], 90);   // ring
+  servo_move_to_angle(&s_servo_configs[3], 120);  // mid
+  servo_move_to_angle(&s_servo_configs[4], 120);  // index
+  vTaskDelay(pdMS_TO_TICKS(1000));                // Hold for 1 second
+  vTaskDelay(pdMS_TO_TICKS(1000));                // Hold for 1 second
 }
 
 void custom_grip_2(void) {
   ESP_LOGI(TAG, "Executing 'custom grip 2' gesture");
-  // for (int i = 0; i < NUM_SERVOS; i++) {
-  //     if(servos[i].direction == SERVO_DIR_REVERSE) {
+  // for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
+  //     if(s_servo_configs[i].direction == SERVO_DIR_REVERSE) {
   //         //always in reverse direction
   //         servo_write_deg_channel(i, 60);
   //     }
   // }
-  servo_write_deg_channel(0, 60);   // thumb
-  servo_write_deg_channel(1, 60);   // pinky
-  servo_write_deg_channel(2, 60);   // ring
-  servo_write_deg_channel(3, 60);   // mid
-  servo_write_deg_channel(4, 60);   // index
-  vTaskDelay(pdMS_TO_TICKS(1000));  // Hold for 1 second
+  servo_move_to_angle(&s_servo_configs[0], 60);  // thumb
+  servo_move_to_angle(&s_servo_configs[1], 60);  // pinky
+  servo_move_to_angle(&s_servo_configs[2], 60);  // ring
+  servo_move_to_angle(&s_servo_configs[3], 60);  // mid
+  servo_move_to_angle(&s_servo_configs[4], 60);  // index
+  vTaskDelay(pdMS_TO_TICKS(1000));               // Hold for 1 second
 }
 
 // ============================================================================
 // ROTARY ENCODER IMPLEMENTATION
 // ============================================================================
 
-static volatile int encoder_value = 0;
-static volatile bool button_pressed = false;
-static volatile uint32_t last_button_time = 0;
+static int encoder_value = 0;
+static bool button_pressed = false;
+static uint32_t last_button_time = 0;
 static const uint32_t DEBOUNCE_TIME_MS = 200;
 
 // ISR for CLK pin (rotary encoder rotation)
@@ -419,23 +418,25 @@ void start_calibration_mode(void) {
           selected_finger = 0;
           encoder_value = 0;
         }
-        if (selected_finger >= NUM_SERVOS) {
-          selected_finger = NUM_SERVOS - 1;
-          encoder_value = NUM_SERVOS - 1;
+        if (selected_finger >= LIMB_ARR_LEN(s_servo_configs)) {
+          selected_finger = LIMB_ARR_LEN(s_servo_configs) - 1;
+          encoder_value = LIMB_ARR_LEN(s_servo_configs) - 1;
         }
 
         // Visual feedback - move the selected servo slightly
         static int last_selected = -1;
         if (last_selected != selected_finger) {
-          ESP_LOGI(TAG, "Selected finger: %s", servos[selected_finger].name);
-          servo_write_deg_channel(selected_finger, 90);
+          ESP_LOGI(TAG, "Selected finger: %s",
+                   s_servo_configs[selected_finger].name);
+          servo_move_to_angle(&s_servo_configs[selected_finger], 90);
           last_selected = selected_finger;
         }
 
         if (is_encoder_button_pressed()) {
-          ESP_LOGI(TAG, "Calibrating %s", servos[selected_finger].name);
+          ESP_LOGI(TAG, "Calibrating %s",
+                   s_servo_configs[selected_finger].name);
           state = CAL_STATE_SET_MIN;
-          temp_min_angle = servos[selected_finger].min_angle;
+          temp_min_angle = s_servo_configs[selected_finger].min_angle;
           encoder_value = temp_min_angle;
         }
         break;
@@ -453,13 +454,13 @@ void start_calibration_mode(void) {
         }
 
         // Move servo to current angle for visual feedback
-        servo_write_deg_channel(selected_finger, temp_min_angle);
+        servo_move_to_angle(&s_servo_configs[selected_finger], temp_min_angle);
         vTaskDelay(pdMS_TO_TICKS(20));
 
         if (is_encoder_button_pressed()) {
           ESP_LOGI(TAG, "Min angle set to %d°", temp_min_angle);
           state = CAL_STATE_SET_MAX;
-          temp_max_angle = servos[selected_finger].max_angle;
+          temp_max_angle = s_servo_configs[selected_finger].max_angle;
           encoder_value = temp_max_angle;
         }
         break;
@@ -477,7 +478,7 @@ void start_calibration_mode(void) {
         }
 
         // Move servo to current angle for visual feedback
-        servo_write_deg_channel(selected_finger, temp_max_angle);
+        servo_move_to_angle(&s_servo_configs[selected_finger], temp_max_angle);
         vTaskDelay(pdMS_TO_TICKS(20));
 
         if (is_encoder_button_pressed()) {
@@ -489,11 +490,9 @@ void start_calibration_mode(void) {
             encoder_value = temp_min_angle;
           } else {
             // Save the calibration
-            servos[selected_finger].min_angle = temp_min_angle;
-            servos[selected_finger].max_angle = temp_max_angle;
             ESP_LOGI(TAG, "Max angle set to %d°", temp_max_angle);
             ESP_LOGI(TAG, "%s calibration complete: Min=%d°, Max=%d°",
-                     servos[selected_finger].name, temp_min_angle,
+                     s_servo_configs[selected_finger].name, temp_min_angle,
                      temp_max_angle);
 
             // Return to finger selection or exit
@@ -526,8 +525,8 @@ void start_calibration_mode(void) {
 
   ESP_LOGI(TAG, "=== CALIBRATION COMPLETE ===");
   ESP_LOGI(TAG, "Final calibration values:");
-  for (int i = 0; i < NUM_SERVOS; i++) {
-    ESP_LOGI(TAG, "%s: Min=%d°, Max=%d°", servos[i].name, servos[i].min_angle,
-             servos[i].max_angle);
+  for (int i = 0; i < LIMB_ARR_LEN(s_servo_configs); i++) {
+    ESP_LOGI(TAG, "%s: Min=%d°, Max=%d°", s_servo_configs[i].name,
+             s_servo_configs[i].min_angle, s_servo_configs[i].max_angle);
   }
 }

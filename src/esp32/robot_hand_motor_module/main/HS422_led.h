@@ -1,11 +1,12 @@
 #pragma once
 
-#include "driver/gpio.h"
-#include "driver/ledc.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "hal/ledc_types.h"
+#include "limb_utils.h"
+#include "soc/gpio_num.h"
 
 // =================================
 // #define BUTTON_Next_GPIO  19    // GPIO for button to move to next position
@@ -16,13 +17,6 @@
 #define ROTARY_ENCODER_CLK_GPIO 21  // CLK pin (A phase)
 #define ROTARY_ENCODER_DT_GPIO 18   // DT pin (B phase)
 #define ROTARY_ENCODER_SW_GPIO 19   // SW pin (button/switch)
-
-#define THUMB_SERVO_GPIO GPIO_NUM_0
-#define INDEX_SERVO_GPIO GPIO_NUM_1
-#define MID_SERVO_GPIO GPIO_NUM_2
-#define RING_SERVO_GPIO GPIO_NUM_3
-#define PINKY_SERVO_GPIO GPIO_NUM_4
-#define TWIST_SERVO_GPIO GPIO_NUM_5
 
 #define SERVO_FREQ_HZ 50   // 50 Hz = 20 ms period
 #define SERVO_RES_BITS 13  // resolution; 13 bits = 8191 ticks
@@ -36,21 +30,17 @@
 #define SERVO_PERIOD_US (1000000UL / SERVO_FREQ_HZ)
 #define SERVO_MAX_DUTY ((1U << SERVO_RES_BITS) - 1)
 
-#define NUM_SERVOS 6
-#define NUM_FINGER_SERVOS 5
-#define WRIST_SERVO_CONFIG_INDEX (NUM_SERVOS - 1)
-
 // Direction enum
 typedef enum { SERVO_DIR_NORMAL = 1, SERVO_DIR_REVERSE = -1 } servo_direction_t;
 
 typedef struct {
-  int gpio_pin;                 // GPIO pin for this servo
+  gpio_num_t gpio_pin;          // GPIO pin for this servo
   ledc_channel_t ledc_channel;  // LEDC channel (0-7)
   float min_angle;              // Minimum angle in degrees
   float max_angle;              // Maximum angle in degrees
   uint32_t min_pulse_us;        // Minimum pulse width in microseconds
   uint32_t max_pulse_us;        // Maximum pulse width in microseconds
-  float current_angle;          // Current servo position
+  AngularVelocity max_speed;
   float current_force;          // Current force applied, measured by FSR
   servo_direction_t direction;  // Direction of servo movement
   const char* name;             // Human-readable name for debugging
@@ -65,9 +55,12 @@ typedef enum {
 } calibration_state_t;
 
 // Function declarations
-uint32_t us_to_duty(uint32_t us);
-esp_err_t servo_led_init(void);
-void servo_write_deg_channel(int channel, float deg);
+esp_err_t servo_led_init(const servo_config_t* servos, size_t servos_size);
+void servo_move_to_angle(const servo_config_t* servo, float angle);
+void servo_fade_to_angle(const servo_config_t* servo, float angle,
+                         uint32_t fade_ms);
+void servo_move_to_angle_with_speed(const servo_config_t* servo, float angle,
+                                    AngularVelocity speed);
 void servo_write_all_deg(int deg);
 void close_all_fingers(void);
 void open_all_fingers(void);
