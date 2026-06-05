@@ -72,8 +72,8 @@ static const ServoConfig kUpDownServoConfig = {
             .min_adc_value = 0,
             .max_adc_value = 2200,
             // should be [0,90], but is actually like [0,75]
-            .min_potentiometer_angle = {150},
-            .max_potentiometer_angle = {240},
+            .min_potentiometer_angle = {145},
+            .max_potentiometer_angle = {235},
             .min_potentiometer_angle_as_joint_angle = {0.F},
             .joint_angle_to_potentiometer_angle_ratio = 1.F,
             .is_reversed = true,
