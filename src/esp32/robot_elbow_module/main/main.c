@@ -171,6 +171,7 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+[[maybe_unused]]
 static void imu_task([[maybe_unused]] void* pvParameter) {
   ImuRawData raw_data;
 
@@ -251,6 +252,7 @@ static void imu_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+[[maybe_unused]]
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   while (true) {
     can_automatically_reenable_on_bus_off();

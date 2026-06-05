@@ -98,6 +98,7 @@ static const servo_config_t s_servo_configs[] = {
                             .name = "Wrist"},
 };
 
+[[maybe_unused]]
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   while (true) {
     can_automatically_reenable_on_bus_off();
@@ -105,6 +106,7 @@ static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+[[maybe_unused]]
 static void imu_task([[maybe_unused]] void* pvParameter) {
   uint32_t can_error_count = 0;
   esp_err_t err = ESP_OK;

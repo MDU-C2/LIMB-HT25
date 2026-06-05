@@ -58,6 +58,7 @@ enum {
 
 void loop_control(void);
 
+[[maybe_unused]]
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   while (true) {
     can_automatically_reenable_on_bus_off();
@@ -65,6 +66,7 @@ static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+[[maybe_unused]]
 void imu_task([[maybe_unused]] void* pvParameter) {
   enum {
     IMU_FREQ_HZ = 100,

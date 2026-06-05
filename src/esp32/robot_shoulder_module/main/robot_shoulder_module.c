@@ -483,6 +483,7 @@ static void motors_update_task([[maybe_unused]] void* args) {
   vTaskDelete(NULL);
 }
 
+[[maybe_unused]]
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   while (true) {
     can_automatically_reenable_on_bus_off();
