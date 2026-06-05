@@ -69,7 +69,8 @@ typedef enum {
 
 // Function declarations
 esp_err_t servo_led_init(void);
-void servo_write_deg_channel(int channel, float deg);
+void servo_move_to_angle(ServoHandle channel, float angle);
+void servo_fade_to_angle(ServoHandle handle, float angle, uint32_t fade_ms);
 void servo_move_to_angle_with_speed(ServoHandle handle, float angle,
                                     AngularVelocity speed);
 void servo_write_all_deg(int deg);
