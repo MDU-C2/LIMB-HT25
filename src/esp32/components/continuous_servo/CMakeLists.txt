@@ -1,6 +1,6 @@
 idf_component_register(
   SRCS
-  "servo.c"
+  "continuous_servo.c"
   INCLUDE_DIRS
   "include"
   REQUIRES

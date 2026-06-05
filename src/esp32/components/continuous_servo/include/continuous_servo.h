@@ -8,9 +8,9 @@
 // Determines if low angles should generate low or high pulse widths, and vice
 // versa for high angles.
 typedef enum {
-  SERVO_DIR_NORMAL,
-  SERVO_DIR_REVERSE,
-} ServoDirection;
+  CONTINUOUS_SERVO_DIR_NORMAL,
+  CONTINUOUS_SERVO_DIR_REVERSE,
+} ContinuousServoDirection;
 
 // Configuration options for initializing servos. Also serves as the handle for
 // the servo once configured.
@@ -53,42 +53,48 @@ typedef struct {
   Potentiometer potentiometer;
 
   // If the angles should be reversed.
-  ServoDirection direction;
+  ContinuousServoDirection direction;
   // Human-readable name for debugging
   const char* name;
-} ServoConfig;
+} ContinuousServoConfig;
 
-typedef ledc_channel_t ServoHandle;
+typedef ledc_channel_t ContinuousServoHandle;
 
 // Initialize servos using provided configurations.
-esp_err_t servo_init(const ServoConfig* servo_config,
-                     uint16_t latest_potentiometer_adc_value,
-                     ServoHandle* out_handle);
+esp_err_t continuous_servo_init(const ContinuousServoConfig* servo_config,
+                                uint16_t latest_potentiometer_adc_value,
+                                ContinuousServoHandle* out_handle);
 
 // This function is meant to be called periodically. It determines how far it
 // should move the servo based on the distance to the target angle and the time
-// remaining until the next call to servo_update.
-bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
-                  uint16_t potentiometer_value);
+// remaining until the next call to continuous_servo_update.
+bool continuous_servo_update(ContinuousServoHandle handle,
+                             uint16_t ms_until_next_period,
+                             uint16_t potentiometer_value);
 
 // Set target angular velocity (degrees per second)
-void servo_set_target_velocity(ServoHandle handle,
-                               AngularVelocity target_velocity);
+void continuous_servo_set_target_velocity(ContinuousServoHandle handle,
+                                          AngularVelocity target_velocity);
 
-// Sets the target angle that `servo_update` aims for.
-void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);
+// Sets the target angle that `continuous_servo_update` aims for.
+void continuous_servo_set_target_angle(ContinuousServoHandle handle,
+                                       JointAngle target_angle);
 
-void servo_set_estop(ServoHandle handle, bool active);
+void continuous_servo_set_estop(ContinuousServoHandle handle, bool active);
 
-PotentiometerAngle servo_get_current_angle(ServoHandle handle);
+PotentiometerAngle continuous_servo_get_current_angle(
+    ContinuousServoHandle handle);
 
-PotentiometerAngle servo_get_target_angle(ServoHandle handle);
+PotentiometerAngle continuous_servo_get_target_angle(
+    ContinuousServoHandle handle);
 
-AngularVelocity servo_get_current_velocity(ServoHandle handle);
+AngularVelocity continuous_servo_get_current_velocity(
+    ContinuousServoHandle handle);
 
 // Apply the provided angular velocity.
-void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity);
+void continuous_servo_apply_velocity(ContinuousServoHandle handle,
+                                     AngularVelocity velocity);
 
 // Apply the velocity represented by the provided pulse width.
-void servo_apply_pulse_width_as_velocity(ServoHandle handle,
-                                         uint16_t pulse_width);
+void continuous_servo_apply_pulse_width_as_velocity(
+    ContinuousServoHandle handle, uint16_t pulse_width);

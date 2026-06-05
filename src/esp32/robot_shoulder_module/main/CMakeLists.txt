@@ -8,6 +8,6 @@ idf_component_register(
   can_driver
   imu
   potentiometer
-  servo
+  continuous_servo
   stepper
   limb_utils)
