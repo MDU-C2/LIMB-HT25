@@ -33,8 +33,6 @@
 // Direction enum
 typedef enum { SERVO_DIR_NORMAL = 1, SERVO_DIR_REVERSE = -1 } servo_direction_t;
 
-typedef ledc_channel_t ServoHandle;
-
 typedef struct {
   gpio_num_t gpio_pin;          // GPIO pin for this servo
   ledc_channel_t ledc_channel;  // LEDC channel (0-7)
@@ -58,9 +56,10 @@ typedef enum {
 
 // Function declarations
 esp_err_t servo_led_init(const servo_config_t* servos, size_t servos_size);
-void servo_move_to_angle(ServoHandle channel, float angle);
-void servo_fade_to_angle(ServoHandle handle, float angle, uint32_t fade_ms);
-void servo_move_to_angle_with_speed(ServoHandle handle, float angle,
+void servo_move_to_angle(const servo_config_t* servo, float angle);
+void servo_fade_to_angle(const servo_config_t* servo, float angle,
+                         uint32_t fade_ms);
+void servo_move_to_angle_with_speed(const servo_config_t* servo, float angle,
                                     AngularVelocity speed);
 void servo_write_all_deg(int deg);
 void close_all_fingers(void);

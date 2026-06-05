@@ -20,12 +20,12 @@ enum {
   IMU_SDA_GPIO = GPIO_NUM_9,
   IMU_SCL_GPIO = GPIO_NUM_7,
 
-  THUMB_HANDLE = 0,
-  INDEX_HANDLE = 1,
-  MIDDLE_HANDLE = 2,
-  RING_HANDLE = 3,
-  PINKY_HANDLE = 4,
-  WRIST_HANDLE = 5,
+  THUMB_CONFIG_INDEX = 0,
+  INDEX_CONFIG_INDEX = 1,
+  MIDDLE_CONFIG_INDEX = 2,
+  RING_CONFIG_INDEX = 3,
+  PINKY_CONFIG_INDEX = 4,
+  WRIST_CONFIG_INDEX = 5,
 
   THUMB_SERVO_GPIO = GPIO_NUM_0,
   INDEX_SERVO_GPIO = GPIO_NUM_1,
@@ -38,64 +38,64 @@ enum {
 // Servo configurations - customize each servo individually
 static const servo_config_t s_servo_configs[] = {
     // Thumb servo
-    {.gpio_pin = THUMB_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_0,
-     .max_angle = 30,
-     .min_angle = 0,
-     .min_pulse_us = 1400,
-     .max_pulse_us = 1900,
-     .max_speed = {40},
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Thumb"},
+    [THUMB_CONFIG_INDEX] = {.gpio_pin = THUMB_SERVO_GPIO,
+                            .ledc_channel = LEDC_CHANNEL_0,
+                            .max_angle = 30,
+                            .min_angle = 0,
+                            .min_pulse_us = 1400,
+                            .max_pulse_us = 1900,
+                            .max_speed = {40},
+                            .direction = SERVO_DIR_REVERSE,
+                            .name = "Thumb"},
     // Index finger
-    {.gpio_pin = INDEX_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_1,
-     .max_angle = 85,
-     .min_angle = 0,
-     .min_pulse_us = 1100,
-     .max_pulse_us = 1900,
-     .max_speed = {40},
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Index"},
+    [INDEX_CONFIG_INDEX] = {.gpio_pin = INDEX_SERVO_GPIO,
+                            .ledc_channel = LEDC_CHANNEL_1,
+                            .max_angle = 85,
+                            .min_angle = 0,
+                            .min_pulse_us = 1100,
+                            .max_pulse_us = 1900,
+                            .max_speed = {40},
+                            .direction = SERVO_DIR_REVERSE,
+                            .name = "Index"},
     // Middle finger
-    {.gpio_pin = MID_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_2,
-     .max_angle = 90,
-     .min_angle = 0,
-     .min_pulse_us = 800,
-     .max_pulse_us = 1700,
-     .max_speed = {40},
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Middle"},
+    [MIDDLE_CONFIG_INDEX] = {.gpio_pin = MID_SERVO_GPIO,
+                             .ledc_channel = LEDC_CHANNEL_2,
+                             .max_angle = 90,
+                             .min_angle = 0,
+                             .min_pulse_us = 800,
+                             .max_pulse_us = 1700,
+                             .max_speed = {40},
+                             .direction = SERVO_DIR_REVERSE,
+                             .name = "Middle"},
     // Ring finger
-    {.gpio_pin = RING_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_3,
-     .max_angle = 50,
-     .min_angle = 0,
-     .min_pulse_us = 1400,
-     .max_pulse_us = 2200,
-     .max_speed = {40},
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Ring"},
+    [RING_CONFIG_INDEX] = {.gpio_pin = RING_SERVO_GPIO,
+                           .ledc_channel = LEDC_CHANNEL_3,
+                           .max_angle = 50,
+                           .min_angle = 0,
+                           .min_pulse_us = 1400,
+                           .max_pulse_us = 2200,
+                           .max_speed = {40},
+                           .direction = SERVO_DIR_REVERSE,
+                           .name = "Ring"},
     // Pinky finger
-    {.gpio_pin = PINKY_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_4,
-     .max_angle = 90,
-     .min_angle = 0,
-     .min_pulse_us = 700,
-     .max_pulse_us = 1600,
-     .max_speed = {120},
-     .direction = SERVO_DIR_REVERSE,
-     .name = "Pinky"},
-    {.gpio_pin = TWIST_SERVO_GPIO,
-     .ledc_channel = LEDC_CHANNEL_5,
-     .min_angle = 0,
-     .max_angle = 140,
-     .min_pulse_us = 500,
-     .max_pulse_us = 2500,
-     .max_speed = {100},
-     .direction = SERVO_DIR_NORMAL,
-     .name = "Wrist"},
+    [PINKY_CONFIG_INDEX] = {.gpio_pin = PINKY_SERVO_GPIO,
+                            .ledc_channel = LEDC_CHANNEL_4,
+                            .max_angle = 90,
+                            .min_angle = 0,
+                            .min_pulse_us = 700,
+                            .max_pulse_us = 1600,
+                            .max_speed = {120},
+                            .direction = SERVO_DIR_REVERSE,
+                            .name = "Pinky"},
+    [WRIST_CONFIG_INDEX] = {.gpio_pin = TWIST_SERVO_GPIO,
+                            .ledc_channel = LEDC_CHANNEL_5,
+                            .min_angle = 0,
+                            .max_angle = 140,
+                            .min_pulse_us = 500,
+                            .max_pulse_us = 2500,
+                            .max_speed = {100},
+                            .direction = SERVO_DIR_NORMAL,
+                            .name = "Wrist"},
 };
 
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
@@ -211,7 +211,8 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       float angle = deserialize_float(rx_data, kFromLittleEndian);
       AngularVelocity velocity = {
           deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
-      servo_move_to_angle_with_speed(THUMB_HANDLE, angle, velocity);
+      servo_move_to_angle_with_speed(&s_servo_configs[THUMB_CONFIG_INDEX],
+                                     angle, velocity);
       ESP_LOGI(TAG, "Actuation thumb to %.2f degrees at %.2f dps", angle,
                velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_INDEX_ACTUATION) {
@@ -223,7 +224,8 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       float angle = deserialize_float(rx_data, kFromLittleEndian);
       AngularVelocity velocity = {
           deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
-      servo_move_to_angle_with_speed(INDEX_HANDLE, angle, velocity);
+      servo_move_to_angle_with_speed(&s_servo_configs[INDEX_CONFIG_INDEX],
+                                     angle, velocity);
       ESP_LOGI(TAG, "Actuation index to %.2f degrees at %.2f dps", angle,
                velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_MIDDLE_ACTUATION) {
@@ -236,7 +238,8 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       float angle = deserialize_float(rx_data, kFromLittleEndian);
       AngularVelocity velocity = {
           deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
-      servo_move_to_angle_with_speed(MIDDLE_HANDLE, angle, velocity);
+      servo_move_to_angle_with_speed(&s_servo_configs[MIDDLE_CONFIG_INDEX],
+                                     angle, velocity);
       ESP_LOGI(TAG, "Actuation middle to %.2f degrees at %.2f dps", angle,
                velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_RING_ACTUATION) {
@@ -248,7 +251,8 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       float angle = deserialize_float(rx_data, kFromLittleEndian);
       AngularVelocity velocity = {
           deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
-      servo_move_to_angle_with_speed(RING_HANDLE, angle, velocity);
+      servo_move_to_angle_with_speed(&s_servo_configs[RING_CONFIG_INDEX], angle,
+                                     velocity);
       ESP_LOGI(TAG, "Actuation ring to %.2f degrees at %.2f dps", angle,
                velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_PINKY_ACTUATION) {
@@ -260,7 +264,8 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       float angle = deserialize_float(rx_data, kFromLittleEndian);
       AngularVelocity velocity = {
           deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
-      servo_move_to_angle_with_speed(PINKY_HANDLE, angle, velocity);
+      servo_move_to_angle_with_speed(&s_servo_configs[PINKY_CONFIG_INDEX],
+                                     angle, velocity);
       ESP_LOGI(TAG, "Actuation pinky to %.2f degrees at %.2f dps", angle,
                velocity.dps);
     } else if (rx_id == CAN_ID_ROBOT_LOWER_ARM_ROTATION_ACTUATION) {
@@ -273,7 +278,8 @@ static void can_rx_task([[maybe_unused]] void* pvParameter) {
       float angle = deserialize_float(rx_data, kFromLittleEndian);
       AngularVelocity velocity = {
           deserialize_float(rx_data + sizeof(float), kFromLittleEndian)};
-      servo_move_to_angle_with_speed(WRIST_HANDLE, angle, velocity);
+      servo_move_to_angle_with_speed(&s_servo_configs[WRIST_CONFIG_INDEX],
+                                     angle, velocity);
       ESP_LOGI(TAG, "Actuation wrist to %.2f degrees at %.2f dps", angle,
                velocity.dps);
     }
