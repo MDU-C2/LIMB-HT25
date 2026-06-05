@@ -7,6 +7,9 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "imu.h"
+#include "limb_utils.h"
+#include "portmacro.h"
 #include "soc/gpio_num.h"
 
 static const char* TAG = "HAND_MAIN";
@@ -62,6 +65,86 @@ static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+void imu_task([[maybe_unused]] void* pvParameter) {
+  enum {
+    IMU_FREQ_HZ = 100,
+    IMU_PERIOD_MS = 1000 / IMU_FREQ_HZ,
+  };
+
+  uint32_t can_error_count = 0;
+  uint32_t can_error_count_since_last_log = 0;
+  esp_err_t err = ESP_OK;
+
+  ImuRawData raw_data = {0};
+
+  TickType_t current_tick = xTaskGetTickCount();
+  while (true) {
+    xTaskDelayUntil(&current_tick, pdMS_TO_TICKS(IMU_PERIOD_MS));
+
+    err = imu_read_data(&raw_data);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Error reading IMU: %s", esp_err_to_name(err));
+      continue;
+    }
+
+    const ImuData data = imu_to_mg_and_mdps(raw_data);
+
+    float can_buf[1] = {0};
+
+    can_buf[0] = htolef(data.gyro.pitch);
+    err = can_send(CAN_ID_ROBOT_HAND_IMU_GYRO_PITCH, (uint8_t*)can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.gyro.roll);
+    err = can_send(CAN_ID_ROBOT_HAND_IMU_GYRO_ROLL, (uint8_t*)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.gyro.yaw);
+    err = can_send(CAN_ID_ROBOT_HAND_IMU_GYRO_YAW, (uint8_t*)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.accel.x);
+    err = can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL_X, (uint8_t*)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.accel.y);
+    err = can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL_Y, (uint8_t*)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    can_buf[0] = htolef(data.accel.z);
+    err = can_send(CAN_ID_ROBOT_HAND_IMU_ACCEL_Z, (uint8_t*)&can_buf,
+                   sizeof(can_buf), 0);
+    if (err != ESP_OK) {
+      ++can_error_count_since_last_log;
+    }
+
+    enum {
+      kMinCanErrorCountPerLogging = 100,
+    };
+    if (can_error_count_since_last_log > kMinCanErrorCountPerLogging) {
+      can_error_count += can_error_count_since_last_log;
+      can_error_count_since_last_log = 0;
+      ESP_LOGW(TAG, "CAN errors: %d, last_error: %s", can_error_count,
+               esp_err_to_name(err));
+    }
+  }
+}
+
 void app_main(void) {
   ESP_LOGI(TAG, "Starting Brain Node - Safe Mode Available");
 
@@ -69,6 +152,17 @@ void app_main(void) {
     ESP_LOGE(TAG, "ADC Service Init Failed!");
     abort();
   }
+
+#if CONFIG_IMU_ENABLED
+  ImuConfig imu_config = IMU_CONFIG_DEFAULT();
+  imu_config.sda_pin = IMU_SDA_GPIO;
+  imu_config.scl_pin = IMU_SCL_GPIO;
+  ESP_ERROR_CHECK(imu_init(&imu_config));
+  if (!imu_is_present()) {
+    ESP_LOGE(TAG, "Couldn't find IMU even though it was initialized");
+    abort();
+  }
+#endif
 
   // 2. Initialize CAN Bus
   {
@@ -82,6 +176,8 @@ void app_main(void) {
 
   enum {
     TASK_CAN_RX_PRIORITY = 5,
+    TASK_IMU_PRIORITY = 4,
+    TASK_STACK_DEPTH = 4096
   };
 
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
@@ -91,6 +187,17 @@ void app_main(void) {
                     NULL, TASK_CAN_RX_PRIORITY + 1, NULL);
     if (err != pdPASS) {
       ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
+  }
+#endif
+
+#if CONFIG_IMU_ENABLED
+  {
+    BaseType_t err = xTaskCreate(imu_task, "imu_task", TASK_STACK_DEPTH, NULL,
+                                 TASK_IMU_PRIORITY, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create imu task, err code: %d");
       abort();
     }
   }
