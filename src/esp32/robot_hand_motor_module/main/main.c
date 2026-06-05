@@ -26,6 +26,76 @@ enum {
   RING_HANDLE = 3,
   PINKY_HANDLE = 4,
   WRIST_HANDLE = 5,
+
+  THUMB_SERVO_GPIO = GPIO_NUM_0,
+  INDEX_SERVO_GPIO = GPIO_NUM_1,
+  MID_SERVO_GPIO = GPIO_NUM_2,
+  RING_SERVO_GPIO = GPIO_NUM_3,
+  PINKY_SERVO_GPIO = GPIO_NUM_4,
+  TWIST_SERVO_GPIO = GPIO_NUM_5,
+};
+
+// Servo configurations - customize each servo individually
+static const servo_config_t s_servo_configs[] = {
+    // Thumb servo
+    {.gpio_pin = THUMB_SERVO_GPIO,
+     .ledc_channel = LEDC_CHANNEL_0,
+     .max_angle = 30,
+     .min_angle = 0,
+     .min_pulse_us = 1400,
+     .max_pulse_us = 1900,
+     .max_speed = {40},
+     .direction = SERVO_DIR_REVERSE,
+     .name = "Thumb"},
+    // Index finger
+    {.gpio_pin = INDEX_SERVO_GPIO,
+     .ledc_channel = LEDC_CHANNEL_1,
+     .max_angle = 85,
+     .min_angle = 0,
+     .min_pulse_us = 1100,
+     .max_pulse_us = 1900,
+     .max_speed = {40},
+     .direction = SERVO_DIR_REVERSE,
+     .name = "Index"},
+    // Middle finger
+    {.gpio_pin = MID_SERVO_GPIO,
+     .ledc_channel = LEDC_CHANNEL_2,
+     .max_angle = 90,
+     .min_angle = 0,
+     .min_pulse_us = 800,
+     .max_pulse_us = 1700,
+     .max_speed = {40},
+     .direction = SERVO_DIR_REVERSE,
+     .name = "Middle"},
+    // Ring finger
+    {.gpio_pin = RING_SERVO_GPIO,
+     .ledc_channel = LEDC_CHANNEL_3,
+     .max_angle = 50,
+     .min_angle = 0,
+     .min_pulse_us = 1400,
+     .max_pulse_us = 2200,
+     .max_speed = {40},
+     .direction = SERVO_DIR_REVERSE,
+     .name = "Ring"},
+    // Pinky finger
+    {.gpio_pin = PINKY_SERVO_GPIO,
+     .ledc_channel = LEDC_CHANNEL_4,
+     .max_angle = 90,
+     .min_angle = 0,
+     .min_pulse_us = 700,
+     .max_pulse_us = 1600,
+     .max_speed = {120},
+     .direction = SERVO_DIR_REVERSE,
+     .name = "Pinky"},
+    {.gpio_pin = TWIST_SERVO_GPIO,
+     .ledc_channel = LEDC_CHANNEL_5,
+     .min_angle = 0,
+     .max_angle = 140,
+     .min_pulse_us = 500,
+     .max_pulse_us = 2500,
+     .max_speed = {100},
+     .direction = SERVO_DIR_NORMAL,
+     .name = "Wrist"},
 };
 
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
@@ -216,7 +286,7 @@ void app_main() {
 
   // Initialize all servos
   ESP_LOGI(TAG, "Initializing servos...");
-  servo_led_init();
+  servo_led_init(s_servo_configs, LIMB_ARR_LEN(s_servo_configs));
   // vTaskDelay(pdMS_TO_TICKS(1000));
 
 #if CONFIG_IMU_ENABLED

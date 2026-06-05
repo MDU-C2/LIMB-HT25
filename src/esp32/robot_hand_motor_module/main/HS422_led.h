@@ -18,13 +18,6 @@
 #define ROTARY_ENCODER_DT_GPIO 18   // DT pin (B phase)
 #define ROTARY_ENCODER_SW_GPIO 19   // SW pin (button/switch)
 
-#define THUMB_SERVO_GPIO GPIO_NUM_0
-#define INDEX_SERVO_GPIO GPIO_NUM_1
-#define MID_SERVO_GPIO GPIO_NUM_2
-#define RING_SERVO_GPIO GPIO_NUM_3
-#define PINKY_SERVO_GPIO GPIO_NUM_4
-#define TWIST_SERVO_GPIO GPIO_NUM_5
-
 #define SERVO_FREQ_HZ 50   // 50 Hz = 20 ms period
 #define SERVO_RES_BITS 13  // resolution; 13 bits = 8191 ticks
 
@@ -36,10 +29,6 @@
 
 #define SERVO_PERIOD_US (1000000UL / SERVO_FREQ_HZ)
 #define SERVO_MAX_DUTY ((1U << SERVO_RES_BITS) - 1)
-
-#define NUM_SERVOS 6
-#define NUM_FINGER_SERVOS 5
-#define WRIST_SERVO_CONFIG_INDEX (NUM_SERVOS - 1)
 
 // Direction enum
 typedef enum { SERVO_DIR_NORMAL = 1, SERVO_DIR_REVERSE = -1 } servo_direction_t;
@@ -68,7 +57,7 @@ typedef enum {
 } calibration_state_t;
 
 // Function declarations
-esp_err_t servo_led_init(void);
+esp_err_t servo_led_init(const servo_config_t* servos, size_t servos_size);
 void servo_move_to_angle(ServoHandle channel, float angle);
 void servo_fade_to_angle(ServoHandle handle, float angle, uint32_t fade_ms);
 void servo_move_to_angle_with_speed(ServoHandle handle, float angle,
