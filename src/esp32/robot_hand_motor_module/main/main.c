@@ -1,4 +1,3 @@
-#include "HS422_led.h"
 #include "can_driver.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -9,6 +8,7 @@
 #include "imu.h"
 #include "limb_utils.h"
 #include "portmacro.h"
+#include "servo.h"
 
 static const char* TAG = "SERVOS";
 

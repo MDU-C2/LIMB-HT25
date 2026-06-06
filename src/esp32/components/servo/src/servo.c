@@ -1,4 +1,4 @@
-#include "HS422_led.h"
+#include "servo.h"
 
 #include <math.h>
 
@@ -7,7 +7,7 @@
 #include "hal/ledc_types.h"
 #include "limb_utils.h"
 
-static const char* const TAG = "HS422_LEDC";
+static const char* const TAG = "Servo";
 
 // We support a static amount of servo motors, so we statically allocate space
 // for them.

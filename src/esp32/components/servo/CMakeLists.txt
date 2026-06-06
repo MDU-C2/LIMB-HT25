@@ -1,9 +1,8 @@
 idf_component_register(
   SRCS
-  "main.c"
+  "src/servo.c"
   REQUIRES
-  log
-  can_driver
-  imu
+  driver
   limb_utils
-  servo)
+  INCLUDE_DIRS
+  "include")
