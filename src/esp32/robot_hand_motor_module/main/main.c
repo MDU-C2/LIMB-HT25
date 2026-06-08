@@ -10,7 +10,7 @@
 #include "portmacro.h"
 #include "servo.h"
 
-static const char* TAG = "SERVOS";
+static const char* TAG = "Hand motor module";
 
 enum {
   CAN_TX_PIN = GPIO_NUM_6,
