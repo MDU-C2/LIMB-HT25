@@ -340,15 +340,6 @@ void app_main() {
   }
 #endif
 
-  {
-    BaseType_t err =
-        xTaskCreate(can_rx_task, "can_rx_task", 1024 * 2 * 2, NULL, 6, NULL);
-    if (err != pdPASS) {
-      ESP_LOGE(TAG, "Failed to create imu task, err code: %d", err);
-      abort();
-    }
-  }
-
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
   {
     BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
@@ -359,4 +350,13 @@ void app_main() {
     }
   }
 #endif
+
+  {
+    BaseType_t err =
+        xTaskCreate(can_rx_task, "can_rx_task", 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create imu task, err code: %d", err);
+      abort();
+    }
+  }
 }
