@@ -102,7 +102,6 @@ static int CharAccess(uint16_t connection_handle, uint16_t attribute_handle,
                       struct ble_gatt_access_ctxt* context,
                       [[maybe_unused]] void* args) {
   if (context->op != BLE_GATT_ACCESS_OP_READ_CHR) {
-    char uuid_buf[BLE_UUID_STR_LEN] = {0};
     switch (context->op) {
       case BLE_GATT_ACCESS_OP_WRITE_DSC:
         ESP_LOGW(kLimbTag, "Invalid write access on characteristic descriptor");
