@@ -218,7 +218,6 @@ static int GapEventHandler(struct ble_gap_event* event,
     };
 
     case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE: {
-      // FIXME: Seems like 1M is set instead of 2M.
       ESP_LOGI(kGapTag,
                "Phy update event: conn_handle=%d status=%d tx_phy=%d rx_phy=%d",
                event->phy_updated.conn_handle, event->phy_updated.status,

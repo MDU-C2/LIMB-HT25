@@ -24,12 +24,14 @@ Furthermore, it sends the CAN messages:
 # Servo motors
 
 The servo motors are both of the model JX Servo PDI-HV2060MG. For the LIMB project, both servo motors have
-had their internal potentiometers removed and replaced with $2.5\ \text{k}\Omega$ resistors FIXME: MORE DETAILS.
-This has the effect of making the servo motor think its potentiometer is always centered, in our case corresponding
-to a pulse width of $1500\ \mu\text{s}$. By writing a pulse width higher or lower than $1500\ \mu\text{s}$, the servo
-will infinitely rotate either clockwise or counterclockwise. The magnitude of the difference between the pulse
-width used and $1500\ \mu\text{s}$ determines the speed of rotation.
+been modified to support continuous rotation. As such, the
+[continuous servo component](../components/continuous_servo/) should be used instead of the
+[regular servo component](../components/servo/).
+
+More information regarding the continuous rotation modification can be found
+[in the documentation](../../../docs/servo_modification.md).
 
 # Stepper motor
 
-The stepper motor is a NEMA17-04 controlled using a DRV8825 stepper motor driver.
+The stepper motor is a [Joy-IT NEMA17-04](https://joy-it.net/en/products/NEMA17-04)
+controlled using a [Pololu DRV8825 stepper motor driver](https://www.pololu.com/product/2133).

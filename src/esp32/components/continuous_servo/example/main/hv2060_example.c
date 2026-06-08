@@ -39,10 +39,7 @@ const ContinuousServoConfig servo_config = {
     .direction = CONTINUOUS_SERVO_DIR_NORMAL,
     .pwm_channel = LEDC_CHANNEL_0,
     .pwm_timer = LEDC_TIMER_0,
-    // FIXME: This value assumes 7.4V, but it was measured with 7V.
     .max_capable_angular_velocity = {400.F},
-    // FIXME: The measured value I got here was 150. We cheat a bit to make sure
-    // we don't get stuck.
     .max_capable_angular_velocity_pw_offset = 800,
     .min_capable_angular_velocity = {34.F},
     .min_capable_angular_velocity_pw_offset = 17,
@@ -53,7 +50,6 @@ const ContinuousServoConfig servo_config = {
     .potentiometer =
         (Potentiometer){
             .range_of_motion = {285.F},
-            // FIXME: These need to be calibrated.
             .min_adc_value = 6,
             .max_adc_value = 3087,
             .min_potentiometer_angle = {HV2060_MIN_POTENTIOMETER_ANGLE},

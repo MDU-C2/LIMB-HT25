@@ -43,9 +43,7 @@ static uint32_t s_values_in_channel_periods[SOC_ADC_MAX_CHANNEL_NUM] = {0};
 static uint32_t s_values_read_already_in_period[SOC_ADC_MAX_CHANNEL_NUM];
 
 static adc_cali_handle_t s_calibration_handle;
-// TODO(johan): Could be configured using Kconfig together with channels and
-// frequency. That way we get it as a compile time argument and can initialize
-// the array size based on the actual frequency used.
+
 enum {
   kAdcReadBufLen = SOC_ADC_DIGI_DATA_BYTES_PER_CONV * 5 * 40,
 };
