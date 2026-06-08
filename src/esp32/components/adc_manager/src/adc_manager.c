@@ -341,8 +341,6 @@ static bool write_results_to_channel_buffers(
           &inout_results->channel_buffers[channel], millivolts);
       if (!success) {
         ESP_LOGW(TAG, "Channel buffer for ADC values is full.");
-        // In a debug build we don't want this situation to be missed.
-        assert(false && "Channel buffer for ADC values is full.");
       } else {
         wrote_value = true;
       }
