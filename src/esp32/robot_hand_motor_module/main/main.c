@@ -94,7 +94,7 @@ static const servo_config_t s_servo_configs[] = {
                             .min_pulse_us = 500,
                             .max_pulse_us = 2500,
                             .max_speed = {100},
-                            .direction = SERVO_DIR_NORMAL,
+                            .direction = SERVO_DIR_REVERSE,
                             .name = "Wrist"},
 };
 
