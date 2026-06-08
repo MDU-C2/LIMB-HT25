@@ -1,5 +1,6 @@
 #include "adc_manager.h"
 #include "can_driver.h"
+#include "continuous_servo.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -10,7 +11,6 @@
 #include "limb_utils.h"
 #include "portmacro.h"
 #include "potentiometer.h"
-#include "servo.h"
 #include "soc/gpio_num.h"
 #include "stepper.h"
 
@@ -49,13 +49,13 @@ enum {
 
 // Motors are hv2060
 
-static const ServoConfig kUpDownServoConfig = {
+static const ContinuousServoConfig kUpDownServoConfig = {
     .gpio_pin = SERVO_UP_DOWN_GPIO,
     .pwm_timer = LEDC_TIMER_0,
     .pwm_channel = LEDC_CHANNEL_0,
     .name = "Shoulder up/down servo",
     // TODO(johan): These need to be changed after testing on actual arm.
-    .direction = SERVO_DIR_REVERSE,
+    .direction = CONTINUOUS_SERVO_DIR_REVERSE,
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
@@ -80,13 +80,13 @@ static const ServoConfig kUpDownServoConfig = {
         },
 };
 
-static const ServoConfig kLeftRightServoConfig = {
+static const ContinuousServoConfig kLeftRightServoConfig = {
     .gpio_pin = SERVO_LEFT_RIGHT_GPIO,
     .pwm_timer = LEDC_TIMER_0,
     .pwm_channel = LEDC_CHANNEL_1,
     .name = "Shoulder left/right servo",
     // TODO(johan): These need to be changed after testing on actual arm.
-    .direction = SERVO_DIR_NORMAL,
+    .direction = CONTINUOUS_SERVO_DIR_NORMAL,
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
@@ -205,8 +205,8 @@ static uint16_t s_latest_potentiometer_up_down_value = 0;
 static uint16_t s_latest_potentiometer_left_right_value = 0;
 static uint16_t s_latest_potentiometer_rotation_value = 0;
 
-static ServoHandle s_left_right_servo_handle;
-static ServoHandle s_up_down_servo_handle;
+static ContinuousServoHandle s_left_right_servo_handle;
+static ContinuousServoHandle s_up_down_servo_handle;
 static stepper_control_handle_t s_upper_arm_rotation_stepper_handle;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
@@ -224,11 +224,11 @@ static void can_rx_task([[maybe_unused]] void* arg) {
 
     switch (can_id) {
       case CAN_ID_ROBOT_SHOULDER_UP_DOWN_STOP: {
-        servo_set_estop(s_up_down_servo_handle, true);
+        continuous_servo_set_estop(s_up_down_servo_handle, true);
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_STOP: {
-        servo_set_estop(s_left_right_servo_handle, true);
+        continuous_servo_set_estop(s_left_right_servo_handle, true);
         break;
       }
       case CAN_ID_ROBOT_UPPER_ARM_ROTATION_STOP: {
@@ -251,8 +251,9 @@ static void can_rx_task([[maybe_unused]] void* arg) {
             deserialize_float(can_buf + sizeof(float), kFromLittleEndian)};
         ESP_LOGI(TAG, "Received up/down actuation: angle=%f, velocity=%f dps",
                  joint_angle.degree, target_velocity.dps);
-        servo_set_target_angle(s_up_down_servo_handle, joint_angle);
-        servo_set_target_velocity(s_up_down_servo_handle, target_velocity);
+        continuous_servo_set_target_angle(s_up_down_servo_handle, joint_angle);
+        continuous_servo_set_target_velocity(s_up_down_servo_handle,
+                                             target_velocity);
         break;
       }
       case CAN_ID_ROBOT_SHOULDER_LEFT_RIGHT_ACTUATION: {
@@ -273,8 +274,10 @@ static void can_rx_task([[maybe_unused]] void* arg) {
         ESP_LOGI(TAG,
                  "Received left/right actuation: angle=%f, velocity=%f dps",
                  joint_angle.degree, target_velocity.dps);
-        servo_set_target_angle(s_left_right_servo_handle, joint_angle);
-        servo_set_target_velocity(s_left_right_servo_handle, target_velocity);
+        continuous_servo_set_target_angle(s_left_right_servo_handle,
+                                          joint_angle);
+        continuous_servo_set_target_velocity(s_left_right_servo_handle,
+                                             target_velocity);
         break;
       }
       case CAN_ID_ROBOT_UPPER_ARM_ROTATION_ACTUATION: {
@@ -345,10 +348,10 @@ static void motors_update_task([[maybe_unused]] void* args) {
     s_potentiometer_rotation_buffer->length = 0;
 
     // Update servos.
-    servo_update(s_up_down_servo_handle, PERIOD_MS,
-                 s_latest_potentiometer_up_down_value);
-    servo_update(s_left_right_servo_handle, PERIOD_MS,
-                 s_latest_potentiometer_left_right_value);
+    continuous_servo_update(s_up_down_servo_handle, PERIOD_MS,
+                            s_latest_potentiometer_up_down_value);
+    continuous_servo_update(s_left_right_servo_handle, PERIOD_MS,
+                            s_latest_potentiometer_left_right_value);
     stepper_update(s_upper_arm_rotation_stepper_handle, PERIOD_MS,
                    s_latest_potentiometer_rotation_value);
 
@@ -363,11 +366,11 @@ static void motors_update_task([[maybe_unused]] void* args) {
       if (++i == 100) {
         i = 0;
         PotentiometerAngle target_pot_angle =
-            servo_get_target_angle(s_up_down_servo_handle);
+            continuous_servo_get_target_angle(s_up_down_servo_handle);
         JointAngle target_joint_angle =
             to_joint_angle(&kUpDownServoConfig.potentiometer, target_pot_angle);
         AngularVelocity velocity =
-            servo_get_current_velocity(s_up_down_servo_handle);
+            continuous_servo_get_current_velocity(s_up_down_servo_handle);
         ESP_LOGI(TAG,
                  "up/down: adc=%u, curr pot=%.2f, target pot=%.2f, curr "
                  "joint=%.2f, target joint=%.2f, velocity: %.2f",
@@ -402,11 +405,11 @@ static void motors_update_task([[maybe_unused]] void* args) {
       if (++i == 100) {
         i = 0;
         PotentiometerAngle target_pot_angle =
-            servo_get_target_angle(s_left_right_servo_handle);
+            continuous_servo_get_target_angle(s_left_right_servo_handle);
         JointAngle target_joint_angle = to_joint_angle(
             &kLeftRightServoConfig.potentiometer, target_pot_angle);
         AngularVelocity velocity =
-            servo_get_current_velocity(s_left_right_servo_handle);
+            continuous_servo_get_current_velocity(s_left_right_servo_handle);
         ESP_LOGI(TAG,
                  "left/right: adc=%u, curr pot=%.2f, target pot=%.2f, curr "
                  "joint=%.2f, target joint=%.2f, velocity: %.2f",
@@ -532,8 +535,9 @@ void app_main(void) {
                        s_potentiometer_rotation_buffer->length);
     s_potentiometer_rotation_buffer->length = 0;
 
-    err = servo_init(&kUpDownServoConfig, s_latest_potentiometer_up_down_value,
-                     &s_up_down_servo_handle);
+    err = continuous_servo_init(&kUpDownServoConfig,
+                                s_latest_potentiometer_up_down_value,
+                                &s_up_down_servo_handle);
     s_potentiometer_up_down_buffer->length = 0;
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error calling servos_init for up/down servo: %s",
@@ -541,9 +545,9 @@ void app_main(void) {
       abort();
     }
 
-    err = servo_init(&kLeftRightServoConfig,
-                     s_latest_potentiometer_left_right_value,
-                     &s_left_right_servo_handle);
+    err = continuous_servo_init(&kLeftRightServoConfig,
+                                s_latest_potentiometer_left_right_value,
+                                &s_left_right_servo_handle);
     s_potentiometer_left_right_buffer->length = 0;
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error calling servos_init for left/right servo: %s",

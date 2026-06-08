@@ -1,4 +1,3 @@
-#include "HS422_led.h"
 #include "can_driver.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -9,8 +8,9 @@
 #include "imu.h"
 #include "limb_utils.h"
 #include "portmacro.h"
+#include "servo.h"
 
-static const char* TAG = "SERVOS";
+static const char* TAG = "Hand motor module";
 
 enum {
   CAN_TX_PIN = GPIO_NUM_6,
@@ -94,7 +94,7 @@ static const servo_config_t s_servo_configs[] = {
                             .min_pulse_us = 500,
                             .max_pulse_us = 2500,
                             .max_speed = {100},
-                            .direction = SERVO_DIR_NORMAL,
+                            .direction = SERVO_DIR_REVERSE,
                             .name = "Wrist"},
 };
 

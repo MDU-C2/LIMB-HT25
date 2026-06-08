@@ -1,4 +1,4 @@
-#include "HS422_led.h"
+#include "servo.h"
 
 #include <math.h>
 
@@ -7,7 +7,7 @@
 #include "hal/ledc_types.h"
 #include "limb_utils.h"
 
-static const char* const TAG = "HS422_LEDC";
+static const char* const TAG = "Servo";
 
 // We support a static amount of servo motors, so we statically allocate space
 // for them.
@@ -26,9 +26,12 @@ uint32_t duty_to_us(uint32_t duty) {
 }
 
 float pulse_width_to_angle(const servo_config_t* servo, uint16_t pw_us) {
-  const float angle = LIMB_LERP_FROM_RANGE(
-      (float)pw_us, (float)servo->min_pulse_us, (float)servo->max_pulse_us,
-      servo->min_angle, servo->max_angle);
+  float angle = LIMB_LERP_FROM_RANGE((float)pw_us, (float)servo->min_pulse_us,
+                                     (float)servo->max_pulse_us,
+                                     servo->min_angle, servo->max_angle);
+  if (servo->direction == SERVO_DIR_REVERSE) {
+    angle = servo->min_angle + (servo->max_angle - angle);
+  }
   return angle;
 }
 

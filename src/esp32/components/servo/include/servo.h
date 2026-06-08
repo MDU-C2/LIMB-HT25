@@ -1,94 +1,83 @@
 #pragma once
+
 #include "esp_err.h"
-#include "hal/adc_types.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "hal/ledc_types.h"
 #include "limb_utils.h"
-#include "potentiometer.h"
+#include "soc/gpio_num.h"
 
-// Determines if low angles should generate low or high pulse widths, and vice
-// versa for high angles.
-typedef enum {
-  SERVO_DIR_NORMAL,
-  SERVO_DIR_REVERSE,
-} ServoDirection;
+// =================================
+// #define BUTTON_Next_GPIO  19    // GPIO for button to move to next position
+// (active low) #define BUTTON_Prev_GPIO  20    // GPIO for button to move to
+// previous position (
 
-// Configuration options for initializing servos. Also serves as the handle for
-// the servo once configured.
+// Rotary Encoder GPIO pins
+#define ROTARY_ENCODER_CLK_GPIO 21  // CLK pin (A phase)
+#define ROTARY_ENCODER_DT_GPIO 18   // DT pin (B phase)
+#define ROTARY_ENCODER_SW_GPIO 19   // SW pin (button/switch)
+
+#define SERVO_FREQ_HZ 50   // 50 Hz = 20 ms period
+#define SERVO_RES_BITS 13  // resolution; 13 bits = 8191 ticks
+
+#define SERVO_MIN_US 500   // 500
+#define SERVO_MAX_US 2500  // 2500
+#define SERVO_MIN_DEG 0
+#define SERVO_MAX_DEG 180
+// =================================
+
+#define SERVO_PERIOD_US (1000000UL / SERVO_FREQ_HZ)
+#define SERVO_MAX_DUTY ((1U << SERVO_RES_BITS) - 1)
+
+// Direction enum
+typedef enum { SERVO_DIR_NORMAL = 1, SERVO_DIR_REVERSE = -1 } servo_direction_t;
+
 typedef struct {
-  // GPIO pin used for the PWM signal for the servo.
-  int gpio_pin;
-  // LEDC channel used by the servo.
-  ledc_channel_t pwm_channel;
-  // LEDC timer used by the servo.
-  ledc_timer_t pwm_timer;
+  gpio_num_t gpio_pin;          // GPIO pin for this servo
+  ledc_channel_t ledc_channel;  // LEDC channel (0-7)
+  float min_angle;              // Minimum angle in degrees
+  float max_angle;              // Maximum angle in degrees
+  uint32_t min_pulse_us;        // Minimum pulse width in microseconds
+  uint32_t max_pulse_us;        // Maximum pulse width in microseconds
+  AngularVelocity max_speed;
+  float current_force;          // Current force applied, measured by FSR
+  servo_direction_t direction;  // Direction of servo movement
+  const char* name;             // Human-readable name for debugging
+} servo_config_t;
 
-  // The pulse width that stops the servo.
-  uint16_t motionless_pw;
+// Calibration state
+typedef enum {
+  CAL_STATE_SELECT_FINGER,  // Selecting which finger to calibrate
+  CAL_STATE_SET_MIN,        // Setting minimum angle
+  CAL_STATE_SET_MAX,        // Setting maximum angle
+  CAL_STATE_DONE            // Calibration complete
+} calibration_state_t;
 
-  // The min and max speeds that the servo can actuate with.
+// Function declarations
+esp_err_t servo_led_init(const servo_config_t* servos, size_t servos_size);
+void servo_move_to_angle(const servo_config_t* servo, float angle);
+void servo_fade_to_angle(const servo_config_t* servo, float angle,
+                         uint32_t fade_ms);
+void servo_move_to_angle_with_speed(const servo_config_t* servo, float angle,
+                                    AngularVelocity speed);
+void servo_write_all_deg(int deg);
+void close_all_fingers(void);
+void open_all_fingers(void);
 
-  // The maximum capable angular velocity.
-  AngularVelocity max_capable_angular_velocity;
-  // The pulse width offset from motionless_pw that corresponds to the
-  // max_capable_angular_velocity.
-  uint16_t max_capable_angular_velocity_pw_offset;
+// Gesture functions
+void make_fist_gesture(void);
+void open_hand_gesture(void);
+void make_peace_gesture(void);
+void count_to_five_gesture(void);
+void rock_gesture(void);
+void flip_off_gesture(void);
 
-  // The maximum allowed speed of the servo in the direction that increases the
-  // potentiometer angle.
-  AngularVelocity max_speed_increasing_angle;
-  // The maximum allowed speed of the servo in the direction that increases the
-  // potentiometer angle.
-  AngularVelocity max_speed_decreasing_angle;
-  // The maximum allowed acceleration of the servo.
-  AngularAcceleration max_accel;
+void custom_grip_1(void);
+void custom_grip_2(void);
 
-  // The ratio between the servo's rotation and the joint's rotation
-  // (i.e. 15 means the servo has to complete 15 turns for the joint to complete
-  // 1 turn).
-  float gear_ratio;
-
-  // The ADC channel used for the servo's potentiometer.
-  adc_channel_t pot_adc_channel;
-  // The configuration/calibration of the servo's potentiometer.
-  Potentiometer potentiometer;
-
-  // If the angles should be reversed.
-  ServoDirection direction;
-  // Human-readable name for debugging
-  const char* name;
-} ServoConfig;
-
-typedef ledc_channel_t ServoHandle;
-
-// Initialize servos using provided configurations.
-esp_err_t servo_init(const ServoConfig* servo_config,
-                     uint16_t latest_potentiometer_adc_value,
-                     ServoHandle* out_handle);
-
-// This function is meant to be called periodically. It determines how far it
-// should move the servo based on the distance to the target angle and the time
-// remaining until the next call to servo_update.
-bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
-                  uint16_t potentiometer_value);
-
-// Set target angular velocity (degrees per second)
-void servo_set_target_velocity(ServoHandle handle,
-                               AngularVelocity target_velocity);
-
-// Sets the target angle that `servo_update` aims for.
-void servo_set_target_angle(ServoHandle handle, JointAngle target_angle);
-
-void servo_set_estop(ServoHandle handle, bool active);
-
-PotentiometerAngle servo_get_current_angle(ServoHandle handle);
-
-PotentiometerAngle servo_get_target_angle(ServoHandle handle);
-
-AngularVelocity servo_get_current_velocity(ServoHandle handle);
-
-// Apply the provided angular velocity.
-void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity);
-
-// Apply the velocity represented by the provided pulse width.
-void servo_apply_pulse_width_as_velocity(ServoHandle handle,
-                                         uint16_t pulse_width);
+// Rotary encoder functions
+esp_err_t rotary_encoder_init(void);
+void start_calibration_mode(void);
+int get_encoder_value(void);
+bool is_encoder_button_pressed(void);

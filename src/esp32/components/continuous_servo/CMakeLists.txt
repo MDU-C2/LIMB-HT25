@@ -1,0 +1,10 @@
+idf_component_register(
+  SRCS
+  "continuous_servo.c"
+  INCLUDE_DIRS
+  "include"
+  REQUIRES
+  driver
+  limb_utils
+  potentiometer
+  motor_ramping)

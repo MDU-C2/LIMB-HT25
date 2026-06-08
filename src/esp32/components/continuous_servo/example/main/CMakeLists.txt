@@ -5,5 +5,5 @@ idf_component_register(
   "."
   REQUIRES
   adc_manager
-  servo
+  continuous_servo
   freertos)

@@ -1,4 +1,5 @@
 #include "adc_manager.h"
+#include "continuous_servo.h"
 #include "driver/gpio.h"
 #include "esp_check.h"
 #include "esp_err.h"
@@ -9,7 +10,6 @@
 #include "hal/ledc_types.h"
 #include "limb_utils.h"
 #include "potentiometer.h"
-#include "servo.h"
 
 #define LIMB_ARR_LEN(arr) (sizeof(arr) / sizeof(*(arr)))
 
@@ -34,9 +34,9 @@ enum {
   SERVO_POT_ADC_CHANNEL = ADC_CHANNEL_0,
 };
 
-const ServoConfig servo_config = {
+const ContinuousServoConfig servo_config = {
     .gpio_pin = GPIO_NUM_1,
-    .direction = SERVO_DIR_NORMAL,
+    .direction = CONTINUOUS_SERVO_DIR_NORMAL,
     .pwm_channel = LEDC_CHANNEL_0,
     .pwm_timer = LEDC_TIMER_0,
     // FIXME: This value assumes 7.4V, but it was measured with 7V.
@@ -101,9 +101,9 @@ void app_main(void) {
                      s_servo_potentiometer_adc_channel_buffer->length);
   s_servo_potentiometer_adc_channel_buffer->length = 0;
 
-  ServoHandle servo = 0;
-  ESP_ERROR_CHECK(
-      servo_init(&servo_config, latest_potentiometer_adc_value, &servo));
+  ContinuousServoHandle servo = 0;
+  ESP_ERROR_CHECK(continuous_servo_init(
+      &servo_config, latest_potentiometer_adc_value, &servo));
 
   JointAngle stops[] = {
       {0},
@@ -111,7 +111,7 @@ void app_main(void) {
   };
 
   int i = 0;
-  servo_set_target_angle(servo, stops[i]);
+  continuous_servo_set_target_angle(servo, stops[i]);
 
   TickType_t current_tick = xTaskGetTickCount();
   ESP_LOGI("test", "tick: %d", current_tick);
@@ -153,15 +153,15 @@ void app_main(void) {
                          s_servo_potentiometer_adc_channel_buffer->data,
                          s_servo_potentiometer_adc_channel_buffer->length);
     s_servo_potentiometer_adc_channel_buffer->length = 0;
-    bool done =
-        servo_update(servo, period_in_ms, latest_potentiometer_adc_value);
+    bool done = continuous_servo_update(servo, period_in_ms,
+                                        latest_potentiometer_adc_value);
     // ESP_LOGI("test", "ADC value %u",
     //          average);
     if (done) {
       i = (i + 1) % LIMB_ARR_LEN(stops);
       ESP_LOGI("test", "switching to joint angle %.2f", stops[i].degree);
       vTaskDelay(pdMS_TO_TICKS(1000));
-      servo_set_target_angle(servo, stops[i]);
+      continuous_servo_set_target_angle(servo, stops[i]);
     }
     vTaskDelay(pdMS_TO_TICKS(100));
 
