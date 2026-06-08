@@ -58,15 +58,15 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .direction = STEPPER_DIR_REVERSE,
     .steps_per_rev = 200,
     .gear_ratio = 15.0F,
-    .max_velocity_negative = {40.0F},
-    .max_velocity_positive = {40.0F},
+    .max_speed_decreasing_angle = {40.0F},
+    .max_speed_increasing_angle = {40.0F},
     .max_accel = {20.0F},
     .pot_adc_channel = ADC_ELBOW_CHANNEL,
     .pwm_channel = PWM_ELBOW_CHANNEL,
     .pwm_timer = PWM_ELBOW_TIMER,
     .potentiometer =
         (Potentiometer){
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             // We step down voltage we feed to the potentiometer from 3300 mV to
             // 2200 mV.
             .min_adc_value = 0,
@@ -263,6 +263,7 @@ static void stepper_task([[maybe_unused]] void* pvParameter) {
 
   while (1) {
     const uint16_t dt_ms = 10;
+    xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(dt_ms));
 
     adc_mgr_read(&s_adc_mgr_read_results, 0);
     s_latest_potentiometer_adc_value = moving_average16(
@@ -313,8 +314,6 @@ static void stepper_task([[maybe_unused]] void* pvParameter) {
                target_pot_angle.degree, current_angle.degree,
                target_angle.degree, velocity.dps, moving ? "Yes" : "No");
     }
-
-    xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(dt_ms));
   }
 }
 

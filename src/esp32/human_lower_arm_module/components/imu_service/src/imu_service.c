@@ -29,6 +29,8 @@ static void imu_task(void* pvParameters) {
   ESP_LOGI(TAG, "IMU Streaming Task Started at %d Hz", kImuFrequency);
 
   while (1) {
+    xTaskDelayUntil(&xLastWakeTime, xFrequency);
+
     ImuRawData raw_data;
 
     // Initialize packet metadata
@@ -47,8 +49,6 @@ static void imu_task(void* pvParameters) {
       s_imu_seq++;
       xEventGroupSetBits(s_imu_event_group, IMU_STREAM_BIT);
     }
-
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 

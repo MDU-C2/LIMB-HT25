@@ -51,13 +51,13 @@ static const ServoConfig kServoConfig = {
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
     .gear_ratio = 15.F,
-    .max_velocity_negative = {8.F},
-    .max_velocity_positive = {16.F},
+    .max_speed_decreasing_angle = {8.F},
+    .max_speed_increasing_angle = {16.F},
     .max_accel = {8.F},
     .pot_adc_channel = ADC_CHANNEL_0,
     .potentiometer =
         (Potentiometer){
-            .degrees_of_motion = {285.F},
+            .range_of_motion = {285.F},
             .min_adc_value = 20,
             .max_adc_value = 3087,
             .min_potentiometer_angle = {170},

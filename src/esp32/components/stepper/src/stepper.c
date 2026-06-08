@@ -21,11 +21,10 @@
 
 static const char* TAG = "stepper";
 
-// Control constants
-#define ALPHA 0.1f  // Low-pass filter coefficient (0.0-1.0)
 // NOTE: Without microstepping, our step size is 1.8 degrees, so the deadband
 // should probably be at least as large.
-#define DEADBAND_DEG 3.6f  // Deadband in degrees (stop if error < this)
+// If we're within +- 2 degrees, we stop.
+#define DEADBAND_DEG 4.F
 
 // Control context
 typedef struct {
@@ -130,8 +129,8 @@ esp_err_t stepper_init(const stepper_control_config_t* cfg,
   ESP_RETURN_ON_ERROR(
       esp_clk_tree_src_get_freq_hz(SOC_MOD_CLK_APB, 0, &clk_freq), TAG,
       "Couldn't get clock frequency");
-  const float max_vel =
-      MAX(ctx.cfg.max_velocity_negative.dps, ctx.cfg.max_velocity_positive.dps);
+  const float max_vel = MAX(ctx.cfg.max_speed_decreasing_angle.dps,
+                            ctx.cfg.max_speed_increasing_angle.dps);
   const uint32_t max_freq = (uint32_t)roundf(max_vel * ctx.steps_per_degree);
 
   ESP_LOGI(TAG, "Using microstepping factor %u", microstepping_factor);
@@ -288,13 +287,13 @@ esp_err_t stepper_init(const stepper_control_config_t* cfg,
 
   const float min_allowed_velocity =
       (float)ctx.min_frequency / ctx.steps_per_degree;
-  if (cfg->max_velocity_negative.dps < min_allowed_velocity) {
-    ESP_LOGE(TAG, "max_velocity_negative must be at least %f dps",
+  if (cfg->max_speed_decreasing_angle.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_speed_decreasing_angle must be at least %f dps",
              min_allowed_velocity);
     return ESP_ERR_INVALID_ARG;
   }
-  if (cfg->max_velocity_positive.dps < min_allowed_velocity) {
-    ESP_LOGE(TAG, "max_velocity_positive must be at least %f dps",
+  if (cfg->max_speed_increasing_angle.dps < min_allowed_velocity) {
+    ESP_LOGE(TAG, "max_speed_increasing_angle must be at least %f dps",
              min_allowed_velocity);
     return ESP_ERR_INVALID_ARG;
   }
@@ -344,8 +343,8 @@ esp_err_t stepper_init(const stepper_control_config_t* cfg,
            "max_vel_neg=%.2f sps"
            "max_accel=%.2f sps²",
            ctx.steps_per_degree,
-           ctx.cfg.max_velocity_positive.dps * ctx.steps_per_degree,
-           ctx.cfg.max_velocity_negative.dps * ctx.steps_per_degree,
+           ctx.cfg.max_speed_increasing_angle.dps * ctx.steps_per_degree,
+           ctx.cfg.max_speed_decreasing_angle.dps * ctx.steps_per_degree,
            ctx.cfg.max_accel.dps2 * ctx.steps_per_degree);
 
   return ESP_OK;
@@ -371,8 +370,7 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
       &ctx->cfg.potentiometer, latest_potentiometer_adc_value);
 
   if (angle_deg.degree < 10 ||
-      angle_deg.degree >
-          (ctx->cfg.potentiometer.degrees_of_motion.degree - 10)) {
+      angle_deg.degree > (ctx->cfg.potentiometer.range_of_motion.degree - 10)) {
     // If the potentiometer is close to its min or max limits, we might be in a
     // situation where the ADC values are off (maybe a loose wire or the
     // potentiometer is configured incorrectly, for example). In that situation,
@@ -386,8 +384,7 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
       ESP_LOGW(TAG,
                "Potentiometer angle %f is close to its limits of [0, %f]. "
                "Turning off motor as a safety precaution",
-               angle_deg.degree,
-               ctx->cfg.potentiometer.degrees_of_motion.degree);
+               angle_deg.degree, ctx->cfg.potentiometer.range_of_motion.degree);
     }
     return;
   }
@@ -399,10 +396,10 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
   float current_velocity_sps =
       ctx->current_velocity.dps * ctx->steps_per_degree;
   // Aim for the target velocity, but constrain it to the max velocity.
-  const AngularVelocity constrained_target_velocity_positive = {
-      MIN(ctx->target_velocity.dps, ctx->cfg.max_velocity_positive.dps)};
-  const AngularVelocity constrained_target_velocity_negative = {
-      MIN(ctx->target_velocity.dps, ctx->cfg.max_velocity_negative.dps)};
+  const AngularVelocity constrained_target_speed_increasing_angle = {
+      MIN(ctx->target_velocity.dps, ctx->cfg.max_speed_increasing_angle.dps)};
+  const AngularVelocity constrained_target_speed_decreasing_angle = {
+      MIN(ctx->target_velocity.dps, ctx->cfg.max_speed_decreasing_angle.dps)};
   ctx->current_angle = angle_deg;
   ctx->use_position_feedback = true;
   portEXIT_CRITICAL(&ctx->spinlock);
@@ -418,8 +415,8 @@ void stepper_update(stepper_control_handle_t handle, uint16_t dt_ms,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_velocity,
       .max_acceleration = ctx->cfg.max_accel,
-      .max_velocity_negative = constrained_target_velocity_negative,
-      .max_velocity_positive = constrained_target_velocity_positive,
+      .max_speed_decreasing_angle = constrained_target_speed_decreasing_angle,
+      .max_speed_increasing_angle = constrained_target_speed_increasing_angle,
       .timestep_ms = dt_ms,
   };
   AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);

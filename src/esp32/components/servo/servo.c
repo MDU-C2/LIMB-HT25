@@ -31,8 +31,8 @@ enum {
   SERVO_PERIOD_US = 1000000UL / SERVO_FREQUENCY,
 };
 
-#define ALPHA 0.1F
-#define DEADBAND_DEG 2.5F
+// If we're within +- 2.5 degrees, we stop.
+#define DEADBAND_DEG 5.F
 
 // We support a static amount of servo motors, so we statically allocate space
 // for them.
@@ -151,8 +151,9 @@ void servo_apply_velocity(ServoHandle handle, AngularVelocity velocity) {
     return;
   }
 
-  velocity.dps = LIMB_CLAMP(velocity.dps, -ctx->cfg.max_velocity_negative.dps,
-                            ctx->cfg.max_velocity_positive.dps);
+  velocity.dps =
+      LIMB_CLAMP(velocity.dps, -ctx->cfg.max_speed_decreasing_angle.dps,
+                 ctx->cfg.max_speed_increasing_angle.dps);
 
   velocity.dps *= ctx->cfg.gear_ratio;
   if (ctx->cfg.direction == SERVO_DIR_REVERSE) {
@@ -184,7 +185,7 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
 
   if (current_angle.degree < 10 ||
       current_angle.degree >
-          (ctx->cfg.potentiometer.degrees_of_motion.degree - 10)) {
+          (ctx->cfg.potentiometer.range_of_motion.degree - 10)) {
     // If the potentiometer is close to its min or max limits, we might be in a
     // situation where the ADC values are off (maybe a loose wire or the
     // potentiometer is configured incorrectly, for example). In that situation,
@@ -198,16 +199,18 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
                "Potentiometer angle %f is close to its limits of [0, %f]. "
                "Turning off motor as a safety precaution",
                current_angle.degree,
-               ctx->cfg.potentiometer.degrees_of_motion.degree);
+               ctx->cfg.potentiometer.range_of_motion.degree);
     }
     return true;
   }
 
   // Aim for the target velocity, but constrain it to the max velocity.
-  const AngularVelocity constrained_target_velocity_positive = {MIN(
-      ctx->target_angular_velocity.dps, ctx->cfg.max_velocity_positive.dps)};
-  const AngularVelocity constrained_target_velocity_negative = {MIN(
-      ctx->target_angular_velocity.dps, ctx->cfg.max_velocity_negative.dps)};
+  const AngularVelocity constrained_target_speed_increasing_angle = {
+      MIN(ctx->target_angular_velocity.dps,
+          ctx->cfg.max_speed_increasing_angle.dps)};
+  const AngularVelocity constrained_target_speed_decreasing_angle = {
+      MIN(ctx->target_angular_velocity.dps,
+          ctx->cfg.max_speed_decreasing_angle.dps)};
 
   const MotorRampingArgs args = {
       .current_angle = current_angle,
@@ -215,8 +218,8 @@ bool servo_update(ServoHandle handle, uint16_t ms_until_next_period,
       .deadband = (PotentiometerAngle){DEADBAND_DEG},
       .current_velocity = ctx->current_angular_velocity,
       .max_acceleration = ctx->cfg.max_accel,
-      .max_velocity_negative = constrained_target_velocity_negative,
-      .max_velocity_positive = constrained_target_velocity_positive,
+      .max_speed_decreasing_angle = constrained_target_speed_decreasing_angle,
+      .max_speed_increasing_angle = constrained_target_speed_increasing_angle,
       .timestep_ms = ms_until_next_period,
   };
   const AngularVelocity new_velocity = motor_ramping_trapezoidal(&args);

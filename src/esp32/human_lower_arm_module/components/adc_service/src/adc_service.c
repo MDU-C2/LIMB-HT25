@@ -140,7 +140,7 @@ static void adc_task(void* pvParameters) {
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / kEmgPacketSendRateHz);
 
   while (1) {
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    xTaskDelayUntil(&xLastWakeTime, xFrequency);
 
     // Fetch results from DMA through ADC Manager
     esp_err_t err = adc_mgr_read(&res, 0);

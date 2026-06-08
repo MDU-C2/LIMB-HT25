@@ -7,10 +7,9 @@
 
 PotentiometerAngle potentiometer_adc_to_angle(
     const Potentiometer* potentiometer, uint16_t adc_value) {
-  return (PotentiometerAngle){
-      LIMB_LERP_FROM_RANGE((float)adc_value, potentiometer->min_adc_value,
-                           potentiometer->max_adc_value, 0,
-                           potentiometer->degrees_of_motion.degree)};
+  return (PotentiometerAngle){LIMB_LERP_FROM_RANGE(
+      (float)adc_value, potentiometer->min_adc_value,
+      potentiometer->max_adc_value, 0, potentiometer->range_of_motion.degree)};
 }
 
 JointAngle to_joint_angle(const Potentiometer* potentiometer,
