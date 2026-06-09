@@ -7,7 +7,7 @@ ADDR_SPEED              = 32
 ADDR_CURRENT_POSITION   = 36
 
 PROTOCOL_VERSION = 1.0
-DEVICENAME = '/dev/cu.usbserial-FT88YU6M' # TODO: Change this
+DEVICENAME = '/dev/cu.usbserial-FT88YU6M'
 
 TORQUE_ENABLE = 1
 TORQUE_DISABLE = 0

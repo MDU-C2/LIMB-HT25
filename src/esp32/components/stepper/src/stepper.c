@@ -356,8 +356,6 @@ esp_err_t stepper_deinit(stepper_control_handle_t handle) {
   // Stop the motor
   stop_motor(handle);
 
-  // TODO(johan): Do we need to actually reset ledc/gpio as well?
-
   *ctx = (motion_control_context_t){0};
 
   return ESP_OK;

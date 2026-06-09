@@ -163,8 +163,12 @@ void continuous_servo_apply_velocity(ContinuousServoHandle handle,
     velocity.dps = -velocity.dps;
   }
 
-  // FIXME: The servo goes from 0dps directly to ~15dps at at a certain pulse
-  // width. 0-15 pulse width range might not be linear.
+  // NOTE: The correlation between pulse width and velocity was estimated under
+  // no load and is assumed to be linear all the way to the max offset, but
+  // there's no guarantee that it actually is. Since load affects the velocity
+  // and we don't know if the max possible velocity is reached before max
+  // offset, we have no way of predicting the actual velocity that the servo is
+  // going to move at when we set a certain pulse width.
   const int16_t pulse_width_offset = (int16_t)roundf(LIMB_LERP_FROM_RANGE(
       velocity.dps, -ctx->cfg.max_capable_angular_velocity.dps,
       ctx->cfg.max_capable_angular_velocity.dps,
@@ -233,10 +237,6 @@ bool continuous_servo_update(ContinuousServoHandle handle,
   ctx->current_angle = current_angle;
   ctx->current_angular_velocity = new_velocity;
   portEXIT_CRITICAL(&ctx->spinlock);
-
-  // TODO(johan): Check if we want a minimum velocity.
-  // Clamp to minimum velocity if moving
-  // new_velocity.dps = MAX(new_velocity.dps, ctx->min_angular_velocity.dps);
 
   continuous_servo_apply_velocity(handle, new_velocity);
 

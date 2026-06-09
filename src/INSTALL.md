@@ -4,9 +4,13 @@ This guide explains how to install all dependencies for the LIMB-HT25 system.
 
 ## Quick Install
 
+Python dependencies are handled using [`uv`](https://docs.astral.sh/uv/).
+Dependencies will be downloaded to a virtual environment when you run a `uv`
+project command, such as `uv sync` or `uv run`.
+
 ```bash
 cd src
-pip install -r requirements.txt
+uv sync
 ```
 
 ## System Dependencies
@@ -57,17 +61,6 @@ brew install can-utils
 - **pandas**: Data processing (used in EMG scripts)
 - **matplotlib**: Plotting and visualization
 
-## Installation Order
-
-For best results, install in this order:
-
-1. System dependencies (CAN utils, etc.)
-2. Core Python packages: `pip install numpy scipy PyYAML`
-3. ML packages: `pip install torch scikit-learn`
-4. Hardware interfaces: `pip install python-can bleak`
-5. Vision: `pip install depthai opencv-python`
-6. Optional: `pip install pandas matplotlib`
-
 ## Troubleshooting
 
 ### CAN Interface Issues
@@ -93,7 +86,7 @@ For best results, install in this order:
 Test installation:
 
 ```bash
-python3 -c "import numpy, scipy, torch, yaml, can, bleak; print('Core packages OK')"
-python3 -c "import depthai, cv2; print('Vision packages OK')"
+uv run python3 -c "import numpy, scipy, torch, yaml, can, bleak; print('Core packages OK')"
+uv run python3 -c "import depthai, cv2; print('Vision packages OK')"
 ```
 

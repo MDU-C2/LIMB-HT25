@@ -11,7 +11,7 @@ from ble_central.sensor_packet_serialization import (
     ValueDataType,
     decode_packet,
     deserialize_packet_data,
-)  # TODO: Check if we should move this to hardware folder?
+)
 
 
 
@@ -21,7 +21,6 @@ EMG_CHAR_UUID = "24011525-1212-efde-1523-785feabcd122"
 IMU_CHAR_UUID = "25011525-1212-efde-1523-785feabcd122"
 PIEZO_CHAR_UUID = "26011525-1212-efde-1523-785feabcd122"
 
-# TODO Check that these correct below
 EMG_BYTES_PER_VALUE = 2
 EMG_VALUES_PER_SAMPLE = 1
 EMG_SENSOR_COUNT = 1

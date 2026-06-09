@@ -99,7 +99,6 @@ class SampleWindow:
             dropped_packets_count = (
                 sequence_number - self._last_sequence_number_received - 1
             )
-            # TODO(johan): Actually handle dropped packets.
             print(f"Dropped {dropped_packets_count} packets.")
 
         self._last_sequence_number_received = sequence_number

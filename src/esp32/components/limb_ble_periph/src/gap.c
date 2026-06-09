@@ -33,7 +33,13 @@ static void format_addr(char* out_addr_str, uint8_t* addr) {
   int bytes_written =
       sprintf(out_addr_str, "%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1],
               addr[2], addr[3], addr[4], addr[5]);  // NOLINT(*-magic-numbers)
-  assert(bytes_written == 17 && "Couldn't write address as string.");
+  // Shouldn't be possible, but safety check anyway.
+  if (bytes_written != kBleAddressStrMaxLen - 1) {
+    out_addr_str[bytes_written] = '\0';
+    ESP_LOGW(kGapTag, "Couldn't write address as string. Wrote %s",
+             out_addr_str);
+    out_addr_str[0] = '\0';
+  }
 }
 
 // Prints the provided connection description.
@@ -218,7 +224,6 @@ static int GapEventHandler(struct ble_gap_event* event,
     };
 
     case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE: {
-      // FIXME: Seems like 1M is set instead of 2M.
       ESP_LOGI(kGapTag,
                "Phy update event: conn_handle=%d status=%d tx_phy=%d rx_phy=%d",
                event->phy_updated.conn_handle, event->phy_updated.status,

@@ -1,5 +1,6 @@
 #include "limb_ble_periph.h"
 
+#include "esp_err.h"
 #include "esp_log.h"
 #include "gap.h"
 #include "host/ble_gatt.h"
@@ -15,11 +16,24 @@ static const char* const kDeviceName = "LIMBServer";
 static const char* const kTag = "LIMB BLE periph";
 
 // Performs necessary bluetooth LE setup.
-static void BleInit(void) {
+static bool BleInit(void) {
   // NimBLE stores a bunch of stuff in Non-Volatile Storage.
-  ESP_ERROR_CHECK(nvs_flash_init());
+  {
+    esp_err_t err = nvs_flash_init();
+    if (err != ESP_OK) {
+      ESP_LOGE(kTag, "Error calling nvs_flash_init: %s", esp_err_to_name(err));
+      return false;
+    }
+  }
 
-  ESP_ERROR_CHECK(nimble_port_init());
+  {
+    esp_err_t err = nimble_port_init();
+    if (err != ESP_OK) {
+      ESP_LOGE(kTag, "Error calling nimble_port_init: %s",
+               esp_err_to_name(err));
+      return false;
+    }
+  }
 
   // We need to set up some GAP and GATT stuff and set callbacks for when NimBLE
   // is started.
@@ -29,17 +43,24 @@ static void BleInit(void) {
     if (err != 0) {
       ESP_LOGE("LIMB-GAP", "failed to set device name to %s, error code: %d",
                kDeviceName, err);
+      return false;
     }
   }
 
   ble_svc_gatt_init();
   {
     int err = ble_gatts_count_cfg(get_sensor_services());
-    assert((err == 0) && "Error calling ble_gatts_count_cfg.");
+    if (err != 0) {
+      ESP_LOGE(kTag, "Error calling ble_gatts_count_cfg.");
+      return false;
+    }
   }
   {
     int err = ble_gatts_add_svcs(get_sensor_services());
-    assert((err == 0) && "Error calling ble_gatts_count_cfg.");
+    if (err != 0) {
+      ESP_LOGE(kTag, "Error calling ble_gatts_add_svcs.");
+      return false;
+    }
   }
 
   // Configure NimBLE host callbacks.
@@ -53,14 +74,17 @@ static void BleInit(void) {
   // way to call it is to first do a forward declaration.
   void ble_store_config_init(void);
   ble_store_config_init();
+
+  return true;
 }
 
 void BleTask([[maybe_unused]] void* arg) {
   ESP_LOGI(kTag, "Initializing Bluetooth...");
-  BleInit();
-
-  ESP_LOGI(kTag, "Starting Bluetooth...");
-  nimble_port_run();
+  bool success = BleInit();
+  if (success) {
+    ESP_LOGI(kTag, "Starting Bluetooth...");
+    nimble_port_run();
+  }
 
   vTaskDelete(NULL);
 }

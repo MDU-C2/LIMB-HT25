@@ -98,6 +98,7 @@ static const servo_config_t s_servo_configs[] = {
                             .name = "Wrist"},
 };
 
+[[maybe_unused]]
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   while (true) {
     can_automatically_reenable_on_bus_off();
@@ -105,6 +106,7 @@ static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   }
 }
 
+[[maybe_unused]]
 static void imu_task([[maybe_unused]] void* pvParameter) {
   uint32_t can_error_count = 0;
   esp_err_t err = ESP_OK;
@@ -340,15 +342,6 @@ void app_main() {
   }
 #endif
 
-  {
-    BaseType_t err =
-        xTaskCreate(can_rx_task, "can_rx_task", 1024 * 2 * 2, NULL, 6, NULL);
-    if (err != pdPASS) {
-      ESP_LOGE(TAG, "Failed to create imu task, err code: %d", err);
-      abort();
-    }
-  }
-
 #if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
   {
     BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
@@ -359,4 +352,13 @@ void app_main() {
     }
   }
 #endif
+
+  {
+    BaseType_t err =
+        xTaskCreate(can_rx_task, "can_rx_task", 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create imu task, err code: %d", err);
+      abort();
+    }
+  }
 }

@@ -23,7 +23,6 @@ class SocketCANInterface(CANInterface):
         self.running = False
         self.message_parser = CANMessageParser()
 
-        # TODO: Do we need this?
         self.rx_count = 0
         self.tx_count = 0
         self.error_count = 0

@@ -54,12 +54,14 @@ static const ContinuousServoConfig kUpDownServoConfig = {
     .pwm_timer = LEDC_TIMER_0,
     .pwm_channel = LEDC_CHANNEL_0,
     .name = "Shoulder up/down servo",
-    // TODO(johan): These need to be changed after testing on actual arm.
     .direction = CONTINUOUS_SERVO_DIR_REVERSE,
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
     .gear_ratio = 15.F,
+    // The servo has to fight against gravity when the potentiometer angle
+    // decreases, so the speed ends up being reduced. That's why the max
+    // speeds are different.
     .max_speed_increasing_angle = {10.F},
     .max_speed_decreasing_angle = {20.F},
     .max_accel = {15.F},
@@ -85,12 +87,14 @@ static const ContinuousServoConfig kLeftRightServoConfig = {
     .pwm_timer = LEDC_TIMER_0,
     .pwm_channel = LEDC_CHANNEL_1,
     .name = "Shoulder left/right servo",
-    // TODO(johan): These need to be changed after testing on actual arm.
     .direction = CONTINUOUS_SERVO_DIR_NORMAL,
     .motionless_pw = 1500,
     .max_capable_angular_velocity = {400},
     .max_capable_angular_velocity_pw_offset = 150,
     .gear_ratio = 15.F,
+    // The servo has to fight against gravity when the potentiometer angle
+    // increases, so the speed ends up being reduced. That's why the max
+    // speeds are different.
     .max_speed_increasing_angle = {20.F},
     .max_speed_decreasing_angle = {10.F},
     .max_accel = {15.F},
@@ -110,7 +114,6 @@ static const ContinuousServoConfig kLeftRightServoConfig = {
         },
 };
 
-// FIXME: All these need to be configured properly.
 static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .enable_gpio = STEPPER_UPPER_ARM_ROTATION_ENABLE_GPIO,
     .dir_gpio = STEPPER_UPPER_ARM_ROTATION_DIR_GPIO,
@@ -480,6 +483,7 @@ static void motors_update_task([[maybe_unused]] void* args) {
   vTaskDelete(NULL);
 }
 
+[[maybe_unused]]
 static void reenable_can_task([[maybe_unused]] void* pvParameter) {
   while (true) {
     can_automatically_reenable_on_bus_off();
@@ -567,6 +571,17 @@ void app_main(void) {
     }
   }
 
+#if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
+  {
+    BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
+                                 1024 * 2 * 2, NULL, 6, NULL);
+    if (err != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
+      abort();
+    }
+  }
+#endif
+
   {
     BaseType_t err =
         xTaskCreate(can_rx_task, "CAN rx task", 1024 * 2 * 2, NULL, 5, NULL);
@@ -584,15 +599,4 @@ void app_main(void) {
       abort();
     }
   }
-
-#if CONFIG_FORCE_REENABLE_CAN_ON_BUS_OFF
-  {
-    BaseType_t err = xTaskCreate(reenable_can_task, "reenable_can_task",
-                                 1024 * 2 * 2, NULL, 6, NULL);
-    if (err != pdPASS) {
-      ESP_LOGE(TAG, "Failed to create reenable_can_task, err code: %d");
-      abort();
-    }
-  }
-#endif
 }
