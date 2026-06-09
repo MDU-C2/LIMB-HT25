@@ -64,6 +64,7 @@ esp_err_t imu_service_start(EventGroupHandle_t event_group) {
   ImuConfig imu_hw_config = IMU_CONFIG_DEFAULT();
   imu_hw_config.sda_pin = GPIO_NUM_4;
   imu_hw_config.scl_pin = GPIO_NUM_5;
+  imu_hw_config.gyro_range = IMU_FS_G_500_DPS;
   if (imu_init(&imu_hw_config) != ESP_OK) return ESP_FAIL;
 
   // Check presence and initialize IMU 1
