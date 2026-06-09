@@ -3,9 +3,21 @@
 LIMB is a project at Mälardalen University with the aim of creating a bionic arm
 to be used in the rehabilitation process of stroke survivors.
 
+![A photo of the bionic arm built in the LIMB project](/res/bionic_arm.jpg)
+
 ## Platforms used
 
 The microcontrollers used are ESP32-C3-Zeros and the main computer is an [NVIDIA Jetson AGX Orin Developer Kit](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/).
+
+## Controlling the arm
+
+To control the arm first connect to the NVIDIA Jetson AGX Orin. See
+the [AGX Orin documentation](/docs/jetson_agx_orin.md) for more details on how to connect to it.
+Then you can use CAN messages to control the arm and get information from its sensors.
+See the [CAN documentation](/docs/can/can.md) for more details regarding sending and receiving
+CAN messages using the AGX Orin. There are various
+ready-made python scripts in the [`/src/`](/src/) directory that can be used to control the arm.
+See [`/src/README.md`](/src/README.md) for more details on how to run the python scripts.
 
 ## Structure of repository
 

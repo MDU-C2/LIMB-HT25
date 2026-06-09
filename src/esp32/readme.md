@@ -32,9 +32,13 @@ If you use a component that relies on some feature, make sure to use
 `idf.py menuconfig` to enable all necessary configurations for your program.
 For example, if your program uses NimBLE (directly or indirectly via a component),
 you have to enable NimBLE through `Component config > Bluetooth > Bluetooth > Host > NimBLE - BLE only`.
+The modules also have LIMB specific configurations in `idf.py menuconfig`
+under `LIMB config` that should be taken into account.
 
-As a general rule FreeRTOS should probably also be modified to use a 1000 Hz tick rate via menuconfig:
-`Component config > FreeRTOS > Kernel > configTICK_RATE_HZ = 1000`
+As a general rule FreeRTOS should probably also be modified to use
+a 1000 Hz tick rate via menuconfig: `Component config > FreeRTOS >
+Kernel > configTICK_RATE_HZ = 1000`. This is set by default using
+`Kconfig.projbuild` files for all modules.
 
 Once the programs should be deployed, make sure to change the optimization level from debug via menuconfig:
 `Compiler options > Optimization Level = Optimize for performance`.

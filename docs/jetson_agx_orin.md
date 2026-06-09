@@ -8,6 +8,10 @@ You can access the Orin either by connecting it to a keyboard, mouse, and monito
 ### Connecting via ssh
 You can use the USB-C port next to the 40-pin header to
 [connect to the Orin using a virtual ethernet connection](https://docs.nvidia.com/jetson/agx-orin-devkit/user-guide/howto.html#up-stream-facing-port-ufp).
+The location of the USB-C port is shown in the image below, with a white USB cable connected to it:
+
+![An image showing the USB-C port on the NVIDIA Jetson AGX Orin in the bionic arm's torso](/res/usb-c-port-for-ssh.jpg)
+
 The Orin will be given the IP address 192.168.55.1 and your computer will be given the address 192.168.55.100.
 You should then be able to `ssh` into the Orin using `ssh bigboyorin@192.168.55.1` and entering its password.
 
@@ -15,8 +19,13 @@ Connecting the Orin to your computer using the USB-C port next to the 40-pin hea
 Orin show up as a storage device that contains, among other things, some readme files regarding
 setting up the Orin. If you require more information, that is one place to check.
 
+> [!important]
+> When trying to connect to the Orin via SSH from computers running Windows, we've gotten disconnected quickly
+> after connecting with the error message `client_loop: send disconnect: Connection reset`.
+> If you run into the same problem, try connecting via macOS or Linux if possible.
+
 ## Running python
-The Orin uses an old version of Ubuntu without access to newer python versions. See [src/README.md](../src/README.md#python-on-the-agx-orin) for more information.
+The Orin uses an old version of Ubuntu without access to newer python versions. See [src/README.md](/src/README.md#python-on-the-agx-orin) for more information.
 
 ## Connecting the Orin to a CAN bus
 The Orin has two CAN controllers built-in, but no CAN transceivers.
@@ -24,7 +33,7 @@ Once the CAN transceiver has been connected to the correct pins in the
 [40-pin header](https://developer.nvidia.com/downloads/assets/embedded/secure/jetson/agx_orin/jetson_agx_orin_devkit_carrier_board_specification_sp#page=37),
 the correct registers have to be written to, CAN kernel drivers have to be enabled,
 and a virtual CAN interface has to be created. This process is taken care of by the
-[scripts/agx_setup_can.sh](../scripts/agx_setup_can.sh) script, creating the `can0`
+[scripts/agx_setup_can.sh](/scripts/agx_setup_can.sh) script, creating the `can0`
 interface for the CAN0 pins and the `can1` interface for the CAN1 pins.
 
 More information regarding setting up and using CAN on the Orin can be found in the
