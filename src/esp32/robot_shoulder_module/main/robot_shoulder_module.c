@@ -65,7 +65,6 @@ static const ContinuousServoConfig kUpDownServoConfig = {
     .max_speed_increasing_angle = {10.F},
     .max_speed_decreasing_angle = {20.F},
     .max_accel = {15.F},
-    .pot_adc_channel = POTENTIOMETER_UP_DOWN_CHANNEL,
     .potentiometer =
         (Potentiometer){
             .range_of_motion = {285.F},
@@ -98,7 +97,6 @@ static const ContinuousServoConfig kLeftRightServoConfig = {
     .max_speed_increasing_angle = {20.F},
     .max_speed_decreasing_angle = {10.F},
     .max_accel = {15.F},
-    .pot_adc_channel = POTENTIOMETER_LEFT_RIGHT_CHANNEL,
     .potentiometer =
         (Potentiometer){
             .range_of_motion = {285.F},
@@ -128,7 +126,6 @@ static const stepper_control_config_t kUpperArmRotationStepperConfig = {
     .max_speed_decreasing_angle = {40.F},
     .max_speed_increasing_angle = {40.F},
     .max_accel = {20.F},
-    .pot_adc_channel = POTENTIOMETER_ROTATION_CHANNEL,
     .pwm_channel = LEDC_CHANNEL_2,
     .pwm_timer = LEDC_TIMER_1,
     .steps_per_rev = 200,

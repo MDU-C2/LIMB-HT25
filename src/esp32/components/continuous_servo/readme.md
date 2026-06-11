@@ -54,7 +54,6 @@ static const ContinuousServoConfig kServoConfig = {
     .max_speed_decreasing_angle = {8.F},
     .max_speed_increasing_angle = {16.F},
     .max_accel = {8.F},
-    .pot_adc_channel = ADC_CHANNEL_0,
     .potentiometer =
         (Potentiometer){
             .range_of_motion = {285.F},

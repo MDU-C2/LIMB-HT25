@@ -47,8 +47,6 @@ typedef struct {
   // 1 turn).
   float gear_ratio;
 
-  // The ADC channel used for the servo's potentiometer.
-  adc_channel_t pot_adc_channel;
   // The configuration/calibration of the servo's potentiometer.
   Potentiometer potentiometer;
 
