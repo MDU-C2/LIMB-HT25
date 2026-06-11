@@ -50,6 +50,9 @@ The program can also be configured to not use the IMU by running `idf.py menucon
 
 The stepper motor is a [Joy-IT NEMA17-04](https://joy-it.net/en/products/NEMA17-04)
 controlled using a [Pololu DRV8825 stepper motor driver](https://www.pololu.com/product/2133).
+The stepper driver is current limited to 1 A by setting the reference voltage to
+0.5 V using the process explained on its [product
+page](https://www.pololu.com/product/2133).
 
 ## Motor joint and speed limits in CAN actuation messages
 
