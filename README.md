@@ -1,7 +1,10 @@
 # LIMB
 
-LIMB is a project at Mälardalen University with the aim of creating a bionic arm
-to be used in the rehabilitation process of stroke survivors.
+LIMB is a student project at [Mälardalen University](https://www.mdu.se/) with the aim of creating a bionic arm
+to be used in the rehabilitation process of stroke survivors. The arm was
+developed in collaboration with [Universidad de Antioquia](http://www.udea.edu.co/),
+[Universidad Tecnológica de Panamá](https://utp.ac.pa/), and
+[UC Berkeley](https://www.berkeley.edu/).
 
 ![A photo of the bionic arm built in the LIMB project](/res/bionic_arm.jpg)
 

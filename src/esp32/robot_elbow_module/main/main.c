@@ -61,7 +61,6 @@ static const stepper_control_config_t s_elbow_stepper_cfg = {
     .max_speed_decreasing_angle = {40.0F},
     .max_speed_increasing_angle = {40.0F},
     .max_accel = {20.0F},
-    .pot_adc_channel = ADC_ELBOW_CHANNEL,
     .pwm_channel = PWM_ELBOW_CHANNEL,
     .pwm_timer = PWM_ELBOW_TIMER,
     .potentiometer =

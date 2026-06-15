@@ -322,9 +322,8 @@ esp_err_t stepper_init(const stepper_control_config_t* cfg,
       clamp_potentiometer_angle(&ctx.cfg.potentiometer, ctx.current_angle);
   ctx.use_position_feedback = true;
 
-  ESP_LOGI(TAG,
-           "Potentiometer initialized: ADC channel=%d, raw=%u, angle=%.2f deg",
-           cfg->pot_adc_channel, latest_potentiometer_adc_value, initial_angle);
+  ESP_LOGI(TAG, "Potentiometer initialized: raw=%u, angle=%.2f deg",
+           latest_potentiometer_adc_value, initial_angle);
 
   // Initialize motion state
   ctx.estop_active = false;

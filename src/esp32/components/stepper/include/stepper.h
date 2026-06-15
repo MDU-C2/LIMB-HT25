@@ -63,9 +63,6 @@ typedef struct {
 
   // Position feedback
 
-  // ADC channel for potentiometer (use -1 or value >= SOC_ADC_MAX_CHANNEL_NUM
-  // if not used)
-  adc_channel_t pot_adc_channel;
   // The potentiometer configuration/calibration used with the stepper.
   Potentiometer potentiometer;
 

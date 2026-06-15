@@ -46,7 +46,6 @@ const ContinuousServoConfig servo_config = {
     .motionless_pw = 1500,
     .max_velocity = {30.F},
     .max_accel = {10.F},
-    .pot_adc_channel = SERVO_POT_ADC_CHANNEL,
     .potentiometer =
         (Potentiometer){
             .range_of_motion = {285.F},
